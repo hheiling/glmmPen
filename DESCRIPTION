@@ -23,3 +23,5 @@ Packaged: 2019-01-25 20:03:59 UTC; hheiling
 Author: Hillary Heiling [aut, cre],
   Naim Rashid [aut],
   Quefeng Li [aut]
+Suggests: 
+    testthat
