@@ -1,0 +1,25 @@
+Package: glmmPen
+Type: Package
+Title: High Dimensional Penalized Generalized Linear Mixed Models
+        (pGLMM)
+Version: 1.2.0
+Date: 2018-10-26
+Authors@R: c(
+    person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
+    person("Naim", "Rashid", email = "naim@unc.edu", role = c("aut")),
+    person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")))
+Maintainer: Hillary Heiling <hheiling@live.unc.edu>
+Description: Fits penalized high and low dimensional generalized linear mixed models using 
+    the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm and coordinate descent. 
+    Supports fitting of logistic regression models and MCP penalties.
+License: GPL (>= 2)
+Encoding: UTF-8
+Depends: lme4, irr, ncvreg, mvtnorm, ROCR, grpreg, glmnet, inline, bigalgebra,
+    Rcpp, RcppArmadillo, bigmemory, BH
+LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH
+RoxygenNote: 6.1.0.9000
+NeedsCompilation: yes
+Packaged: 2019-01-25 20:03:59 UTC; hheiling
+Author: Hillary Heiling [aut, cre],
+  Naim Rashid [aut],
+  Quefeng Li [aut]
