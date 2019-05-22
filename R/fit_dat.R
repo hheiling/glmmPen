@@ -14,6 +14,9 @@ fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC =
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = F, maxitEM = 100, 
                    pnonzerovar = 0, ufullinit = NULL){
   
+  # Things to address:
+  ## Already deal with family modification in 'wrapper' function glmmPen
+  ## In dat, what should pnonzero be?
   
   ## added nov 4th 2016 for simulation purposes only to set small penalties to 0
   if(lambda0_scad <=10^-6) lambda0_scad = 0

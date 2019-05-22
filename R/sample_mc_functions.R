@@ -1,5 +1,9 @@
 #' @export
 sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex ){
+  # Things to address:
+  ## Will already deal with family specification in glmmPen, can remove family adjustments here
+  ## Will need to make sure family "if else" statements are consistent 
+  
   
   if(family == "binomial"){
     f = binomial()
