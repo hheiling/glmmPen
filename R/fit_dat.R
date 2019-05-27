@@ -31,14 +31,16 @@ fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC =
   lambda1 = lambda1_scad
   lambda0 = lambda0_scad
   
-  if(family == "binomial"){
-    f = binomial()
-  }else if(family == "poisson"){
-    f = poisson()
-  }else{
-    print(family)
-    stop("family not specified properly")
-  }
+  f = get(family, mode = "function", envir = parent.frame())
+  # Deleted commented section below later: already have restriction on family in glmmPen()
+  # if(family == "binomial"){
+  #   f = binomial()
+  # }else if(family == "poisson"){
+  #   f = poisson()
+  # }else{
+  #   print(family)
+  #   stop("family not specified properly")
+  # }
   
   #group = factor(apply(Z[,1:2], 1, FUN = function(x) which(x == 1))) #as.numeric(Z[,1])
   d = nlevels(factor(group))
