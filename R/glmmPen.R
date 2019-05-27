@@ -8,6 +8,8 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Things to address / Questions to answer:
   ## dat$pnonzero and pnonzerovar should equal ... ?
   ## Add option for different penalties
+  ## Specify what fit_dat output will be
+  ## Provide option for offset, weights
   
   # Input modification and restriction for family
   if(is.character(family)){
@@ -26,15 +28,6 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   if(class(data) != "data.frame"){
     stop("data must be of class 'data.frame'")
   }
-  # if(!(group %in% colnames(data))){
-  #   stop("'group' must be a column in data")
-  # }
-  # group = data$groupID
-  # if(!is.vector(group) | !is.numeric(group) | !is.factor(group)){
-  #   stop("'group' must be a numeric factor vector")
-  #   # What exactly does the group vector need to be like?
-  # }
-
   if(sum(c(nMC, nMC_max, maxitEM) %% 1) > 0 | sum(c(nMC, nMC_max, maxitEM) <= 0) > 0){
     stop("nMC, nMC_max, and maxitEM must be positive integers")
   }
@@ -44,10 +37,6 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   if(lambda0 < 0 | lambda1 < 0){
     stop("lambda0 and lambda1 cannot be negative")
   }
-
-  # Other processing - match.call
-  # call = match.call(expand.dots = F)
-  # Needs work? What does this do, and how can it be used properly?
 
   # Deal with NAs
   if(na.action == "na.omit"){ # Need to use character? Is na.action a function? ...
@@ -60,7 +49,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Convert formula and data to useful forms to plug into fit_dat
   ## substitute | for +
   mod_frame_full = subbars(formula)
-  # Add offset = offset, weights = weights in model.frame function?
+  ## Add offset = offset, weights = weights in model.frame function?
   frame_full = model.frame(mod_frame_full, data = data)
 
   ## Identify random effects
@@ -84,10 +73,10 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Problem if variable specified in formula is the intercept / a constant column 
   # and -1 not included in formula
   constant_cols = X[,apply(X, 2, var, na.rm=TRUE) == 0]
-  if(ncol(constant_cols) > 1){
-    stop("Variable(s) in formula has zero variance (constant column) \n
+  if(class(constant_cols) == "data.frame"){ # If true, more than one column with zero variance
+    stop("Variable(s) in formula has zero variance (constant column).
          Either remove this variable from formula or specify -1 in formula")
-  }
+  } # If only one column, class(constant_cols) == "numeric"
 
   ## Make sure colnames random effects subset of colnames X
   cnms = reGrpList$cnms[[1]]
@@ -113,7 +102,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   coef_names = list(fixed = colnames(X), random = cnms, group = group_name)
   
   # Things that should be included in call:
-  ## formula, data, group, offset, weights, Y, X, Z, (and associated colnames of y, X, Z)
+  ## formula, data, any other items included in glmmPen function call
   call = match.call(expand.dots = F)
 
   # Call fit_dat function - adjust to use match.call object?
@@ -124,15 +113,15 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
                    pnonzerovar = ncol(Z), maxitEM = maxitEM, alpha = alpha)
   
   # Things that should be included in fit_dat:
-  ## beta (fixed effect coefficients), alpha (random effect coefficients), 
-  ## Gamma (random effect covariance matrix), u (gibbs mcmc matrix), BIC_ICQ, 
-  ## penalty (penalty parameter results), iter (number iterations), conv (did algorithm converge?),
-  ## other ... ?
+  ## (fill in later)
 
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = Y, X = X, Z = Z,
-                       group = group, offset = offset, weights = weights))
+                       group = group, coef_names = coef_names, family = family,
+                       offset = offset, weights = weights))
+
   
-  return(fit)
+  out_object = pglmmObj$new(output)
+  return(out_object)
 
   }
