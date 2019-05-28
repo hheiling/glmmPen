@@ -1,7 +1,7 @@
 # Setting class definitions
 
 #' @export
-setRefClass("pglmmObj",
+pglmmObj = setRefClass("pglmmObj",
             fields = list(
               fixef = "numeric", # fixed effects coefficients
               ranef = "data.frame", # random effects coefficients
