@@ -1,5 +1,4 @@
 ##' @export
-
 glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
                   offset = NULL, weights = NULL, # penalty,
                   lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T, gibbs = T,
@@ -73,6 +72,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Problem if variable specified in formula is the intercept / a constant column 
   # and -1 not included in formula
   constant_cols = X[,apply(X, 2, var, na.rm=TRUE) == 0]
+  ## Change to matrix (X not data.frame)
   if(class(constant_cols) == "data.frame"){ # If true, more than one column with zero variance
     stop("Variable(s) in formula has zero variance (constant column).
          Either remove this variable from formula or specify -1 in formula")
