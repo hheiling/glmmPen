@@ -4,19 +4,20 @@
 # Properties: 
 ## Reference Class object
 
-fixef = function(object){
-  UseMethod("fixef")
-}
+# fixef = function(object){
+#   UseMethod("fixef")
+# }
 
 ##' @S3method fixef pglmmObj
 fixef.pglmmObj = function(object){
   object$fixef
 }
 
-ranef = function(object){
-  UseMethod("ranef")
-}
+# ranef = function(object){
+#   UseMethod("ranef")
+# }
 
+##' @S3method ranef pglmmObj
 ranef.pglmmObj = function(object){
   object$ranef
 }
@@ -47,18 +48,21 @@ coefGlmmPen = function(object){
 ##' @S3method coef pglmmObj
 coef.pglmmObj = coefGlmmPen
 
-family = function(object){
-  UseMethod{"family"}
-}
+# family = function(object){
+#   UseMethod{"family"}
+# }
 
+##' @importFrom stats family
+##' @S3method family pglmmObj
 family.pglmmObj = function(object){
   object$family
 }
 
-nobs = function(object){
-  UseMethod("nobs")
-}
+# nobs = function(object){
+#   UseMethod("nobs")
+# }
 
+##' @S3method nobs pglmmObj
 nobs.pglmmObj = function(object){
   nrows(object$X)
 }
@@ -71,10 +75,12 @@ nobs.pglmmObj = function(object){
 #   
 # }
 
-fitted = function(object){
-  UseMethod("fitted")
-}
+# fitted = function(object){
+#   UseMethod("fitted")
+# }
 
+##' @importFrom stats fitted
+##' @S3method fitted pglmmObj
 fitted.pglmmObj = function(object){
   X = object$X
   Z = object$Z
