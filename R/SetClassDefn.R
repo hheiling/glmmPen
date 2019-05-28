@@ -1,6 +1,6 @@
 # Setting class definitions
 
-##' @export
+#' @export
 pglmmObj = setRefClass("pglmmObj",
             fields = list(
               fixef = "numeric", # fixed effects coefficients
