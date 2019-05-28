@@ -31,6 +31,8 @@ factorize <- function(x,frloc,char.only=FALSE) {
   return(frloc)
 }
 
+##' @importFrom Matrix sparseMatrix
+##' @importMethodsFrom Matrix t diag
 ##' @export
 mkBlist_glmmPen <- function(x,frloc, drop.unused.levels=TRUE,
                             reorder.vars=FALSE) {
@@ -73,6 +75,8 @@ mkBlist_glmmPen <- function(x,frloc, drop.unused.levels=TRUE,
   list(ff = ff, sm = sm, nl = nl, cnms = colnames(mm))
 }
 
+##' @importFrom Matrix sparseMatrix drop0
+##' @importMethodsFrom Matrix coerce rbind
 ##' @export
 mkReTrms_glmmPen <- function(bars, fr, drop.unused.levels=TRUE,
                              reorder.terms=TRUE,
