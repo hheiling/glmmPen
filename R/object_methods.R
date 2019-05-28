@@ -32,37 +32,41 @@ ranef.pglmmObj = function(object){
 #   return(coefficients)
 # }
 
-coefMer <- function(object, ...){
-  # Direct copy from lme4 source code
-  if (length(list(...)))
-    warning('arguments named "', paste(names(list(...)), collapse = ", "),
-            '" ignored')
-  fef <- data.frame(rbind(fixef(object)), check.names = FALSE)
-  ref <- ranef(object)
-  ## check for variables in RE but missing from FE, fill in zeros in FE accordingly
-  refnames <- unlist(lapply(ref,colnames))
-  nmiss <- length(missnames <- setdiff(refnames,names(fef)))
-  if (nmiss > 0) {
-    fillvars <- setNames(data.frame(rbind(rep(0,nmiss))),missnames)
-    fef <- cbind(fillvars,fef)
-  }
-  val <- lapply(ref, function(x)
-    fef[rep.int(1L, nrow(x)),,drop = FALSE])
-  for (i in seq(a = val)) {
-    refi <- ref[[i]]
-    row.names(val[[i]]) <- row.names(refi)
-    nmsi <- colnames(refi)
-    if (!all(nmsi %in% names(fef)))
-      stop("unable to align random and fixed effects")
-    for (nm in nmsi) val[[i]][[nm]] <- val[[i]][[nm]] + refi[,nm]
-  }
-  class(val) <- "coef.mer"
-  val
-} ##  {coefMer}
+# coefMer <- function(object, ...){
+#   # Direct copy from lme4 source code
+#   if (length(list(...)))
+#     warning('arguments named "', paste(names(list(...)), collapse = ", "),
+#             '" ignored')
+#   fef <- data.frame(rbind(fixef(object)), check.names = FALSE)
+#   ref <- ranef(object)
+#   ## check for variables in RE but missing from FE, fill in zeros in FE accordingly
+#   refnames <- unlist(lapply(ref,colnames))
+#   nmiss <- length(missnames <- setdiff(refnames,names(fef)))
+#   if (nmiss > 0) {
+#     fillvars <- setNames(data.frame(rbind(rep(0,nmiss))),missnames)
+#     fef <- cbind(fillvars,fef)
+#   }
+#   val <- lapply(ref, function(x)
+#     fef[rep.int(1L, nrow(x)),,drop = FALSE])
+#   for (i in seq(a = val)) {
+#     refi <- ref[[i]]
+#     row.names(val[[i]]) <- row.names(refi)
+#     nmsi <- colnames(refi)
+#     if (!all(nmsi %in% names(fef)))
+#       stop("unable to align random and fixed effects")
+#     for (nm in nmsi) val[[i]][[nm]] <- val[[i]][[nm]] + refi[,nm]
+#   }
+#   class(val) <- "coef.mer"
+#   val
+# } ##  {coefMer}
 
-#' @importFrom stats coef
+# @importFrom stats coef
+# @export
+# coef.pglmmObj = coefMer
+
+#' @importFrom lme4 coef.merMod
 #' @export
-coef.pglmmObj = coefMer
+coef.pglmmObj = coef.merMod
 
 #' @importFrom stats family
 #' @export
@@ -94,6 +98,12 @@ fitted.pglmmObj = function(object){
   
   mu = X %*% beta + Z %*% gamma
   return(mu)
+}
+
+#' @importFrom stats formula
+#' @export
+formula.pglmmObj = function(object){
+  object$formula
 }
 
 # Functions to add:
