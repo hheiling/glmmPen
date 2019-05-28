@@ -16,9 +16,11 @@ ranef.pglmmObj = function(object){
 
 coefGlmmPen = function(object){
   # Find combined coefficients
+  ## Borrowed some code elements from coef.merMod in lme4
   
   fixef = data.frame(rbind(object$fixef), check.names = F)
   ranef = object$ranef
+  group = object$group
   
   # check for variables in RE but missing from FE, fill in zeros in FE accordingly
   refnames = unlist(lapply(ranef,colnames))
@@ -42,37 +44,10 @@ coefGlmmPen = function(object){
     }
   }
   
+  rownames(output) = levels(group)
   return(output)
   
 }
-
-# coefMer <- function(object, ...){
-#   # Direct copy from lme4 source code
-#   if (length(list(...)))
-#     warning('arguments named "', paste(names(list(...)), collapse = ", "),
-#             '" ignored')
-#   fef <- data.frame(rbind(fixef(object)), check.names = FALSE)
-#   ref <- ranef(object)
-#   ## check for variables in RE but missing from FE, fill in zeros in FE accordingly
-#   refnames <- unlist(lapply(ref,colnames))
-#   nmiss <- length(missnames <- setdiff(refnames,names(fef)))
-#   if (nmiss > 0) {
-#     fillvars <- setNames(data.frame(rbind(rep(0,nmiss))),missnames)
-#     fef <- cbind(fillvars,fef)
-#   }
-#   val <- lapply(ref, function(x)
-#     fef[rep.int(1L, nrow(x)),,drop = FALSE])
-#   for (i in seq(a = val)) {
-#     refi <- ref[[i]]
-#     row.names(val[[i]]) <- row.names(refi)
-#     nmsi <- colnames(refi)
-#     if (!all(nmsi %in% names(fef)))
-#       stop("unable to align random and fixed effects")
-#     for (nm in nmsi) val[[i]][[nm]] <- val[[i]][[nm]] + refi[,nm]
-#   }
-#   class(val) <- "coef.mer"
-#   val
-# } 
 
 #' @importFrom stats coef
 #' @export
