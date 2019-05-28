@@ -125,7 +125,7 @@ mkReTrms_glmmPen <- function(bars, fr, drop.unused.levels=TRUE,
   thoff <- cumsum(c(0L, nth))           # offsets into theta
   
   Lambdat <-
-    t(do.call(sparseMatrix,
+    Matrix::t(do.call(sparseMatrix,
               do.call(rbind,
                       lapply(seq_along(blist), function(i)
                       {
