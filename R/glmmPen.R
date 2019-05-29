@@ -108,7 +108,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Call fit_dat function - adjust to use match.call object?
   # fit_dat object found in "/R/fit_dat.R" file
   fit = fit_dat(dat = data_input, lambda0_scad = lambda0, lambda1_scad = lambda1, nMC = nMC,
-                   family = family, group = reGrpList$flist, trace = trace, vartol = vartol,
+                   family = family, group = group, trace = trace, vartol = vartol,
                    conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
                    pnonzerovar = ncol(Z), maxitEM = maxitEM, alpha = alpha)
   
@@ -117,7 +117,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
 
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = Y, X = X, Z = Z,
-                       group = group, coef_names = coef_names, family = family,
+                       group = reGrpList$flist, coef_names = coef_names, family = family,
                        offset = offset, weights = weights))
 
   
