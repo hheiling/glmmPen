@@ -31,6 +31,7 @@ pglmmObj = setRefClass("pglmmObj",
                 group <<- x$group
                 ## For now, assume only one group designation allowed
                 d = lapply(group, function (j) nlevels(j))[[1]]
+                levs = lapply(group, function(j) levels(j))[[1]]
                 
                 # y, X, Z
                 y <<- x$Y
@@ -67,7 +68,7 @@ pglmmObj = setRefClass("pglmmObj",
                 rand = colMeans(gibbs_mcmc)
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
-                rownames(ref) = lapply(group, function(j) levels(j))
+                rownames(ref) = levs
                 colnames(ref) = x$coef_names$random
                 ranef <<- lapply(group, function(j) ref)
                 
