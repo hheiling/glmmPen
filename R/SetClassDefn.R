@@ -4,9 +4,9 @@
 pglmmObj = setRefClass("pglmmObj",
             fields = list(
               fixef = "numeric", # fixed effects coefficients
-              ranef = "data.frame", # random effects coefficients
+              ranef = "list", # random effects coefficients
               # coefficients = "numeric", # sum of fixed and random effects coefficients
-              group = "factor",
+              group = "list",
               covar = "matrix",
               gibbs_mcmc = "matrix",
               family = "character",
@@ -19,7 +19,8 @@ pglmmObj = setRefClass("pglmmObj",
               formula = "formula",
               y = "numeric",
               X = "matrix",
-              Z = "matrix"
+              Z = "matrix",
+              penalty = "character"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -28,7 +29,8 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 # Group
                 group <<- x$group
-                d = nlevels(group)
+                ## For now, assume only one group designation allowed
+                d = lapply(group, function (j) nlevels(j))[[1]]
                 
                 # y, X, Z
                 y <<- x$Y
@@ -64,16 +66,17 @@ pglmmObj = setRefClass("pglmmObj",
                 # Random effects
                 rand = colMeans(gibbs_mcmc)
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
-                ranef <<- as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
-                rownames(ranef) <<- levels(x$group)
-                colnames(ranef) <<- x$coef_names$random
+                ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
+                rownames(ref) = lapply(group, function(j) levels(j))
+                colnames(ref) = x$coef_names$random
+                ranef <<- lapply(group, function(j) ref)
                 
                 family <<- x$family
                 J <<- x$J
                 formula <<- x$formula
                 call <<- x$call
                 # BIC_ICQ <<- x$BIC
-                # penalty <<- x$penalty
+                penalty <<- x$penalty
                 
               }
             ))

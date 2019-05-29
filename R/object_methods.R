@@ -30,7 +30,7 @@ coefGlmmPen = function(object){
     fixef = cbind(fillvars,fixef)
   }
   
-  output = fixef[rep.int(1L, nrow(ranef)), , drop = FALSE]
+  output = lapply(ranef, function(j) fixef[rep.int(1L, nrow(j)), , drop = FALSE])
   
   for (i in seq(a = output)){
     refi <- ranef[[i]]

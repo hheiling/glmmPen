@@ -76,7 +76,7 @@ mkBlist_glmmPen <- function(x,frloc, drop.unused.levels=TRUE,
 }
 
 ##' @importFrom Matrix sparseMatrix drop0
-##' @importMethodsFrom Matrix coerce rbind
+##' @importMethodsFrom Matrix coerce
 ##' @export
 mkReTrms_glmmPen <- function(bars, fr, drop.unused.levels=TRUE,
                              reorder.terms=TRUE,
