@@ -19,7 +19,8 @@ pglmmObj = setRefClass("pglmmObj",
               formula = "formula",
               y = "numeric",
               X = "matrix",
-              Z = "matrix"
+              Z = "matrix",
+              frame = "data.frame"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -32,10 +33,11 @@ pglmmObj = setRefClass("pglmmObj",
                 d = lapply(group, function (j) nlevels(j))[[1]]
                 levs = lapply(group, function(j) levels(j))[[1]]
                 
-                # y, X, Z
+                # y, X, Z, frame
                 y <<- x$Y
                 X <<- x$X
                 Z <<- x$Z
+                frame <<- x$frame
                 
                 # Fixed effects coefficients
                 p = ncol(X)
@@ -63,7 +65,7 @@ pglmmObj = setRefClass("pglmmObj",
                 gibbs_mcmc <<- x$u 
                 # colnames(gibbs_mcmc) = 
                 
-                # Random effects
+                # Random effects coefficients
                 rand = colMeans(gibbs_mcmc)
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )

@@ -248,7 +248,7 @@ glmmPen_test = function(formula, data, family = "binomial", na.action = "na.omit
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = Y, X = X, Z = Z,
                        group = reGrpList$flist, coef_names = coef_names, family = family,
-                       offset = offset, weights = weights))
+                       offset = offset, weights = weights, frame = frame_full))
   
   
   out_object = pglmmObj$new(output)
