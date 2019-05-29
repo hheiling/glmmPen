@@ -20,7 +20,6 @@ pglmmObj = setRefClass("pglmmObj",
               y = "numeric",
               X = "matrix",
               Z = "matrix"
-              # penalty = "character"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
