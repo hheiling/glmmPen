@@ -124,14 +124,14 @@ model.frame.pglmmObj = function(object, fixed.only = F){
   return(frame)
 }
 
-randomListRaw = function(object){
-  bars = findbars(object$formula)
-  ref = ranef(object)
-  vars.random = lapply(ref, function(j) as.factor(colnames(j)))
-  # Assumption: only one group allowed
-  frame_rand = lapply(bars, function(j) object$frame[vars.random[[j]]])
-  return(frame_rand)
-}
+# randomListRaw = function(object){
+#   # Assumption: only one group allowed
+#   bars = findbars(object$formula)
+#   ref = ranef(object)
+#   vars.random = lapply(ref, function(j) colnames(j))
+#   frame_rand = lapply(bars, function(j) object$frame[as.factor(vars.random[[j]])])
+#   return(frame_rand)
+# }
 
 #' @importFrom stats model.matrix
 #' @export
@@ -142,7 +142,7 @@ model.matrix.pglmmObj = function(object, type = c("fixed", "random", "randomList
   switch(type[1],
          "fixed" = object$X,
          "random" = Matrix(object$Z, sparse = T),
-         "randomListRaw" = randomListRaw(object))
+         "randomListRaw" = stop("'randomListRaw' option not available at this time"))
   }
 
 # Functions to add:
