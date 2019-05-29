@@ -19,8 +19,8 @@ pglmmObj = setRefClass("pglmmObj",
               formula = "formula",
               y = "numeric",
               X = "matrix",
-              Z = "matrix",
-              penalty = "character"
+              Z = "matrix"
+              # penalty = "character"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -77,7 +77,7 @@ pglmmObj = setRefClass("pglmmObj",
                 formula <<- x$formula
                 call <<- x$call
                 # BIC_ICQ <<- x$BIC
-                penalty <<- x$penalty
+                # penalty <<- x$penalty
                 
               }
             ))
