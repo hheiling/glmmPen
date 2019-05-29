@@ -100,8 +100,7 @@ formula.pglmmObj = function(object, fixed.only = F, random.only = F){
   }
   if(fixed.only){
     formula = nobars(form)
-  }
-  if(random.only){
+  }else if(random.only){
     formula = reOnly(form, response = T)
   }else{
     formula = form
@@ -128,7 +127,7 @@ model.frame.pglmmObj = function(object, fixed.only = F){
 randomListRaw = function(object){
   bars = findbars(object$formula)
   ref = ranef(object)
-  vars.random = lapply(ref, function(j) colnames(j))
+  vars.random = lapply(ref, function(j) as.factor(colnames(j)))
   # Assumption: only one group allowed
   frame_rand = lapply(bars, function(j) object$frame[vars.random[[j]]])
   return(frame_rand)
