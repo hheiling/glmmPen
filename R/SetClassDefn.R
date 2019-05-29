@@ -4,9 +4,9 @@
 pglmmObj = setRefClass("pglmmObj",
             fields = list(
               fixef = "numeric", # fixed effects coefficients
-              ranef = "data.frame", # random effects coefficients
+              ranef = "list", # random effects coefficients
               # coefficients = "numeric", # sum of fixed and random effects coefficients
-              group = "factor",
+              group = "list",
               covar = "matrix",
               gibbs_mcmc = "matrix",
               family = "character",
@@ -19,7 +19,8 @@ pglmmObj = setRefClass("pglmmObj",
               formula = "formula",
               y = "numeric",
               X = "matrix",
-              Z = "matrix"
+              Z = "matrix",
+              frame = "data.frame"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -28,12 +29,15 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 # Group
                 group <<- x$group
-                d = nlevels(group)
+                ## For now, assume only one group designation allowed
+                d = lapply(group, function (j) nlevels(j))[[1]]
+                levs = lapply(group, function(j) levels(j))[[1]]
                 
-                # y, X, Z
+                # y, X, Z, frame
                 y <<- x$Y
                 X <<- x$X
                 Z <<- x$Z
+                frame <<- x$frame
                 
                 # Fixed effects coefficients
                 p = ncol(X)
@@ -61,12 +65,13 @@ pglmmObj = setRefClass("pglmmObj",
                 gibbs_mcmc <<- x$u 
                 # colnames(gibbs_mcmc) = 
                 
-                # Random effects
+                # Random effects coefficients
                 rand = colMeans(gibbs_mcmc)
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
-                ranef <<- as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
-                rownames(ranef) <<- levels(x$group)
-                colnames(ranef) <<- x$coef_names$random
+                ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
+                rownames(ref) = levs
+                colnames(ref) = x$coef_names$random
+                ranef <<- lapply(group, function(j) ref)
                 
                 family <<- x$family
                 J <<- x$J

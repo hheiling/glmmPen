@@ -16,7 +16,7 @@ ranef.pglmmObj = function(object){
 
 coefGlmmPen = function(object){
   # Find combined coefficients
-  ## Borrowed some code elements from coef.merMod in lme4
+  ## Borrowed code elements from coef.merMod in lme4
   
   fixef = data.frame(rbind(object$fixef), check.names = F)
   ranef = object$ranef
@@ -30,7 +30,7 @@ coefGlmmPen = function(object){
     fixef = cbind(fillvars,fixef)
   }
   
-  output = fixef[rep.int(1L, nrow(ranef)), , drop = FALSE]
+  output = lapply(ranef, function(j) fixef[rep.int(1L, nrow(j)), , drop = FALSE])
   
   for (i in seq(a = output)){
     refi <- ranef[[i]]
@@ -44,7 +44,6 @@ coefGlmmPen = function(object){
     }
   }
   
-  rownames(output) = levels(group)
   return(output)
   
 }
@@ -85,11 +84,66 @@ fitted.pglmmObj = function(object){
   return(mu)
 }
 
+reOnly <- function(f, response=FALSE) {
+  # Copied from lme4 source code (predict.R)
+  reformulate(paste0("(", vapply(findbars(f), safeDeparse, ""), ")"),
+              response = if(response && length(f)==3L) f[[2]])
+}
+
 #' @importFrom stats formula
 #' @export
-formula.pglmmObj = function(object){
-  object$formula
+formula.pglmmObj = function(object, fixed.only = F, random.only = F){
+  form = object$formula
+  frame = object$frame
+  if(fixed.only && random.only){
+    stop("cannot specify both 'fixed.only' and 'random.only")
+  }
+  if(fixed.only){
+    formula = nobars(form)
+  }else if(random.only){
+    formula = reOnly(form, response = T)
+  }else{
+    formula = form
+  }
+  
+  return(formula)
+  
 }
+
+#' @importFrom stats model.frame
+#' @export
+model.frame.pglmmObj = function(object, fixed.only = F){
+  frame = object$frame
+  # Borrowed some code from lme4
+  if(fixed.only){
+    form = formula(object, fixed.only = T)
+    vars.fixed = rownames(attr(terms.formula(form), "factors"))
+    frame = frame[vars.fixed]
+  }
+  
+  return(frame)
+}
+
+# randomListRaw = function(object){
+#   # Assumption: only one group allowed
+#   bars = findbars(object$formula)
+#   ref = ranef(object)
+#   vars.random = lapply(ref, function(j) colnames(j))
+#   frame_rand = lapply(bars, function(j) object$frame[as.factor(vars.random[[j]])])
+#   return(frame_rand)
+# }
+
+#' @importFrom stats model.matrix
+#' @export
+model.matrix.pglmmObj = function(object, type = c("fixed", "random", "randomListRaw")) {
+  # if(length(type) > 1){
+  #   warning("only the first element of 'type' will be used")
+  # }
+  switch(type[1],
+         "fixed" = object$X,
+         "random" = Matrix(object$Z, sparse = T),
+         "randomListRaw" = stop("'randomListRaw' option not available at this time"))
+  }
 
 # Functions to add:
 ## offset() - will not have $offset option
