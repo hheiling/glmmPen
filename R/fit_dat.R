@@ -8,7 +8,7 @@
 #' observation
 #' 
 #' @export
-fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC = 1000, 
+fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
                    family = "binomial", type = "hmmcov", trace = 0, initcov = NULL, 
                    glmIALconv = 1e-12, d = 2, group, alpha = 1, vartol = 0.1, nMC_max = 5000, 
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = F, maxitEM = 100, 
@@ -19,8 +19,8 @@ fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC =
   ## In dat, what should pnonzero be?
   
   ## added nov 4th 2016 for simulation purposes only to set small penalties to 0
-  if(lambda0_scad <=10^-6) lambda0_scad = 0
-  if(lambda1_scad <=10^-6) lambda1_scad = 0
+  if(lambda0 <=10^-6) lambda0 = 0
+  if(lambda1 <=10^-6) lambda1 = 0
   ##
   
   y = dat$y
@@ -28,8 +28,8 @@ fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC =
   Z = as.matrix(dat$Z)
   group = dat$group
   p1 = dat$pnonzero
-  lambda1 = lambda1_scad
-  lambda0 = lambda0_scad
+  lambda1 = lambda1
+  lambda0 = lambda0
   
   f = get(family, mode = "function", envir = parent.frame())
   # Deleted commented section below later: already have restriction on family in glmmPen()
@@ -45,21 +45,22 @@ fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC =
   #group = factor(apply(Z[,1:2], 1, FUN = function(x) which(x == 1))) #as.numeric(Z[,1])
   d = nlevels(factor(group))
   # fit all data using glmer from lme4 package
-  if(ncol(X) < 5){
-    if(ncol(Z) > d){
-      fit_glmer = try(glmer(y ~ X-1 + (X-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-    }else{
-      fit_glmer = try(glmer(y ~ X-1 + (1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-    }
-    # fit true (oracle) model
-    fit_glmer_oracle = fit_glmer #glmer(y ~ X[,1:(p1+1)]-1 + (X[,1:(p1+1)]-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
-    
-  }else{
-    
-    # fit true (oracle) model
-    fit_glmer = fit_glmer_oracle = try(glmer(y ~ X[,1:(p1+1+pnonzerovar)]-1 + (X[,1:(p1+1+pnonzerovar)]-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-    
-  }
+  ## Note: delete all references to these variables (and references to pnonzervar)
+  # if(ncol(X) < 5){
+  #   if(ncol(Z) > d){
+  #     fit_glmer = try(glmer(y ~ X-1 + (X-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
+  #   }else{
+  #     fit_glmer = try(glmer(y ~ X-1 + (1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
+  #   }
+  #   # fit true (oracle) model
+  #   fit_glmer_oracle = fit_glmer #glmer(y ~ X[,1:(p1+1)]-1 + (X[,1:(p1+1)]-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+  #   
+  # }else{
+  #   
+  #   # fit true (oracle) model
+  #   fit_glmer = fit_glmer_oracle = try(glmer(y ~ X[,1:(p1+1+pnonzerovar)]-1 + (X[,1:(p1+1+pnonzerovar)]-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
+  #   
+  # }
   print("end glmer")
   
   if(is.character(fit_glmer_oracle)){
@@ -456,7 +457,7 @@ fit_dat = function(dat,  lambda0_scad = 0, lambda1_scad = 0, conv = 0.001, nMC =
     gc()
   }
   
-  if(ncol(X) - 1 == p1 | (lambda0_scad == 0 & lambda1_scad == 0) ){
+  if(ncol(X) - 1 == p1 | (lambda0 == 0 & lambda1 == 0) ){
     fin =   cbind(summary(fit_glmer)$coefficients[-1,1], coef[2:ncol(X)])
     colnames(fin) = c("glmer_full","MCEM_pen")
   }else{
