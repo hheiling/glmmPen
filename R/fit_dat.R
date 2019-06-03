@@ -12,7 +12,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                    family = "binomial", trace = 0,
                    glmIALconv = 1e-12, d = 2, group, alpha = 1, vartol = 0.1, nMC_max = 5000, 
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = F, maxitEM = 100, 
-                   pnonzerovar = 0, ufullinit = NULL){
+                   ufullinit = NULL){
   
   # Things to address:
   ## Already deal with family modification in 'wrapper' function glmmPen
@@ -32,43 +32,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   lambda0 = lambda0
   
   f = get(family, mode = "function", envir = parent.frame())
-  # Deleted commented section below later: already have restriction on family in glmmPen()
-  # if(family == "binomial"){
-  #   f = binomial()
-  # }else if(family == "poisson"){
-  #   f = poisson()
-  # }else{
-  #   print(family)
-  #   stop("family not specified properly")
-  # }
   
-  #group = factor(apply(Z[,1:2], 1, FUN = function(x) which(x == 1))) #as.numeric(Z[,1])
   d = nlevels(factor(group))
-  # fit all data using glmer from lme4 package
-  ## Note: delete all references to these variables (and references to pnonzervar)
-  # if(ncol(X) < 5){
-  #   if(ncol(Z) > d){
-  #     fit_glmer = try(glmer(y ~ X-1 + (X-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-  #   }else{
-  #     fit_glmer = try(glmer(y ~ X-1 + (1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-  #   }
-  #   # fit true (oracle) model
-  #   fit_glmer_oracle = fit_glmer #glmer(y ~ X[,1:(p1+1)]-1 + (X[,1:(p1+1)]-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
-  #   
-  # }else{
-  #   
-  #   # fit true (oracle) model
-  #   fit_glmer = fit_glmer_oracle = try(glmer(y ~ X[,1:(p1+1+pnonzerovar)]-1 + (X[,1:(p1+1+pnonzerovar)]-1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-  #   
-  # }
-  print("end glmer")
-  
-  if(is.character(fit_glmer_oracle)){
-    fit_glmer = fit_glmer_oracle = try(glmer(y ~ X[,1:(p1+1+pnonzerovar)]-1 + (1|group), family = f, control = glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000))))
-  }
-  vc <- VarCorr(fit_glmer_oracle)
-  print(summary(fit_glmer)$coefficients[-1,1])
-  print(vc,comp=c("Std.Dev."),digits=3)
   
   #initial fit
   if(family == "binomial"){
@@ -287,8 +252,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
           BIC = -2*ll + log(d)*sum(coef != 0)  
         }
       }
-      out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, glmer = 
-                   fit_glmer, ll = ll, ll0 = ll0,lambda0 = lambda0, lambda1 = lambda1, 
+      out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC,  
+                 ll = ll, ll0 = ll0,lambda0 = lambda0, lambda1 = lambda1, 
                  fit00 = fit00, covgroup = covgroup, J = J)
       if(returnMC == T) out$u = u0
       return(out)
@@ -368,8 +333,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
         BIC20 = -2*ll20 + log(d)*sum(coef != 0)
         #BIC20 is already computed
       }
-      out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, glmer = 
-                   fit_glmer, ll = ll, ll0 = ll0, ll2=ll2, ll20b=ll20b,lambda0 = lambda0, 
+      out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
+                 ll = ll, ll0 = ll0, ll2=ll2, ll20b=ll20b,lambda0 = lambda0, 
                  lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC20 = BIC20, covgroup 
                  = covgroup, J = J)
       if(returnMC == T) out$u = u0
@@ -403,21 +368,11 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     gc()
   }
   
-  if(ncol(X) - 1 == p1 | (lambda0 == 0 & lambda1 == 0) ){
-    fin =   cbind(summary(fit_glmer)$coefficients[-1,1], coef[2:ncol(X)])
-    colnames(fin) = c("glmer_full","MCEM_pen")
-  }else{
-    fin =   cbind(summary(fit_glmer)$coefficients[-1,1], c(summary(fit_glmer_oracle)$coef[-1,1], rep(0, ncol(X)-p1-1)),coef[2:ncol(X)])
-    colnames(fin) = c("glmer_full","glmer_oracle","MCEM_pen")
-  }
-  rownames(fin) = NULL
-  print(fin)
+
   print(sqrt(diag(cov)[1:3]))
-  vc <- VarCorr(fit_glmer_oracle)
-  print(summary(fit_glmer)$coefficients[-1,1])
   returnMC
-  out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, glmer = 
-               fit_glmer, ll = ll, ll0 = ll0, llb = llb, ll0b = ll0b, ll20 = ll20, 
+  out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
+             ll = ll, ll0 = ll0, llb = llb, ll0b = ll0b, ll20 = ll20, 
              lambda0 = lambda0, lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC = 
                BIC20, covgroup = covgroup, J = J)
   if(returnMC == T) out$u = u
