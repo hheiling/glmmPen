@@ -4,7 +4,7 @@
 glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
                   offset = NULL, weights = NULL, # penalty,
                   lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T, gibbs = T,
-                  maxitEM = 100, trace = 0, vartol = 0.00, conv = 0.001, pnonzerovar = 0, 
+                  maxitEM = 100, trace = 0, vartol = 0.00, conv = 0.001, 
                   alpha = 1){
   # Things to address / Questions to answer:
   ## dat$pnonzero and pnonzerovar should equal ... ?
@@ -75,7 +75,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   for(lev in 1:d){
     Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = d, length.out = nrow(Zt)/d),])
   }
-  Z_dense = Matrix::as.matrix(Z) # Convert Z to dense matrix
+  # Z_dense = Matrix::as.matrix(Z) # Convert Z to dense matrix
   
   ## Get fixed effects X matrix
   formula_nobars = nobars(formula)
@@ -108,7 +108,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
     stop("glmmPen function currently not enabled to use offset and weight parameters")
   }
 
-  data_input = list(y = Y, X = X, Z = Z_dense, group = group)
+  data_input = list(y = Y, X = X, Z = Z, group = group)
   
   coef_names = list(fixed = colnames(X), random = cnms, group = group_name)
   

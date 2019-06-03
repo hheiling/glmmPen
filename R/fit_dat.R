@@ -22,10 +22,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   y = dat$y
   X = as.matrix(dat$X)
-  Z = as.matrix(dat$Z)
+  Z = Matrix::as.matrix(dat$Z)
   group = dat$group
-  lambda1 = lambda1
-  lambda0 = lambda0
   
   f = get(family, mode = "function", envir = parent.frame())
   
