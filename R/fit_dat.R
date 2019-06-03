@@ -186,7 +186,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     oldcoef = coef
     
     y2 = y[rep(1:nrow(X), each = nrow(u))]
-    X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Znew)
+    X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Matrix::as.matrix(Znew))
     #off2 = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),])
     fit = glm(y2 ~ X2, family = binomial())
     #fit = ncvreg(y = y[rep(1:nrow(X), each = nrow(u))], X = X[rep(1:nrow(X), each = nrow(u)),-1], family = "binomial", alpha = 1, lambda = lambda,
