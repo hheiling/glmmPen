@@ -10,11 +10,12 @@
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
                    family = "binomial", trace = 0,
-                   glmIALconv = 1e-12, d = 2, group, alpha = 1, vartol = 0.1, nMC_max = 5000, 
-                   returnMC = F, ufull = NULL, coeffull = NULL, gibbs = F, maxitEM = 100, 
+                   d = 2, group, alpha = 1, nMC_max = 5000, 
+                   returnMC = F, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
                    ufullinit = NULL){
   
   # Things to address:
+  ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
   
   # Set small penalties to zero
   if(lambda0 <=10^-6) lambda0 = 0
@@ -22,6 +23,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   y = dat$y
   X = as.matrix(dat$X)
+  # Convert sparse Z to dense Z
   Z = Matrix::as.matrix(dat$Z)
   group = dat$group
   
@@ -86,7 +88,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     gamma = matrix(J%*%coef[-c(1:ncol(X))], ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     fit$coef = coef[c(1:ncol(X))]#as.numeric(fit$beta)
-    ok = which(diag(var) > vartol)# & coef[1:ncol(X)] != 0)
+    ok = which(diag(var) > 0)# & coef[1:ncol(X)] != 0)
     if(length(ok) == 0) ok = 1 # at least include the random intercept
     okindex = NULL
     for(i in 1:(ncol(Z)/d)){
@@ -107,7 +109,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     cov = var = diag(10^-10)
     gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
     
-    ok = which(vars > vartol)# & coef[1:ncol(X)] != 0)
+    ok = which(vars > 0)# & coef[1:ncol(X)] != 0)
     if(length(ok) == 0) ok = 1 # at least include the random intercept
     okindex = NULL
     for(i in 1:(ncol(Z)/d)){
