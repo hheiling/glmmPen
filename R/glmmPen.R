@@ -108,7 +108,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
     stop("glmmPen function currently not enabled to use offset and weight parameters")
   }
 
-  data_input = list(y = Y, X = X, Z = Z_dense, group = group, pnonzero = ncol(X))
+  data_input = list(y = Y, X = X, Z = Z_dense, group = group)
   
   coef_names = list(fixed = colnames(X), random = cnms, group = group_name)
   
@@ -121,7 +121,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
                    family = family, group = group, trace = trace, vartol = vartol,
                    conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
-                   pnonzerovar = ncol(Z), maxitEM = maxitEM, alpha = alpha)
+                   maxitEM = maxitEM, alpha = alpha)
   
   # Things that should be included in fit_dat:
   ## (fill in later)

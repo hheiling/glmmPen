@@ -15,19 +15,15 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                    ufullinit = NULL){
   
   # Things to address:
-  ## Already deal with family modification in 'wrapper' function glmmPen
-  ## In dat, what should pnonzero be?
   
-  ## added nov 4th 2016 for simulation purposes only to set small penalties to 0
+  # Set small penalties to zero
   if(lambda0 <=10^-6) lambda0 = 0
   if(lambda1 <=10^-6) lambda1 = 0
-  ##
   
   y = dat$y
   X = as.matrix(dat$X)
   Z = as.matrix(dat$Z)
   group = dat$group
-  p1 = dat$pnonzero
   lambda1 = lambda1
   lambda0 = lambda0
   
