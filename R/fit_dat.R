@@ -106,7 +106,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     if(trace == 1) print(coef)
     
-    cov = var = diag(10^-10)
+    vars = rep(10^-10, ncol(Z)/d)
+    cov = var = diag(vars)
     gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
     
     ok = which(vars > 0)# & coef[1:ncol(X)] != 0)
