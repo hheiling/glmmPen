@@ -119,7 +119,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Call fit_dat function - adjust to use match.call object?
   # fit_dat object found in "/R/fit_dat.R" file
   fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
-                   family = family, group = group, trace = trace, vartol = 0,
+                   family = family, group = group, trace = trace,
                    conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = T,
                    maxitEM = maxitEM, alpha = alpha)
   
