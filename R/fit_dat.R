@@ -9,7 +9,7 @@
 #' 
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
-                   family = "binomial", trace = 0, initcov = NULL, 
+                   family = "binomial", trace = 0,
                    glmIALconv = 1e-12, d = 2, group, alpha = 1, vartol = 0.1, nMC_max = 5000, 
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = F, maxitEM = 100, 
                    pnonzerovar = 0, ufullinit = NULL){
@@ -142,21 +142,10 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     coef = as.numeric(fit$beta)
     fit$coef = as.numeric(fit$beta)
-    if(is.null(initcov)){
-      X00 = matrix(0, nrow(Z), ncol(Z)/d)
-      for(j in 1:d){
-        X00 = X00 + Z[,seq(j, ncol(Z), by = d)] 
-      }
-      vars = rep(0.0, ncol(X00))
-      #vars[1] = as.numeric(unlist((VarCorr(glmer(y ~ (1|group), family = f)))))
-      #for(i in 2:ncol(X00)) vars[i] = as.numeric(unlist((VarCorr(glmer(y ~ (X00[,i]-1|group), family = f)))))
-    }else{
-      vars = rep(initcov, ncol(X))
-    }
     
-    if(trace == 1) print(coef);print(vars)
+    if(trace == 1) print(coef)
     
-    cov = var = diag(vars+10^-10)
+    cov = var = diag(10^-10)
     gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
     
     ok = which(vars > vartol)# & coef[1:ncol(X)] != 0)
