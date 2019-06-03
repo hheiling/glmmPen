@@ -101,6 +101,7 @@ sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", gro
   return(u0)
 }
 
+#' @export
 sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex,
                       gibbs = F , uold){
   
