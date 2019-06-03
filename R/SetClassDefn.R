@@ -7,7 +7,7 @@ pglmmObj = setRefClass("pglmmObj",
               ranef = "list", # random effects coefficients
               # coefficients = "numeric", # sum of fixed and random effects coefficients
               group = "list",
-              covar = "matrix",
+              sigma = "matrix",
               gibbs_mcmc = "matrix",
               family = "character",
               J = "dgCMatrix", # sparse matrix
@@ -45,19 +45,8 @@ pglmmObj = setRefClass("pglmmObj",
                 names(fixef) <<- x$coef_names$fixed
                 nonzeroFE <<- fixef[which(fixef != 0)]
                 
-                q = length(x$coef_names$random) # Number random effects
-                # Note: q > 0 always; error in glmmPen function if no random effect specified
-                Gam_vec = x$coef[-c(1:p)]
-                # if(Gamma_diag){ # If, in high dimensional case, Gamma assumed diagonal
-                #   Gamma = diag(Gam_vec)
-                # }else{ # In low dimensional case, have lower-triangular Gamma
-                #   Gamma = matrix(0, nrow = q, ncol = q)
-                #   Gamma[lower.tri(Gamma, diag=T)] = Gam_vec
-                # }
-                Gamma = matrix(0, nrow = q, ncol = q)
-                Gamma[lower.tri(Gamma, diag=T)] = Gam_vec
-                # Covariance matrix of random effects: from Rashid and Li paper, Gamma * t(Gamma)
-                covar <<- Gamma %*% t(Gamma)
+                # Covariance matrix of random effects
+                sigma <<- x$sigma
                 # nonzervarRE <<- sum(rowSums(covar) != 0)
                 # Add names of random effects to matrix (either rownames or colnames)
                 

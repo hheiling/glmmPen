@@ -71,7 +71,7 @@ nobs.pglmmObj = function(object){
 #' @export
 fitted.pglmmObj = function(object){
   X = object$X
-  Z = object$Z
+  Z = Matrix::as.matrix(object$Z)
   beta = object$fixef
   U = object$gibbs_mcmc
   if(ncol(U) == 1){
@@ -80,8 +80,9 @@ fitted.pglmmObj = function(object){
     gamma = colMeans(object$gibbs_mcmc)
   }
   
-  mu = X %*% beta + Z %*% gamma
-  return(mu)
+  eta = X %*% beta + Z %*% gamma
+  return(eta)
+  # Add family conversions to mu
 }
 
 reOnly <- function(f, response=FALSE) {
