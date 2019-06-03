@@ -9,7 +9,7 @@
 #' 
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
-                   family = "binomial", trace = 0,
+                   family = "binomial", trace = 0, penalty = "grMCP",
                    d = 2, group, alpha = 1, nMC_max = 5000, 
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
                    ufullinit = NULL){
@@ -98,7 +98,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     fit00 = fit
   }else{
-    fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda1, alpha = alpha)###
+    fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
     fit00 = fit #### naive fit
     
     coef = as.numeric(fit$beta)
@@ -106,7 +106,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     if(trace == 1) print(coef)
     
-    vars = rep(10^-10, ncol(X))
+    vars = rep(10^-10, ncol(Z)/d)
     cov = var = diag(vars)
     gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
     
@@ -188,7 +188,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     y2 = y[rep(1:nrow(X), each = nrow(u))]
     X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Matrix::as.matrix(Znew))
     #off2 = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),])
-    fit = glm(y2 ~ X2, family = binomial())
+    fit = glm(y2 ~ X2, family = f)
     #fit = ncvreg(y = y[rep(1:nrow(X), each = nrow(u))], X = X[rep(1:nrow(X), each = nrow(u)),-1], family = "binomial", alpha = 1, lambda = lambda,
     #             offset = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),]), penalty = "SCAD" )
     coef = as.numeric(fit$coef)#as.numeric(fit$beta)

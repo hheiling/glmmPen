@@ -2,15 +2,15 @@
 #' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export
 glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
-                  offset = NULL, weights = NULL, # penalty,
+                  offset = NULL, weights = NULL, penalty = "grMCP",
                   lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T,
                   maxitEM = 100, trace = 0, conv = 0.001, 
                   alpha = 1){
   # Things to address / Questions to answer:
-  ## dat$pnonzero and pnonzerovar should equal ... ?
   ## Add option for different penalties
   ## Specify what fit_dat output will be
   ## Provide option for offset, weights
+  ## gibbs T / F: internally specify T or F depending on X and Z dimensions
   
   # Input modification and restriction for family
   if(is.character(family)){
@@ -119,7 +119,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   # Call fit_dat function - adjust to use match.call object?
   # fit_dat object found in "/R/fit_dat.R" file
   fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
-                   family = family, group = group, trace = trace,
+                   family = family, group = group, trace = trace, penalty = penalty,
                    conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = T,
                    maxitEM = maxitEM, alpha = alpha)
   

@@ -1,19 +1,9 @@
 #' @export
 sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex ){
   # Things to address:
-  ## Will already deal with family specification in glmmPen, can remove family adjustments here
   ## Will need to make sure family "if else" statements are consistent 
   
   f = get(family, mode = "function", envir = parent.frame())
-  # Can delete commented section below later: will already have family restriction in glmmPen()
-  # if(family == "binomial"){
-  #   f = binomial()
-  # }else if(family == "poisson"){
-  #   f = poisson()
-  # }else{
-  #   print(family)
-  #   stop("family not specified properly")
-  # }
   
   # find tau for rejection sampler (Booth 1999) by first maximizing u
   if(length(okindex) > 0){
@@ -102,17 +92,10 @@ sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", gro
 }
 
 #' @export
-sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex,
+sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
                       gibbs = F , uold){
   
-  if(family == "binomial"){
-    f = binomial()
-  }else if(family == "poisson"){
-    f = poisson()
-  }else{
-    print(family)
-    stop("family not specified properly")
-  }
+  f = get(family, mode = "function", envir = parent.frame())
   
   # find tau for rejection sampler (Booth 1999) by first maximizing u
   if(length(okindex) > 0 & gibbs == F){
