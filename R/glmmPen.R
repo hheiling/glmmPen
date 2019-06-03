@@ -1,3 +1,5 @@
+#' @importFrom stringr str_to_lower
+#' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export
 glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
                   offset = NULL, weights = NULL, # penalty,
@@ -52,19 +54,28 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   frame_full = model.frame(mod_frame_full, data = data)
 
   ## Identify random effects
-  ### If no | (no random effects listed) then stop(suggestion: use glmnet or ncvreg package instead)
+  ### If no | (no random effects listed) then stop - mkBlist called by mkReTrms give this error
   reExprs = findbars(formula)
-  reGrpList = mkReTrms_glmmPen(reExprs, frame_full)
-  
-  Z = t(as.matrix(reGrpList$Zt))
+  reTrms = mkReTrms(reExprs, frame_full)
+  # t(Zt) from mkReTrms: columns organized by group level, then vars within group level
+  Zt = reTrms$Zt
+  group = reTrms$flist
   
   # Change group condition below?
-  if(length(reGrpList$flist) > 1){
+  if(length(reTrms$flist) > 1){
     stop("procedure can only handle one group")
   }else{
-    group = reGrpList$flist[[1]]
-    group_name = names(reGrpList$flist)
+    group = reTrms$flist[[1]]
+    group_name = names(reTrms$flist)
   }
+  
+  d = nlevels(group[[1]])
+  Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
+  # Want Z columns organized by vars, then levels of group within vars
+  for(lev in 1:d){
+    Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = d, length.out = nrow(Zt)/d),])
+  }
+  Z_dense = Matrix::as.matrix(Z) # Convert Z to dense matrix
   
   ## Get fixed effects X matrix
   formula_nobars = nobars(formula)
@@ -79,7 +90,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   } # If only one column, class(constant_cols) == "numeric"
 
   ## Make sure colnames random effects subset of colnames X
-  cnms = reGrpList$cnms[[1]]
+  cnms = reTrms$cnms[[1]]
   if(sum(!(cnms %in% colnames(X))) > 0){
     stop("random effects must be a subset of fixed effects")
   }
@@ -97,7 +108,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
     stop("glmmPen function currently not enabled to use offset and weight parameters")
   }
 
-  data_input = list(y = Y, X = X, Z = Z, group = group, pnonzero = ncol(X))
+  data_input = list(y = Y, X = X, Z = Z_dense, group = group, pnonzero = ncol(X))
   
   coef_names = list(fixed = colnames(X), random = cnms, group = group_name)
   
@@ -117,7 +128,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
 
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = Y, X = X, Z = Z,
-                       group = reGrpList$flist, coef_names = coef_names, family = family,
+                       group = reTrms$flist, coef_names = coef_names, family = family,
                        offset = offset, weights = weights, frame = frame_full))
 
   
