@@ -9,7 +9,7 @@
 #' 
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
-                   family = "binomial", type = "hmmcov", trace = 0, initcov = NULL, 
+                   family = "binomial", trace = 0, initcov = NULL, 
                    glmIALconv = 1e-12, d = 2, group, alpha = 1, vartol = 0.1, nMC_max = 5000, 
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = F, maxitEM = 100, 
                    pnonzerovar = 0, ufullinit = NULL){
@@ -233,59 +233,16 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     active1 = rep(1, ncol(X)-1)
     
     oldcoef = coef
-    if(type == "hmmcov"){
-      # need to find way to suppress intercept here
-      start_time <- Sys.time()
-      # cat(sprintf("class of Znew: %s \n", class(Znew)))
-      # cat(sprintf("class of as.matrix(Znew): %s \n", class(as.matrix(Znew))))
-      fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
-                    penalty="grMCP", family="binomial",lambda = lambda0, 
-                    offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), alpha = alpha, active = active0, 
-                    initbeta = c(0,coef[-c(1:ncol(X))]))
-      end_time <- Sys.time()
-      print(start_time - end_time)
-      gc()
-      coef = rep(0,length(covgroup) + ncol(X))
-      coef[-c(1:ncol(X))] = fit0$beta[-1]
-      c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
-      start_time <- Sys.time()
-      fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda1, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-      end_time <- Sys.time()
-      print(start_time - end_time)
-      gc()
-      coef[c(1:ncol(X))] = fit1$beta
-      c0[c(1:ncol(X))] = c0[c(1:ncol(X))] + (fit1$beta == 0)^2
-      fit = fit1
-      fit$coef = coef
-      
-      # need to compile code first before running.  Actives will default to 1 to test, then uncomment the below to skip groups
-      # update active set every 5 iterations
-      if(floor(i/5) == ceiling(i/5)){
-        active1[which(c0[c(2:ncol(X))] == 5)] = 0
-        active1[which(c0[c(2:ncol(X))] < 5)] = 1
-        
-        for(kk in 1:max(covgroup)){
-          active0[kk] = (all(c0[-c(1:ncol(X))][covgroup == kk]<5))^2
-        }
-        print(length(covgroup))
-        print(length(c0[-c(1:ncol(X))]))
-        print(active1)
-        print(active0)
-        # reset c0
-        c0 = rep(0, length(coef))
-      }
-      
-    }else{
-      y2 = y[rep(1:nrow(X), each = nrow(u))]
-      X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Znew)
-      #off2 = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),])
-      fit = glm(y2 ~ X2, family = binomial())
-      #fit = ncvreg(y = y[rep(1:nrow(X), each = nrow(u))], X = X[rep(1:nrow(X), each = nrow(u)),-1], family = "binomial", alpha = 1, lambda = lambda,
-      #             offset = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),]), penalty = "SCAD" )
-      coef = as.numeric(fit$coef)#as.numeric(fit$beta)
-      fit$coef = coef
-      fit$w2use = which(coef[-1] != 0)
-    }
+    
+    y2 = y[rep(1:nrow(X), each = nrow(u))]
+    X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Znew)
+    #off2 = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),])
+    fit = glm(y2 ~ X2, family = binomial())
+    #fit = ncvreg(y = y[rep(1:nrow(X), each = nrow(u))], X = X[rep(1:nrow(X), each = nrow(u)),-1], family = "binomial", alpha = 1, lambda = lambda,
+    #             offset = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),]), penalty = "SCAD" )
+    coef = as.numeric(fit$coef)#as.numeric(fit$beta)
+    fit$coef = coef
+    fit$w2use = which(coef[-1] != 0)
     
     problem = F
     if(any(is.na(coef))){
