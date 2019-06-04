@@ -38,7 +38,6 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     nTotal = NULL
   }
   
-  
   if(ncol(Z)/d <= 15){
     # create J, q2 x q*(q+1)/2
     J = Matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2, sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2)
@@ -54,10 +53,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       sumx = sumy 
       zeros = zeros + i
       covgroup = rbind(covgroup, rep(i, (ncol(Z)/d)))
-      #print(c((ncol(Z)/d - (i-1)),sumy, sumx))
     }
     covgroup = covgroup[lower.tri(covgroup, diag = T)]
-    #if(ncol(Z)/d > 20){
   }else{
     J = Matrix(0,(ncol(Z)/d)^2, (ncol(Z)/d), sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d))
     index = 0
@@ -71,15 +68,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       sumy = sumy + (ncol(Z)/d - (i-1))
       sumx = sumy 
       zeros = zeros + i
-      #print(c((ncol(Z)/d - (i-1)),sumy, sumx))
     }
     covgroup = rep(1:(ncol(Z)/d))
   }
-  #J = Matrix(J, sparse = TRUE)
-  #J = as.big.matrix(J)
-  # initial value for beta
-  #fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda1, alpha = alpha)
-  #fit00 = fit # naive fit  
   
   if(!is.null(ufull) & !is.null(coeffull)){
     fit = list()
@@ -87,7 +78,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     coef = coeffull
     gamma = matrix(J%*%coef[-c(1:ncol(X))], ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
-    fit$coef = coef[c(1:ncol(X))]#as.numeric(fit$beta)
+    fit$coef = coef[c(1:ncol(X))]
     ok = which(diag(var) > 0)# & coef[1:ncol(X)] != 0)
     if(length(ok) == 0) ok = 1 # at least include the random intercept
     okindex = NULL
@@ -99,7 +90,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     fit00 = fit
   }else{
     fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
-    fit00 = fit #### naive fit
+    fit00 = fit # naive fit
     
     coef = as.numeric(fit$beta)
     fit$coef = as.numeric(fit$beta)
@@ -125,7 +116,6 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   finish = 0
   while(finish == 0){
     for(i in 1:d){
-      #print(Z[group == i,seq(i, ncol(Z), by = d)]%*% gamma)
       Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i,seq(i, ncol(Z), by = d)]%*% gamma
     }
     if(!any(is.na(Znew2))) finish = 1
@@ -150,8 +140,6 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   diff = rep(NA, 100)
   stopcount = 0
   
-  #etae = matrix(X %*% coef, nrow = nrow(X), ncol = nrow(u) ) + Z%*%t(u)
-  
   ## this needs to get updated to reflect whatever is chosen to evaluate likelihood
   if(family == "poisson"){
     ll = ll0 = ll20 = sum(rowMeans(dpois(matrix(y, nrow = length(y), ncol = ncol(etae)), lambda =  exp(etae), log = T)))
@@ -159,7 +147,6 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     ll = ll0 = ll20  = sum(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae)), size = 1, prob = exp(etae)/(1+exp(etae)), log = T)))
   }  
   Znew = NULL
-  
   
   # initialize zero count vectors
   c0 = rep(0, length(coef))
@@ -187,11 +174,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     y2 = y[rep(1:nrow(X), each = nrow(u))]
     X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Matrix::as.matrix(Znew))
-    #off2 = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),])
     fit = glm(y2 ~ X2, family = f)
-    #fit = ncvreg(y = y[rep(1:nrow(X), each = nrow(u))], X = X[rep(1:nrow(X), each = nrow(u)),-1], family = "binomial", alpha = 1, lambda = lambda,
-    #             offset = rowSums(Z[rep(1:nrow(X), each = nrow(u)),] *   u[rep(1:nrow(u), nrow(X)),]), penalty = "SCAD" )
-    coef = as.numeric(fit$coef)#as.numeric(fit$beta)
+    
+    coef = as.numeric(fit$coef) 
     fit$coef = coef
     fit$w2use = which(coef[-1] != 0)
     
@@ -217,14 +202,11 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       ll = sum(rowMeans(dpois(matrix(y, nrow = length(y), ncol = ncol(etae)), lambda =  exp(etae), log = T)))
     }else if(family == "binomial"){
       q = apply(matrix(dbinom( y[rep(1:nrow(X), each = nrow(u))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T), ncol = nrow(u), byrow = T), 2, FUN = function(etaei) sum(dbinom(y, size = 1, prob = exp(etaei)/(1+exp(etaei)), log = T)))     
-      #ll = sum(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae)), size = 1, prob = exp(etae)/(1+exp(etae)), log = T)))
       
       ll = (sum((dbinom(y[rep(1:nrow(X), each = nrow(u))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dmvnorm(u, log = T)))/nrow(u) # calc of norm is fine since cov = I
       ll0 = (sum((dbinom(y[rep(1:nrow(X), each = nrow(u))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(u)
       ll20 =  sum(log(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae2)), size = 1, prob = exp(etae2)/(1+exp(etae2)), log = F))))
-      ## change this 5/23 12:36 AM to check the issue
-      #ll = ll0 #commented out to try fixed grpreg function, try again later
-      ##
+      
     }  
     
     if(!is.finite(ll)){
@@ -244,7 +226,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
         Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
         etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
         if(!is.finite(ll)){
-          ll2 = ll ## 11/28 changed to ll0 from 11
+          ll2 = ll
         }else{
           BIC = -2*ll + log(d)*sum(coef != 0)  
         }
@@ -274,20 +256,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     finish = 0
     while(finish == 0){
       for(j in 1:d){
-        #print(Z[group == i,seq(i, ncol(Z), by = d)]%*% gamma)
         Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*% gamma
       }
       if(!any(is.na(Znew2))) finish = 1
     }
-    #print(fit$coef)
-    #print(sqrt(cov))
-    
-    ## increase nMC?
-    
     
     #stopping rule
     diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
-    #diff[i] = max(abs(coef - oldcoef)/(abs(oldcoef)+.1))
     
     if( sum(diff[i:max(i-2, 1)] < conv) >=3 ) break
     
@@ -305,9 +280,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     lim = quantile(q, c(0.025, 0.975))
     
     ### E stepf
-    #if(any(svd(cov)$d < 10^-15)) cov = cov + diag(rep(10^-10, ncol(cov)))
     u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, d = d, okindex = okindex, nZ= ncol(Z), gibbs = gibbs, uold = u0)
-    #u = bmmat(u)
+    
     nMC2 = nrow(u)
     
     if(any(is.na(u)) | any(colSums(u) == 0)){
