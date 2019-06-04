@@ -1,7 +1,7 @@
 #' @importFrom stringr str_to_lower
 #' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export
-glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
+glmmPen = function(formula, data, family = "binomial", na.action = na.omit,
                   offset = NULL, weights = NULL, penalty = "grMCP",
                   lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T,
                   maxitEM = 100, trace = 0, conv = 0.001, 
@@ -39,27 +39,28 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
     stop("lambda0 and lambda1 cannot be negative")
   }
 
+  # Convert formula and data to useful forms to plug into fit_dat
+  
+  ## substitute | for +
+  form_full = subbars(formula)
+  
   # Deal with NAs
-  if(na.action == "na.omit"){ # Need to use character? Is na.action a function? ...
-    na.omit(data)
+  if(na.action == na.omit){ # Need to use character? Is na.action a function? ...
+    data = na.omit(data[,colnames(model.frame(form_full, data = data))])
   }else{
     warning("This function not equipted to deal with NA values. \n
             Please check that data does not contain NA values. \n", immediate. = T)
   }
-
-  # Convert formula and data to useful forms to plug into fit_dat
-  ## substitute | for +
-  mod_frame_full = subbars(formula)
+  
   ## Add offset = offset, weights = weights in model.frame function?
-  frame_full = model.frame(mod_frame_full, data = data)
-
+  frame_full = model.frame(form_full, data = data)
+  
   ## Identify random effects
   ### If no | (no random effects listed) then stop - mkBlist called by mkReTrms give this error
   reExprs = findbars(formula)
   reTrms = mkReTrms(reExprs, frame_full)
   # t(Zt) from mkReTrms: columns organized by group level, then vars within group level
   Zt = reTrms$Zt
-  group = reTrms$flist
   
   # Change group condition below?
   if(length(reTrms$flist) > 1){
@@ -80,6 +81,7 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   ## Get fixed effects X matrix
   formula_nobars = nobars(formula)
   X = model.matrix(formula_nobars, data)
+  
   # Problem if variable specified in formula is the intercept / a constant column 
   # and -1 not included in formula
   constant_cols = X[,apply(X, 2, var, na.rm=TRUE) == 0]
