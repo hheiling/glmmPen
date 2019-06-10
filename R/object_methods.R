@@ -185,7 +185,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
   if(is.null(newdata) && is.null(re.form)){
     pred = switch(type[1], # if unspecified, default = link output (linear predictor)
                   response = fitted(object),
-                  link = etaCalc(object))
+                  link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$gibbs_mcmc))
   }else{
     # if(is.null(newdata)){ # Use original data (X matrix and offset)
       # In future, code for is.null(newdata) && !is.null(re.form)
@@ -257,9 +257,9 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
 #' @export
 residuals.pglmmObj = function(object, type = "response"){
   # Add more type options?
-  Y = object$Y
+  Y = object$y
   mu = fitted(object)
-  res = Y = mu
+  res = Y - mu
   return(res)
 }
 
