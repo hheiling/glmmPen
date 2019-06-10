@@ -19,7 +19,7 @@ pglmmObj = setRefClass("pglmmObj",
               formula = "formula",
               y = "numeric",
               X = "matrix",
-              Z = "matrix",
+              Z = "dgCMatrix",
               frame = "data.frame"
             ),
             methods = list(
