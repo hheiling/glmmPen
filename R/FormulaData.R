@@ -18,7 +18,7 @@ formulaData = function(formula, data = NULL, na.action){
       # Proceed as normal
       
       # Deal with NAs
-      if(identical(na.action, na.omit) | na.action == "na.omit"){ # Need to use character? 
+      if(identical(na.action, na.omit) | identical(na.action, "na.omit")){ 
         data = na.omit(data[,colnames(model.frame(formula_full, data = data))])
       }else{
         warning("This function not equipted to deal with NA values. \n
@@ -73,7 +73,7 @@ formulaData = function(formula, data = NULL, na.action){
     # }
     
     # Deal with NAs
-    if(identical(na.action, na.omit) | na.action == "na.omit"){ # Need to use character? 
+    if(identical(na.action, na.omit) | identical(na.action, "na.omit")){  
       na_rows = rowSums(is.na(frame_full))
       frame_full = na.omit(frame_full)
       Y = Y[-na_rows]
