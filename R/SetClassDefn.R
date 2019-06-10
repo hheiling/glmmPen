@@ -30,8 +30,10 @@ pglmmObj = setRefClass("pglmmObj",
                 # Group
                 group <<- x$group
                 ## For now, assume only one group designation allowed
-                d = lapply(group, function (j) nlevels(j))[[1]]
-                levs = lapply(group, function(j) levels(j))[[1]]
+                # d = lapply(group, function (j) nlevels(j))
+                # levs = lapply(group, function(j) levels(j))
+                d = nlevels(group[[1]])
+                levs = levels(group[[1]])
                 
                 # y, X, Z, frame
                 y <<- x$Y
@@ -55,7 +57,8 @@ pglmmObj = setRefClass("pglmmObj",
                 # colnames(gibbs_mcmc) = 
                 
                 # Random effects coefficients
-                rand = colMeans(gibbs_mcmc)
+                rand = colMeans(gibbs_mcmc) # ncol(Z) = ncol(rand)
+                q = ncol(rand) / d # Number random variables
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
                 rownames(ref) = levs
