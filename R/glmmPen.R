@@ -43,10 +43,12 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   
   ## Convert group to numeric factor - for fit_dat
   if(any(is.character(fD_out$group))){
-    group_num = as.factor(as.numeric(fD_out$group))
+    group = as.factor(as.numeric(fD_out$group))
+  }else{
+    group = fD_out$group
   }
 
-  data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, group = group_num)
+  data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, group = group)
   
   coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
   
@@ -57,7 +59,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   # Call fit_dat function - adjust to use match.call object?
   # fit_dat object found in "/R/fit_dat.R" file
   fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
-                   family = family, group = group_num, trace = trace, penalty = penalty,
+                   family = family, trace = trace, penalty = penalty,
                    conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = T,
                    maxitEM = maxitEM, alpha = alpha)
   

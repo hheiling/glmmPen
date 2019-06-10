@@ -10,7 +10,7 @@
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
                    family = "binomial", trace = 0, penalty = "grMCP",
-                   d = 2, group, alpha = 1, nMC_max = 5000, 
+                   alpha = 1, nMC_max = 5000, 
                    returnMC = F, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
                    ufullinit = NULL){
   
