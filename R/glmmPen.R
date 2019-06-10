@@ -39,7 +39,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   }
 
   # Convert formula and data to useful forms to plug into fit_dat
-  fD_out = formulaData(formula, data)
+  fD_out = formulaData(formula, data, na.action)
   
   ## Convert group to numeric factor - for fit_dat
   if(any(is.character(group))){

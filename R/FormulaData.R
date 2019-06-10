@@ -2,7 +2,7 @@
 
 #' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export
-formulaData = function(formula, data = NULL){
+formulaData = function(formula, data = NULL, na.action){
   # Note: need to deal with potential offsets and weights
   
   ## substitute | for +
@@ -18,7 +18,7 @@ formulaData = function(formula, data = NULL){
       # Proceed as normal
       
       # Deal with NAs
-      if(na.action == na.omit){ # Need to use character? 
+      if(identical(na.action, na.omit) | na.action == "na.omit"){ # Need to use character? 
         data = na.omit(data[,colnames(model.frame(formula_full, data = data))])
       }else{
         warning("This function not equipted to deal with NA values. \n
@@ -71,6 +71,18 @@ formulaData = function(formula, data = NULL){
     #     colnames(mm) = gsub(t, "", colnames(mm))
     #   }
     # }
+    
+    # Deal with NAs
+    if(identical(na.action, na.omit) | na.action == "na.omit"){ # Need to use character? 
+      na_rows = rowSums(is.na(frame_full))
+      frame_full = na.omit(frame_full)
+      Y = Y[-na_rows]
+      mm = mm[-na_rows,]
+    }else{
+      warning("This function not equipted to deal with NA values. \n
+              Please check that data does not contain NA values. \n", immediate. = T)
+    }
+    
     
   } # End if/else
   
