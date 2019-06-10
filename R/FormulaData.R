@@ -116,5 +116,6 @@ formulaData = function(formula, data = NULL){
     stop("random effects must be a subset of fixed effects")
   }
   
-  return(list(y = Y, X = mm, Z = Z, group = group, cnms = cnms, group_name = group_name))
+  return(list(y = Y, X = mm, Z = Z, group = group, cnms = cnms, 
+              group_name = group_name, flist = reTrms$flist, frame = frame_full))
 }
