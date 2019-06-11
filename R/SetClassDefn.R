@@ -22,7 +22,8 @@ pglmmObj = setRefClass("pglmmObj",
               y = "numeric",
               X = "matrix",
               Z = "dgCMatrix",
-              frame = "data.frame"
+              frame = "data.frame",
+              sampling = "character"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -73,8 +74,9 @@ pglmmObj = setRefClass("pglmmObj",
                 call <<- x$call
                 # BIC_ICQ <<- x$BIC
                 # penalty <<- x$penalty
+                other <<- x$sampling
               },
-              show = function(object){
-                print(object)
+              show = function(){
+                print(.self)
               }
             ))
