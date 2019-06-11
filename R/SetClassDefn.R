@@ -7,7 +7,9 @@ pglmmObj = setRefClass("pglmmObj",
               ranef = "list", # random effects coefficients
               # coefficients = "numeric", # sum of fixed and random effects coefficients
               group = "list",
-              sigma = "matrix",
+              sigma = "matrix", 
+                # sigma: Turn in to "dgCMatrix"? - sparse for large dimensions matrix
+                # alternatively, if large dims, assume diagonal, report matrix with ncol = 1
               gibbs_mcmc = "matrix",
               family = "character",
               J = "dgCMatrix", # sparse matrix
@@ -71,6 +73,8 @@ pglmmObj = setRefClass("pglmmObj",
                 call <<- x$call
                 # BIC_ICQ <<- x$BIC
                 # penalty <<- x$penalty
-                
+              },
+              show = function(object){
+                print(object)
               }
             ))

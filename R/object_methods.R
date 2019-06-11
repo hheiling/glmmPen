@@ -186,69 +186,34 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     pred = switch(type[1], # if unspecified, default = link output (linear predictor)
                   response = fitted(object),
                   link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$gibbs_mcmc))
-  }else{
-    # if(is.null(newdata)){ # Use original data (X matrix and offset)
-      # In future, code for is.null(newdata) && !is.null(re.form)
-      # X = object$X
-      # offset = model.offset(model.frame(object))
-      # if(is.null(offset)){offset = 0}
-      ## for is.null(newdata), only option not yet covered is !is.null(re.form)
-      
-    # }else{ # Use newdata
-      ## Get fixed effects - fixed vars be same in both original and new data
-      # form_fixef = formula(object, fixed.only = T)
-      # 
-      # 
-      # # Deal with NAs
-      # if(identical(na.action, na.omit) | identical(na.action, "na.mit")){
-      #   data = na.omit(newdata[,colnames(model.frame(formula(object), newdata))])
-      # }else if(identical(na.action, na.pass) | identical(na.action, "na.pass")){
-      #   data = newdata
-      # }else{
-      #   print(na.action)
-      #   stop("specified na.action is not available for 'predict' function; \n
-      #        please use default na.action = na.omit")
-      # }
-      # 
-      # ## Get new model frame - full model frame
-      # mf = model.frame(formula(object), data)
-      # 
-      # ## Get new fixed effects model.matrix
-      # X = model.matrix(form_fixef, data)
-      # ## for !is.null(newdata), both is.null(re.form) and !is.null(re.form) not covered
-      # ## for now, only have is.null(re.form) option
-      # if(is.null(re.form)){
-      #   reExprs = findbars(formula(object))
-      #   reTrms = mkReTrms(reExprs, mf)
-      #   # t(Zt) from mkReTrms: columns organized by group level, then vars within group level
-      #   Zt = reTrms$Zt
-      #   # Assume only one group
-      #   group = reTrms$flist[[1]]
-      #   
-      #   d = nlevels(group)
-      #   Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
-      #   # Want Z columns organized by vars, then levels of group within vars
-      #   for(lev in 1:d){
-      #     Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = d, length.out = nrow(Zt)/d),])
-      #   }
-      if(is.null(re.form)){
-        fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
-        eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = object$gibbs_mcmc)
-        pred = switch(type, 
-                      link = eta,
-                      response = invLink(family = family(object), eta = eta))
-        if(class(pred) %in% c("dgeMatrix","matrix")){
-          if(is.null(rownames(data))){
-            rownames(pred) = seq_along(nrow(data))
-          }else{
-            rownames(pred) = rownames(data)
-          }
-        }else if(class(pred) == "numeric"){
-          if(is.null(rownames(data))){
-            names(pred) = seq_along(nrow(data))
-          }else{
-            names(pred) = rownames(data)
-          }
+  }else if(!is.null(newdata) && is.null(re.form)){
+      fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
+      # Assume only one group
+      if(nlevels(fD_out$group) != nlevels(object$group[[1]])){
+        levs_orig = levels(object$group[[1]])
+        levs_new = levels(fD_out$group)
+        # Columns of Z and object$gibbs_mcmc organized first by vars, then by group within vars
+        present_levs = as.numeric(levs_new %in% levs_orig)
+        keep_cols = rep(present_levs, each = ncol(object$Z)/nlevels(object$group[[1]]))
+        U = object$gibbs_mcmc[,keep_cols]
+      }else{
+        U = object$gibbs_mcmc
+      }
+      eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = U)
+      pred = switch(type, 
+                    link = eta,
+                    response = invLink(family = family(object), eta = eta))
+      if(class(pred) %in% c("dgeMatrix","matrix")){
+        if(is.null(rownames(data))){
+          rownames(pred) = seq_along(nrow(data))
+        }else{
+          rownames(pred) = rownames(data)
+        }
+      }else if(class(pred) == "numeric"){
+        if(is.null(rownames(data))){
+          names(pred) = seq_along(nrow(data))
+        }else{
+          names(pred) = rownames(data)
         }
       }
       # In future, create code for option else(!is.null(re.form))
@@ -266,7 +231,98 @@ residuals.pglmmObj = function(object, type = "response"){
   return(res)
 }
 
+################################################################### 
+# Print functions:
+cat_f = function(...){
+  cat(..., fill = T)
+}
+
+.prt.family = function(object){
+  f = object$family
+  if(is.character(f)){
+    fam = get(f, mode = "function")
+    family = fam()
+  }else if(is.function(f)){
+    family = f()
+  }
+  cat_f(" Family:", family$family, paste(" (", family$link, ")"))
+}
+
+.prt.call <- function(object) {
+  # Copied some code from lme4 source code
+  call = object$call
+  if (!is.null(cc <- call$formula))
+    cat_f("Formula:", deparse(cc))
+  if (!is.null(cc <- call$data))
+    cat_f("   Data:", deparse(cc))
+  if (!is.null(cc <- call$weights))
+    cat_f("Weights:", deparse(cc))
+  if (!is.null(cc <- call$offset))
+    cat_f(" Offset:", deparse(cc))
+  # if (!is.null(cc <- call$subset))
+  #   cat_f(" Subset:", deparse(cc))
+}
+
+.prt.fixef = function(object, digits){
+  if(length(fef <- fixef(object)) > 0) {
+    cat("Fixed Effects:\n")
+    print.default(format(fef, digits = digits),
+                  print.gap = 2L, quote = FALSE)
+  } else cat("No fixed effect coefficients\n")
+}
+
+.prt.ranef = function(object, digits = 4){
+  cat("Random Effects:\n")
+  # Create character matrix
+  cnms = c("Group","Name","Variance")
+  # Assume only one group
+  group = object$group[[1]] 
+  group_name = names(object$group)
+  ref = lapply(ranef(object), function(x) colnames(x))
+  ref_names = ref[[1]]
+  sigma = object$sigma
+  output = matrix(0, nrow = length(ref_names), ncol = length(cnms))
+  output[,2] = ref_names
+  output[,1] = group_name
+  output[,3] = round(diag(sigma), digits = digits)
+  colnames(output) = cnms
+  rownames(output) = rep("", nrow(output))
+  
+  print(output, quote = F)
+}
+
+.prt.nobsgrps = function(object){
+  cat(sprintf("Number Observations: %i,  groups: %s, %i", 
+              nobs(object), names(object$group), nlevels(object$group[[1]])))
+}
+
+#' importFrom stats print
+#' @export 
+print.pglmmObj = function(object, digits = c(4,4)){
+  # ToDo: Add in (best) lambda values, BIC, logLik
+  
+  # Title
+  cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",  
+      "  algorithm", " (", object$sampling, ") ", " ['", class(out_glmmPen), "'] ", fill = T, sep = "")
+  # Family
+  .prt.family(object)
+  # Call information: formula, data, weights, offset, (subset?)
+  .prt.call(object)
+  # Fixed effects information
+  .prt.fixef(object, digits = digits[[1]])
+  # Random effects information
+  .prt.ranef(object, digits = digits[[2]])
+  # Number obs and groups
+  .prt.nobsgrps(object)
+  
+  invisible(object)
+}
+
+# # @exportMethod show
+# setMethod("show",  "pglmmObj", function(object) print.pglmmObj(object))
+
 # Functions to add:
 ## offset() - will not have $offset option
 ## weights() - will not have $weights option
 ### Ideas for offset() and weights() - extract from model.frame ?
+

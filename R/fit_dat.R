@@ -342,10 +342,19 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
 
   print(sqrt(diag(cov)[1:3]))
   returnMC
-  out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
-             ll = ll, ll0 = ll0, llb = llb, ll0b = ll0b, ll20 = ll20, 
-             lambda0 = lambda0, lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC = 
-               BIC20, covgroup = covgroup, J = J)
+  # out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
+  #            ll = ll, ll0 = ll0, llb = llb, ll0b = ll0b, ll20 = ll20, 
+  #            lambda0 = lambda0, lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC = 
+  #              BIC20, covgroup = covgroup, J = J)
+  # if(returnMC == T) out$u = u
+  out = list(fit = fit, coef = coef, sigma = cov,  
+             lambda0 = lambda0, lambda1 = lambda1, 
+             covgroup = covgroup, J = J)
   if(returnMC == T) out$u = u
+  if(gibbs){ # gibbs = T
+    out$sampling = "Gibbs Sampling"
+  }else{
+    out$sampling = "Rejection Sampling"
+  }
   return(out)
 }
