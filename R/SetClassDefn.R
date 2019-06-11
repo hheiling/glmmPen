@@ -74,7 +74,7 @@ pglmmObj = setRefClass("pglmmObj",
                 call <<- x$call
                 # BIC_ICQ <<- x$BIC
                 # penalty <<- x$penalty
-                other <<- x$sampling
+                sampling <<- x$sampling
               },
               show = function(){
                 print(.self)
