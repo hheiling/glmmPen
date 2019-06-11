@@ -20,9 +20,11 @@ formulaData = function(formula, data = NULL, na.action){
       # Deal with NAs
       if(identical(na.action, na.omit) | identical(na.action, "na.omit")){ 
         data = na.omit(data[,colnames(model.frame(formula_full, data = data))])
+      }else if(identical(na.action, na.pass) | identical(na.action, "na.pass")){
+          data = newdata
       }else{
-        warning("This function not equipted to deal with NA values. \n
-                Please check that data does not contain NA values. \n", immediate. = T)
+        print(na.action)
+        stop("specified na.action is not available for 'predict' function")
       }
       
       ## Full data frame with fixed effects, random effects, and group var

@@ -175,7 +175,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
                             re.form = NULL, na.action = na.pass){
   ## Other arguments used by lme4: re.form, random.only = F, allow.new.levels = F, newparams = NULL
   
-  if(!is.null(newdata) && class(newdata) != data.frame){
+  if(!is.null(newdata) && class(newdata) != "data.frame"){
     stop("newdata must be a dataframe")
   }
   if(!is.null(re.form)){
@@ -196,41 +196,44 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
       
     # }else{ # Use newdata
       ## Get fixed effects - fixed vars be same in both original and new data
-      form_fixef = formula(object, fixed.only = T)
-      
-      
-      # Deal with NAs
-      if(na.action == na.omit){
-        data = na.omit(newdata[,colnames(model.frame(formula(object), newdata))])
-      }else if(na.action == na.pass){
-        data = newdata
-      }else{
-        print(na.action)
-        stop("specified na.action not recognized by function")
-      }
-      
-      ## Get new model frame - full model frame
-      mf = model.frame(formula(object), data)
-      
-      ## Get new fixed effects model.matrix
-      X = model.matrix(form_fixef, data)
-      ## for !is.null(newdata), both is.null(re.form) and !is.null(re.form) not covered
-      ## for now, only have is.null(re.form) option
+      # form_fixef = formula(object, fixed.only = T)
+      # 
+      # 
+      # # Deal with NAs
+      # if(identical(na.action, na.omit) | identical(na.action, "na.mit")){
+      #   data = na.omit(newdata[,colnames(model.frame(formula(object), newdata))])
+      # }else if(identical(na.action, na.pass) | identical(na.action, "na.pass")){
+      #   data = newdata
+      # }else{
+      #   print(na.action)
+      #   stop("specified na.action is not available for 'predict' function; \n
+      #        please use default na.action = na.omit")
+      # }
+      # 
+      # ## Get new model frame - full model frame
+      # mf = model.frame(formula(object), data)
+      # 
+      # ## Get new fixed effects model.matrix
+      # X = model.matrix(form_fixef, data)
+      # ## for !is.null(newdata), both is.null(re.form) and !is.null(re.form) not covered
+      # ## for now, only have is.null(re.form) option
+      # if(is.null(re.form)){
+      #   reExprs = findbars(formula(object))
+      #   reTrms = mkReTrms(reExprs, mf)
+      #   # t(Zt) from mkReTrms: columns organized by group level, then vars within group level
+      #   Zt = reTrms$Zt
+      #   # Assume only one group
+      #   group = reTrms$flist[[1]]
+      #   
+      #   d = nlevels(group)
+      #   Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
+      #   # Want Z columns organized by vars, then levels of group within vars
+      #   for(lev in 1:d){
+      #     Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = d, length.out = nrow(Zt)/d),])
+      #   }
       if(is.null(re.form)){
-        reExprs = findbars(formula(object))
-        reTrms = mkReTrms(reExprs, mf)
-        # t(Zt) from mkReTrms: columns organized by group level, then vars within group level
-        Zt = reTrms$Zt
-        # ASsume only one group
-        group = reTrms$flist[[1]]
-        
-        d = nlevels(group)
-        Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
-        # Want Z columns organized by vars, then levels of group within vars
-        for(lev in 1:d){
-          Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = d, length.out = nrow(Zt)/d),])
-        }
-        eta = etaCalc(X, Z, beta = fixef(object), U = object$gibbs_mcmc)
+        fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
+        eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = object$gibbs_mcmc)
         pred = switch(type, 
                       link = eta,
                       response = invLink(family = family(object), eta = eta))
