@@ -351,7 +351,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
              lambda0 = lambda0, lambda1 = lambda1, 
              covgroup = covgroup, J = J)
   if(returnMC == T) out$u = u
-  if(gibbs == T){
+  if(gibbs){ # gibbs = T
     out$sampling = "Gibbs Sampling"
   }else{
     out$sampling = "Rejection Sampling"
