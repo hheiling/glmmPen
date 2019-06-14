@@ -42,6 +42,10 @@ pglmmObj = setRefClass("pglmmObj",
                 y <<- x$Y
                 X <<- x$X
                 Z <<- x$Z
+                  rand_vars = rep(x$coef_names$random, each = d)
+                  grp_levs = rep(levs, times = length(x$coef_names$random))
+                  colnames(Z) <<- noquote(paste(rand_vars, grp_levs, sep = ":"))
+                  rownames(Z) <<- rownames(X)
                 frame <<- x$frame
                 
                 # Fixed effects coefficients
@@ -57,7 +61,7 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
                 gibbs_mcmc <<- x$u 
-                # colnames(gibbs_mcmc) = 
+                colnames(gibbs_mcmc) <<- colnames(Z)
                 
                 # Random effects coefficients
                 rand = colMeans(gibbs_mcmc) 
