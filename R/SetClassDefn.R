@@ -5,6 +5,7 @@ pglmmObj = setRefClass("pglmmObj",
             fields = list(
               fixef = "numeric", # fixed effects coefficients
               ranef = "list", # random effects coefficients
+              coef = "numeric",
               # coefficients = "numeric", # sum of fixed and random effects coefficients
               group = "list",
               sigma = "matrix", 
@@ -47,6 +48,9 @@ pglmmObj = setRefClass("pglmmObj",
                   colnames(Z) <<- noquote(paste(rand_vars, grp_levs, sep = ":"))
                   rownames(Z) <<- rownames(X)
                 frame <<- x$frame
+                
+                # coef vector from fit_dat
+                coef <<- x$coef
                 
                 # Fixed effects coefficients
                 p = ncol(X)
