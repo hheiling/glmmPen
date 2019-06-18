@@ -1,6 +1,6 @@
 #' @export
 sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
-  set.seed(NULL)
+  set.seed(seed = seed)
   library(mvtnorm)
   # set variables
   p = ptot
