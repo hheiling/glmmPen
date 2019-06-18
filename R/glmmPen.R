@@ -4,7 +4,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                   offset = NULL, weights = NULL, penalty = "grMCP",
                   lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T,
                   maxitEM = 100, trace = 0, conv = 0.001, 
-                  alpha = 1){
+                  alpha = 1, gibbs = NULL){
   # Things to address / Questions to answer:
   ## Add option for different penalties
   ## Specify what fit_dat output will be
@@ -42,15 +42,28 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   fD_out = formulaData(formula, data, na.action)
   
   ## Convert group to numeric factor - for fit_dat
-  if(any(is.character(fD_out$group))){
-    group = as.factor(as.numeric(fD_out$group))
-  }else{
-    group = fD_out$group
-  }
+  ## Even if already numeric, convert to levels 1,2,3,... (consecutive integers)
+  group_num = as.factor(as.numeric(fD_out$group))
+  # if(any(is.character(fD_out$group))){
+  #   group = as.factor(as.numeric(fD_out$group))
+  # }else{
+  #   group = fD_out$group
+  # }
 
-  data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, group = group)
+  data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, group = group_num)
   
   coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
+  
+  if(is.null(gibbs)){
+    if(length(fD_out$cnms) > 20){
+      gibbs = T
+    }else{
+      gibbs = F
+    }
+  }else if(!is.logical(gibbs)){
+    stop("gibbs is a logical variable; must be TRUE or FALSE")
+  }
+  
   
   # Things that should be included in call:
   ## formula, data, any other items included in glmmPen function call
@@ -60,7 +73,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   # fit_dat object found in "/R/fit_dat.R" file
   fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
                    family = family, trace = trace, penalty = penalty,
-                   conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = T,
+                   conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
                    maxitEM = maxitEM, alpha = alpha)
   
   # Things that should be included in fit_dat:
