@@ -128,6 +128,7 @@ model.matrix.pglmmObj = function(object, type = c("fixed", "random", "randomList
          "randomListRaw" = stop("'randomListRaw' option not available at this time"))
 }
 
+#' @export
 etaCalc = function(X, Z, beta, U){
 
   if(class(U) == "numeric"){ # U = vector instead of matrix; highly unlikely
@@ -141,6 +142,7 @@ etaCalc = function(X, Z, beta, U){
   return(eta)
 }
 
+#' @export
 invLink = function(family, eta){
   # Inverse link functions (canonical links only)
   if(family == "binomial"){
