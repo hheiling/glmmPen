@@ -233,11 +233,11 @@ residuals.pglmmObj = function(object, type = "response"){
 
 ################################################################### 
 # Print functions:
-cat_f = function(...){
-  cat(..., fill = T)
-}
+# cat_f = function(...){
+#   cat(..., fill = T)
+# }
 
-.prt.family = function(object){
+prt_family = function(object){
   f = object$family
   if(is.character(f)){
     fam = get(f, mode = "function")
@@ -245,25 +245,25 @@ cat_f = function(...){
   }else if(is.function(f)){
     family = f()
   }
-  cat_f(" Family:", family$family, paste(" (", family$link, ")"))
+  cat(" Family:", family$family, paste(" (", family$link, ")"), fill = T)
 }
 
-.prt.call <- function(object) {
+prt_call <- function(object) {
   # Copied some code from lme4 source code
   call = object$call
   if (!is.null(cc <- call$formula))
-    cat_f("Formula:", deparse(cc))
+    cat("Formula:", deparse(cc), fill = T)
   if (!is.null(cc <- call$data))
-    cat_f("   Data:", deparse(cc))
+    cat("   Data:", deparse(cc), fill = T)
   if (!is.null(cc <- call$weights))
-    cat_f("Weights:", deparse(cc))
+    cat("Weights:", deparse(cc), fill = T)
   if (!is.null(cc <- call$offset))
-    cat_f(" Offset:", deparse(cc))
+    cat(" Offset:", deparse(cc), fill = T)
   # if (!is.null(cc <- call$subset))
-  #   cat_f(" Subset:", deparse(cc))
+  #   cat(" Subset:", deparse(cc), fill = T)
 }
 
-.prt.fixef = function(object, digits){
+prt_fixef = function(object, digits){
   if(length(fef <- fixef(object)) > 0) {
     cat("Fixed Effects:\n")
     print.default(format(fef, digits = digits),
@@ -271,7 +271,7 @@ cat_f = function(...){
   } else cat("No fixed effect coefficients\n")
 }
 
-.prt.ranef = function(object, digits = 4){
+prt_ranef = function(object, digits = 4){
   cat("Random Effects:\n")
   # Create character matrix
   cnms = c("Group","Name","Variance")
@@ -291,7 +291,7 @@ cat_f = function(...){
   print(output, quote = F)
 }
 
-.prt.nobsgrps = function(object){
+prt_nobsgrps = function(object){
   cat(sprintf("Number Observations: %i,  groups: %s, %i", 
               nobs(object), names(object$group), nlevels(object$group[[1]])))
 }
@@ -305,15 +305,15 @@ print.pglmmObj = function(object, digits = c(4,4)){
   cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",  
       "  algorithm", " (", object$sampling, ") ", " ['", class(out_glmmPen), "'] ", fill = T, sep = "")
   # Family
-  .prt.family(object)
+  prt_family(object)
   # Call information: formula, data, weights, offset, (subset?)
-  .prt.call(object)
+  prt_call(object)
   # Fixed effects information
-  .prt.fixef(object, digits = digits[[1]])
+  prt_fixef(object, digits = digits[[1]])
   # Random effects information
-  .prt.ranef(object, digits = digits[[2]])
+  prt_ranef(object, digits = digits[[2]])
   # Number obs and groups
-  .prt.nobsgrps(object)
+  prt_nobsgrps(object)
   
   invisible(object)
 }
