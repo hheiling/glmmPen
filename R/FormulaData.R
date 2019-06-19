@@ -21,7 +21,7 @@ formulaData = function(formula, data = NULL, na.action){
       if(identical(na.action, na.omit) | identical(na.action, "na.omit")){ 
         data = na.omit(data[,colnames(model.frame(formula_full, data = data))])
       }else if(identical(na.action, na.pass) | identical(na.action, "na.pass")){
-          data = newdata
+          data = data
       }else{
         print(na.action)
         stop("specified na.action is not available for 'predict' function")
