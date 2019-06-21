@@ -174,22 +174,32 @@ fitted.pglmmObj = function(object){
 #' @importFrom stats predict
 #' @export
 predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
-                            re.form = NULL, na.action = na.pass){
+                            fixed.only = F, na.action = na.pass){
   ## Other arguments used by lme4: re.form, random.only = F, allow.new.levels = F, newparams = NULL
   
   if(!is.null(newdata) && class(newdata) != "data.frame"){
     stop("newdata must be a dataframe")
   }
-  if(!is.null(re.form)){
-    stop("option re.form not available at this time")
-  }
-
-  if(is.null(newdata) && is.null(re.form)){
-    pred = switch(type[1], # if unspecified, default = link output (linear predictor)
-                  response = fitted(object),
-                  link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$gibbs_mcmc))
-  }else if(!is.null(newdata) && is.null(re.form)){
-      fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
+  
+  if(is.null(newdata)){
+    if(!fixed.only){
+      pred = switch(type[1], # if unspecified, default = link output (linear predictor)
+                    link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), 
+                                   U = object$gibbs_mcmc),
+                    response = fitted(object))
+    }else{ # Fixed.only = T
+      eta = object$X %*% fixef(object)
+      pred = switch(type[1],
+                    link = eta,
+                    response = invLink(family = family(object), eta = eta))
+    }
+    
+    data = object$X
+    
+  }else{
+    
+    fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
+    if(!fixed.only){
       # Assume only one group
       if(nlevels(fD_out$group) != nlevels(object$group[[1]])){
         levs_orig = levels(object$group[[1]])
@@ -202,34 +212,80 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
         U = object$gibbs_mcmc
       }
       eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = U)
-      pred = switch(type, 
+      pred = switch(type[1], 
                     link = eta,
                     response = invLink(family = family(object), eta = eta))
-      if(class(pred) %in% c("dgeMatrix","matrix")){
-        if(is.null(rownames(data))){
-          rownames(pred) = seq_along(nrow(data))
-        }else{
-          rownames(pred) = rownames(data)
-        }
-      }else if(class(pred) == "numeric"){
-        if(is.null(rownames(data))){
-          names(pred) = seq_along(nrow(data))
-        }else{
-          names(pred) = rownames(data)
-        }
-      }
-      # In future, create code for option else(!is.null(re.form))
+      
+    }else{ # fixed.only = T
+      eta = fD_out$X %*% fixef(object)
+      pred = switch(type[1], 
+                    link = eta,
+                    response = invLink(family = family(object), eta = eta))
+    }
+    
+    data = newdata
+    
+    # In future, create code for option else(!is.null(re.form))
   }
+  
+  if(class(pred) %in% c("dgeMatrix","matrix")){
+    if(is.null(rownames(data))){
+      rownames(pred) = seq_len(nrow(data))
+    }else{
+      rownames(pred) = rownames(data)
+    }
+  }else if(class(pred) == "numeric"){
+    if(is.null(rownames(data))){
+      names(pred) = seq_len(nrow(data))
+    }else{
+      names(pred) = rownames(data)
+    }
+  }
+  
   return(pred)
+}
+
+var_hat = function(family, mu, sig2 = NULL){
+  if(family == "binomial"){
+    v_hat = mu*(1-mu)
+  }else if(family == "poisson"){
+    v_hat = mu
+  }else if(family == "gaussian"){
+    v_hat = sig2
+  }
+  return(v_hat)
+}
+
+ll = function(family, mu, y, v = NULL){
+  if(family == "binomial"){
+    llik = dbinom(y, size = 1, prob = mu, log = T)
+  }else if(family == "poisson"){
+    llik = dpois(y, lambda = mu, log = T)
+  }else if(family == "gaussian"){
+    llik = dnorm(y, mean = mu, sd = sqrt(v), log = T)
+  }
+  return(llik)
 }
 
 #' @importFrom stats predict
 #' @export
-residuals.pglmmObj = function(object, type = "response"){
-  # Add more type options?
+residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working")){
+  # What is working response?
   Y = object$y
-  mu = fitted(object)
-  res = Y - mu
+  mu = Matrix::as.matrix(fitted(object))
+  type = match.arg(type)
+  
+  if(type == "deviance"){
+    res = sign(Y - mu)*sqrt(-2*(ll(family(object), mu, Y)))
+  }else if(type == "pearson"){
+    res = (Y - mu) / sqrt(var_hat(family(object), mu))
+  }else if(type == "response"){
+    res = Y - mu
+  }else{
+    stop("working residuals not yet available")
+  }
+  
+  attr(res, "residual type") = type
   return(res)
 }
 
