@@ -5,8 +5,6 @@ pglmmObj = setRefClass("pglmmObj",
             fields = list(
               fixef = "numeric", # fixed effects coefficients
               ranef = "list", # random effects coefficients
-              coef = "numeric",
-              # coefficients = "numeric", # sum of fixed and random effects coefficients
               group = "list",
               sigma = "matrix", 
                 # sigma: Turn in to "dgCMatrix"? - sparse for large dimensions matrix
@@ -24,7 +22,8 @@ pglmmObj = setRefClass("pglmmObj",
               X = "matrix",
               Z = "dgCMatrix",
               frame = "data.frame",
-              sampling = "character"
+              sampling = "character",
+              extra = "list"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -48,9 +47,6 @@ pglmmObj = setRefClass("pglmmObj",
                   colnames(Z) <<- noquote(paste(rand_vars, grp_levs, sep = ":"))
                   rownames(Z) <<- rownames(X)
                 frame <<- x$frame
-                
-                # coef vector from fit_dat
-                coef <<- x$coef
                 
                 # Fixed effects coefficients
                 p = ncol(X)
@@ -83,6 +79,9 @@ pglmmObj = setRefClass("pglmmObj",
                 # BIC_ICQ <<- x$BIC
                 # penalty <<- x$penalty
                 sampling <<- x$sampling
+                
+                extra <<- list(fit = x$extra$fit, okindex = x$extra$okindex, 
+                               Znew2 = x$extra$Znew2, coef = x$coef)
               },
               show = function(){
                 print(.self)

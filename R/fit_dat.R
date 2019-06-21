@@ -128,9 +128,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       print("using u from full model to intialize")
       ufullinit = ufull
     }
-    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
+    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                        d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
   }else{
-    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
+    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                        d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
+                        uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
   }
   #u = bmmat(u)
   nMC2 = nrow(u)  
@@ -280,7 +283,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     lim = quantile(q, c(0.025, 0.975))
     
     ### E stepf
-    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, d = d, okindex = okindex, nZ= ncol(Z), gibbs = gibbs, uold = u0)
+    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                        d = d, okindex = okindex, nZ= ncol(Z), gibbs = gibbs, uold = u0)
     
     nMC2 = nrow(u)
     
@@ -349,7 +353,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # if(returnMC == T) out$u = u
   out = list(fit = fit, coef = coef, sigma = cov,  
              lambda0 = lambda0, lambda1 = lambda1, 
-             covgroup = covgroup, J = J)
+             covgroup = covgroup, J = J, 
+             extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   if(returnMC == T) out$u = u
   if(gibbs){ # gibbs = T
     out$sampling = "Gibbs Sampling"
