@@ -282,7 +282,7 @@ residuals.pglmmObj = function(object, type = c("deviance","pearson","response","
   }else if(type == "response"){
     res = Y - mu
   }else{
-    stop("working residuals not yet available")
+    res = (Y - mu) / mu
   }
   
   attr(res, "residual type") = type
@@ -374,6 +374,184 @@ print.pglmmObj = function(object, digits = c(4,4)){
   prt_nobsgrps(object)
   
   invisible(object)
+}
+
+#' @importFrom reshape2 melt
+#' @importFrom stringr str_c str_detect
+#' @export 
+plot_mcmc.pglmmObj = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
+                     grps = "all", vars = "all", numeric.grps = F){
+  # ToDo: Remove cols from U associated with vars with zero variance?
+  
+  if(object$sampling != "Gibbs Sampling"){
+    stop("The plots in plot_mcmc are only relevant when Gibbs sampling is used; \n
+         Rejection sampling was used in this case")
+  }
+  if(!is.vector(grps) | !is.vector(vars)){
+    stop("specified grps and vars must be vectors")
+  }
+  if("all" %in% plots){
+    type = c("sample.path","histogram","cumsum","autocorr")
+  }else{
+    if(any(!(plots %in% c("sample.path","histogram","cumsum","autocorr")))){
+      stop("Specified plot option(s) not recognized. ",
+           "Plots allowed: sample.path, histogram, cumsum, and/or autocorr")
+    }
+    type = plots
+  }
+  
+  U = object$gibbs_mcmc
+  U_cols = colnames(U)
+  # colnames organization = var_name:grp_name
+  
+  # If include intercept, convert to recognized form "Intercept"
+  if(vars != "all"){
+    v_int = c("Intercept","intercept","Int","int")
+    v_intTRUE = vars %in% v_int[-1]
+    vars[v_intTRUE] = "Intercept"
+  }
+  
+  if(grps == "all" && vars == "all"){
+    d = nlevels(object$group[[1]])
+    var_num = ncol(U) / d
+    U_keep = U
+    grp_names = levels(object$group[[1]])
+    var_names = colnames(ranef(object)[[1]])
+    
+  }else if(grps == "all" && vars != "all"){
+    d = nlevels(object$group[[1]])
+    var_num = length(vars)
+    # Concatenate [)]?, var_name, [)]?, and :
+    var_cat = str_c("[(]?",vars,"[)]?",":")
+    for(v in var_cat){
+      if(var_cat[1] == v){
+        U_keep = U[,str_detect(U_cols, v)]
+      }else{
+        U_keep = cbind(U_keep, U[,str_detect(U_cols, v)])
+      }
+    }
+    grp_names = levels(object$group[[1]])
+    var_names = vars
+    
+  }else if(vars == "all" && grps != "all"){
+    d = length(grps)
+    var_num = ncol(U) / nlevels(object$group[[1]])
+    # Concatenate :, grp_name, and $ to :grp_name$
+    grp_cat = str_c(":",grps,"$")
+    for(g in grp_cat){
+      if(grp_cat[1] == g){
+        U_keep0 = U[,str_detect(U_cols, g)]
+      }else{
+        U_keep0 = cbind(U_keep0, U[,str_detect(U_cols, g)])
+      }
+    }
+    grp_names = grps
+    var_names = colnames(ranef(object)[[1]])
+    U_keep = matrix(0, nrow = nrow(U_keep0), ncol = ncol(U_keep0))
+    cols_U_keep = numeric(length = ncol(U_keep0))
+    for(v in 1:length(var_names)){
+      U_keep[,(1+(v-1)*d):(v*d)] = U_keep0[,seq(from = v, by = var_num, length.out = d)]
+      cols_U_keep[(1+(v-1)*d):(v*d)] = colnames(U_keep0)[seq(from = v, by = var_num, length.out = d)]
+    }
+    colnames(U_keep) = cols_U_keep
+    
+  }else{ # both vars and grps != "all"
+    d = length(grps)
+    var_num = length(vars)
+    grp_cat = str_c(":",grps,"$")
+    for(g in grp_cat){
+      if(grp_cat[1] == g){
+        U_keep1 = U[,str_detect(U_cols, g)]
+      }else{
+        U_keep1 = cbind(U_keep1, U[,str_detect(U_cols, g)])
+      }
+    }
+    U_cols_keep1 = colnames(U_keep1)
+    var_cat = str_c("[(]?",vars,"[)]?",":")
+    for(v in var_cat){
+      if(var_cat[1] == v){
+        U_keep2 = U_keep1[,str_detect(U_cols_keep1, v)]
+      }else{
+        U_keep2 = cbind(U_keep2, U_keep1[,str_detect(U_cols_keep1, v)])
+      }
+    }
+    U_keep = U_keep2
+    grp_names = grps
+    var_names = vars
+  }
+  
+  if(numeric.grps){
+    grp_names = as.numeric(grp_names)
+  }
+  
+  num_plots = d*var_num
+  if(num_plots > 100){
+    warning("Number plots specified will be > 100. Consider limiting the groups or variables \n",
+            immediate. = T)
+  }
+  
+  U_t = data.frame(U_keep, t = 1:nrow(U_keep))
+  colnames(U_t) = c(colnames(U_keep), "t")
+  U_long = melt(U_t, id = "t")
+  U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
+                      grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = var_num))
+  
+  plots_return = list()
+  
+  if("sample.path" %in% type){
+    plot_sp = ggplot(U_plot, mapping = aes(x = t, y = value)) + geom_path() +
+      facet_grid(var_names ~ grp_names) + xlab("iteration t") + ylab("draws")
+    
+    plots_return$sample_path = plot_sp
+  }
+  if("histogram" %in% type){
+    hist_U = ggplot(U_plot) + geom_histogram(mapping = aes(x = value)) + 
+      facet_grid(var_names ~ grp_names) + xlab("draws")
+    
+    plots_return$histogram = hist_U
+  }
+  if("cumsum" %in% type){
+    U_means = colMeans(U_keep)
+    U_means = data.frame(rbind(U_means))[rep.int(1L, nrow(U_keep)), , drop = FALSE]
+    U_tmeans = apply(U_keep, 2, cumsum) / 1:nrow(U_keep)
+    U_tdiff = U_tmeans - U_means
+    U_cumsum = apply(U_tdiff, 2, cumsum)
+    U_t = data.frame(U_cumsum, t = 1:nrow(U_cumsum))
+    colnames(U_t) = c(colnames(U_keep), "t")
+    U_long = melt(U_t, id = "t")
+    U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
+                        grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = var_num)) 
+    plot_cumsum = ggplot(U_plot) + geom_smooth(mapping = aes(x = t, y = value), color = "black") +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      facet_grid(var_names ~ grp_names) + xlab("iteration t") + ylab("Cumulative Sum")
+    
+    plots_return$cumsum = plot_cumsum
+  }
+  if("autocorr" %in% type){
+    grp_index = rep(grp_names, times = var_num)
+    var_index = rep(var_names, each = d)
+    for(j in 1:ncol(U_keep)){
+      ACF = acf(U_keep[,j], plot=F, lag.max = 40)
+      ACF_df = with(ACF, data.frame(lag,acf))
+      ACF_df$grp_names = grp_index[j]
+      ACF_df$var_names = var_index[j]
+      if(j == 1){
+        ACF_all = ACF_df
+      }else{
+        ACF_all = rbind(ACF_all, ACF_df)
+      }
+    }
+    
+    plot_acf = ggplot(data = ACF_all, mapping = aes(x = lag, y = acf)) +
+      geom_hline(mapping = aes(yintercept = 0)) + 
+      geom_segment(mapping = aes(xend = lag, yend = 0)) +
+      facet_grid(var_names ~ grp_names)
+    
+    plots_return$autocorr = plot_acf
+  }
+  
+  return(plots_return)
+  
 }
 
 # # @exportMethod show
