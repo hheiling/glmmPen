@@ -4,7 +4,7 @@
 \alias{print.pglmmObj}
 \title{importFrom stats print}
 \usage{
-\method{print}{pglmmObj}(object, digits = c(4, 4))
+\method{print}{pglmmObj}(object, digits = c(fef = 4, ref = 4))
 }
 \description{
 importFrom stats print

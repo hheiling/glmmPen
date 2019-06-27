@@ -291,9 +291,6 @@ residuals.pglmmObj = function(object, type = c("deviance","pearson","response","
 
 ################################################################### 
 # Print functions:
-# cat_f = function(...){
-#   cat(..., fill = T)
-# }
 
 prt_family = function(object){
   f = object$family
@@ -356,20 +353,20 @@ prt_nobsgrps = function(object){
 
 #' importFrom stats print
 #' @export 
-print.pglmmObj = function(object, digits = c(4,4)){
+print.pglmmObj = function(object, digits = c(fef = 4, ref = 4)){
   # ToDo: Add in (best) lambda values, BIC, logLik
   
   # Title
   cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",  
-      "  algorithm", " (", object$sampling, ") ", " ['", class(out_glmmPen), "'] ", fill = T, sep = "")
+      "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = T, sep = "")
   # Family
   prt_family(object)
   # Call information: formula, data, weights, offset, (subset?)
   prt_call(object)
   # Fixed effects information
-  prt_fixef(object, digits = digits[[1]])
+  prt_fixef(object, digits = digits[1])
   # Random effects information
-  prt_ranef(object, digits = digits[[2]])
+  prt_ranef(object, digits = digits[2])
   # Number obs and groups
   prt_nobsgrps(object)
   
