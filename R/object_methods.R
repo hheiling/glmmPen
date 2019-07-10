@@ -351,7 +351,6 @@ prt_nobsgrps = function(object){
               nobs(object), names(object$group), nlevels(object$group[[1]])))
 }
 
-#' importFrom stats print
 #' @export 
 print.pglmmObj = function(object, digits = c(fef = 4, ref = 4)){
   # ToDo: Add in (best) lambda values, BIC, logLik
@@ -404,6 +403,7 @@ prt_resids = function(resids, type = "Pearson", digits) {
   cat("\n")
 }
 
+
 #' @export
 summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "deviance"){
   # ToDo: Add in (best) lambda values, BIC, logLik
@@ -431,6 +431,7 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "
 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
+#' @method plotMCMC pglmmObj
 #' @export 
 plot_mcmc.pglmmObj = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
                      grps = "all", vars = "all", numeric.grps = F){
@@ -629,6 +630,7 @@ plot_mcmc.pglmmObj = function(object, plots = c("all","sample.path","histogram",
   
 }
 
+#' @method plot pglmmObj
 #' @export
 plot.pglmmObj = function(object, x = fitted(object), y = residuals(object, type = "deviance"),
                       x_label = "Fitted Values", y_label = NULL){
