@@ -73,10 +73,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   ## formula, data, any other items included in glmmPen function call
   call = match.call(expand.dots = F)
   
-  rho = environment()
+  # rho = environment()
   if(!is.list(control) | !inherits(control, "pglmmControl")){
     stop("control parameter must be a list of type lambdaControl() or selectControl()")
   }
+  # print(inherits(control, "lambdaControl"))
   if(inherits(control, "lambdaControl")){
     lambda0 = control$lambda0
     lambda1 = control$lambda1
@@ -143,7 +144,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
 #' @export
 lambdaControl = function(lambda0 = 0, lambda1 = 0){
   structure(list(lambda0 = lambda0, lambda1 = lambda1), 
-            class = c("lambdaConrol","pglmmControl"))
+            class = c("lambdaControl","pglmmControl"))
 }
 
 #' @export
