@@ -431,7 +431,7 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "
 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
-#' @method plotMCMC pglmmObj
+#' @method plot_mcmc pglmmObj
 #' @export 
 plot_mcmc.pglmmObj = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
                      grps = "all", vars = "all", numeric.grps = F){
