@@ -122,7 +122,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                       penalty = penalty, returnMC = returnMC,
                       nMC = nMC, nMC_max = nMC_max, family = family, trace = trace,
                       ufull = NULL, coeffull = NULL, gibbs = gibbs,
-                      maxitEM = maxitEM, alpha = alpha, environ = rho)
+                      maxitEM = maxitEM, alpha = alpha)
     
   }
   
