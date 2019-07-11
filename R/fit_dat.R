@@ -128,12 +128,22 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       print("using u from full model to intialize")
       ufullinit = ufull
     }
-    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                        d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
+    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                              d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
+    u = u0 = samplemc_out$u0
+    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
+    if((gibbs == F) & samplemc_out$switch){ 
+      rej_to_gibbs = rej_to_gibbs + 1
+    }
   }else{
-    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                        d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
-                        uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
+    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                              d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
+                              uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
+    u = u0 = samplemc_out$u0
+    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
+    if((gibbs == F) & samplemc_out$switch){ 
+      rej_to_gibbs = rej_to_gibbs + 1
+    }
   }
   #u = bmmat(u)
   nMC2 = nrow(u)  
@@ -153,7 +163,16 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   # initialize zero count vectors
   c0 = rep(0, length(coef))
+  
+  # intitialize switch-from-rejection-sampling-to-gibbs-sampling counter
+  rej_to_gibbs = 0
+  
   for(i in 1:maxitEM){
+    
+    if((rej_to_gibbs > 2) & (gibbs == F)){
+      gibbs = T
+      cat("switched from rejection sampling to gibbs sampling \n")
+    }
     
     oldll = ll0
     
@@ -283,8 +302,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     lim = quantile(q, c(0.025, 0.975))
     
     ### E stepf
-    u = u0 = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                        d = d, okindex = okindex, nZ= ncol(Z), gibbs = gibbs, uold = u0)
+    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                              d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
+    u = u0 = samplemc_out$u0
+    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
+    if((gibbs == F) & samplemc_out$switch){ 
+      rej_to_gibbs = rej_to_gibbs + 1
+    }
     
     nMC2 = nrow(u)
     
@@ -351,15 +375,17 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   #            lambda0 = lambda0, lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC = 
   #              BIC20, covgroup = covgroup, J = J)
   # if(returnMC == T) out$u = u
+  
+  # Change to ll = logLik_imp
+  ll = 0
+  # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
+  # d = nlevels(group) = number independent subjects/groups
+  BICh = -2*ll + sum(diag(cov) != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
   out = list(fit = fit, coef = coef, sigma = cov,  
              lambda0 = lambda0, lambda1 = lambda1, 
-             covgroup = covgroup, J = J, 
+             covgroup = covgroup, J = J, ll = ll, BICh = BICh,
              extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   if(returnMC == T) out$u = u
-  if(gibbs){ # gibbs = T
-    out$sampling = "Gibbs Sampling"
-  }else{
-    out$sampling = "Rejection Sampling"
-  }
+  
   return(out)
 }
