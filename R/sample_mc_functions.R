@@ -155,6 +155,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                              y[select], uhat[index], nMC, 
                                              as.numeric((uold[nrow(uold),index, drop = FALSE])), trace)
           switch = T
+          print("switched to gibbs = T \n")
           }
       }else{
         u0[,index] = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
@@ -171,6 +172,8 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
     }    
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
+  
+  cat("switch: \n", switch)
   
   # return(u0)
   return(list(u0 = u0, switch = switch))
