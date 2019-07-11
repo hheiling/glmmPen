@@ -431,10 +431,10 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "
 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
-#' @method plot_mcmc pglmmObj
+# @method plot_mcmc pglmmObj
 #' @export 
-plot_mcmc.pglmmObj = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
-                     grps = "all", vars = "all", numeric.grps = F){
+plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
+                     grps = "all", vars = "all", numeric.grps = F){ #plot_mcmc.pglmmObj
   # ToDo: Remove cols from U associated with vars with zero variance?
   
   if(object$sampling != "Gibbs Sampling"){
