@@ -171,7 +171,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     if((rej_to_gibbs > 2) & (gibbs == F)){
       gibbs = T
-      cat("switched from rejection sampling to gibbs sampling \n")
+      print("switched from rejection sampling to gibbs sampling \n")
     }
     
     oldll = ll0
@@ -386,6 +386,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
              covgroup = covgroup, J = J, ll = ll, BICh = BICh,
              extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   if(returnMC == T) out$u = u
+  
+  cat(sprintf("rej_to_gibbs counter: %i \n"), rej_to_gibbs)
   
   return(out)
 }
