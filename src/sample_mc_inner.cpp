@@ -78,11 +78,11 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
   // Info for acceptance rate:
   if(trace > 1){
     acc_rate = naccept / index;
-    Rprintf("index: %d, naccept: %d, accept. rate: %d  \n", index, naccept, acc_rate);
+    Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
   }
   
   acc_rate = naccept / index;
-  Rprintf("index: %d, naccept: %d, accept. rate: %d  \n", index, naccept, acc_rate);
+  Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
   
   return(wrap(out));
 }
