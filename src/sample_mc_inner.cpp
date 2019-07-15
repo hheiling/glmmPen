@@ -43,7 +43,7 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
       break;
     }
     
-    if(index == round(0.1*pow(10,8))){
+    if(index == pow(10,6)){
       acc_rate = ((double)naccept) / index;
       if(acc_rate < pow(10,-3)){
         break;
