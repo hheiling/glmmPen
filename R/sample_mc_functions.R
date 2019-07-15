@@ -168,8 +168,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         if(length(index) == 0) next
         
         u0[,index] = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                           matrix(Z[select,index],ncol = length(index), 
-                                                  nrow = sum(select)),  
+                                           matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, 
                                            as.numeric((uold[nrow(uold),index, drop = FALSE])),
                                            trace) 
@@ -185,8 +184,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       if(length(index) == 0) next
       
       u0[,index] = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                         matrix(Z[select,index],ncol = length(index), 
-                                                nrow = sum(select)),  
+                                         matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, 
                                          as.numeric((uold[nrow(uold),index, drop = FALSE])),
                                          trace) 
