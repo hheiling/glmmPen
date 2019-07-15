@@ -165,7 +165,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     if(rej_to_gibbs > 2){
       gibbs = T
-      print("switched from rejection sampling to gibbs sampling \n")
+      print("permanently switched from rejection sampling to gibbs sampling \n")
     }
     
     oldll = ll0
