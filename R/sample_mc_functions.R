@@ -150,7 +150,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       if(nrow(draws) == nMC){
         u0[,index] = draws
       }else{ # If too small an acceptance rate
-        print("switched to gibbs sampling (single round) \n")
+        cat("switched to gibbs sampling (single round) \n")
         error_out = T
         next
       }
