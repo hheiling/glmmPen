@@ -1,8 +1,9 @@
 
 #' @export
-select.tune = function(dat, nMC, lambda0_range,lambda1_range, family, 
-                       vartol, conv, nMC_max, trace = 0,ufull = NULL, coeffull = NULL, gibbs = 
-                         T, maxitEM = 50, pnonzerovar = 0, alpha = 1){
+select_tune = function(dat, nMC, lambda0_range,lambda1_range, family, 
+                       penalty, returnMC = T,
+                       conv, nMC_max, trace = 0, ufull = NULL, coeffull = NULL, 
+                       gibbs = T, maxitEM = 50, alpha = 1){
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
@@ -31,10 +32,12 @@ select.tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       
       gc()
       print(sprintf("lambda0 %f lambda1 %f", lambda0_range[i], lambda1_range[j]))
-      out = try(fit.dat(dat, lambda0_scad = lambda0_range[i], lambda1_scad = lambda1_range[j], nMC = nMC, family = family, 
-                        group = dat$group, trace = trace, vartol = vartol, conv = conv, nMC_max = nMC_max, ufull = ufull, coeffull = coeffull0, 
-                        gibbs = gibbs, maxitEM = maxitEM + maxitEM*(j==1), pnonzerovar = 
-                          pnonzerovar, returnMC  = T, ufullinit = ufullinit, alpha = alpha))
+      out = try(fit_dat(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
+                        nMC = nMC, family = family, penalty = penalty,
+                        trace = trace, conv = conv, nMC_max = nMC_max, 
+                        ufull = ufull, coeffull = coeffull0, 
+                        gibbs = gibbs, maxitEM = maxitEM + maxitEM*(j==1), 
+                        returnMC = returnMC, ufullinit = ufullinit, alpha = alpha))
       
       if(is.character(out)) next
       
@@ -44,7 +47,7 @@ select.tune = function(dat, nMC, lambda0_range,lambda1_range, family,
         ui0 = out$u 
       }
       
-      BIC = out$BIC
+      BIC = out$BICh
       #print(out)
       print(BIC)
       if(!is.numeric(BIC)) BIC = Inf
@@ -57,7 +60,8 @@ select.tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       res[(i-1)*(n2)+j,1] = lambda0_range[i]
       res[(i-1)*(n2)+j,2] = lambda1_range[j]
       res[(i-1)*(n2)+j,3] = BIC
-      res[(i-1)*(n2)+j,4] = out$llb
+      # res[(i-1)*(n2)+j,4] = out$llb
+      res[(i-1)*(n2)+j,4] = out$ll
       res[(i-1)*(n2)+j,5] = sum(out$coef[2:ncol(dat$X)] !=0)
       res[(i-1)*(n2)+j,6] = sum(diag(out$sigma) !=0)
       res[(i-1)*(n2)+j,7] = sum(out$coef !=0)
@@ -75,7 +79,8 @@ select.tune = function(dat, nMC, lambda0_range,lambda1_range, family,
     if(is.character(outcv)){
       out2 = NULL
     }else{
-      bicglm = 2*outcv$fit$loss + log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
+      bicglm = 2*outcv$fit$loss + 
+        log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
       lambda.min = outcv$fit$lambda[which.min(bicglm)]
       out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
     }
@@ -101,9 +106,5 @@ select.tune = function(dat, nMC, lambda0_range,lambda1_range, family,
     out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
   }
   
-  
-  
-  
-  #return(list(result = res, out = fout, res2 = outcv, out2 = out2, coef = coef, outl)) # outl made file too big
   return(list(result = res, out = fout, res2 = outcv, out2 = out2, coef = coef, outind = outind))
 }

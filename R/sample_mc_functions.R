@@ -1,19 +1,9 @@
 #' @export
 sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex ){
   # Things to address:
-  ## Will already deal with family specification in glmmPen, can remove family adjustments here
   ## Will need to make sure family "if else" statements are consistent 
   
   f = get(family, mode = "function", envir = parent.frame())
-  # Can delete commented section below later: will already have family restriction in glmmPen()
-  # if(family == "binomial"){
-  #   f = binomial()
-  # }else if(family == "poisson"){
-  #   f = poisson()
-  # }else{
-  #   print(family)
-  #   stop("family not specified properly")
-  # }
   
   # find tau for rejection sampler (Booth 1999) by first maximizing u
   if(length(okindex) > 0){
@@ -101,17 +91,11 @@ sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", gro
   return(u0)
 }
 
-sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex,
+#' @export
+sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
                       gibbs = F , uold){
   
-  if(family == "binomial"){
-    f = binomial()
-  }else if(family == "poisson"){
-    f = poisson()
-  }else{
-    print(family)
-    stop("family not specified properly")
-  }
+  f = get(family, mode = "function", envir = parent.frame())
   
   # find tau for rejection sampler (Booth 1999) by first maximizing u
   if(length(okindex) > 0 & gibbs == F){
@@ -142,26 +126,74 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", gr
   fitted_mat = as.matrix(X %*% fit$coef[1:ncol(X)])
   #generate samples for each i
   
-  for(i in 1:d){
-    select = group == i
-    index = seq(i, ncol(Z), by = d)
-    ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-    index = index[which(diag(cov) != 0)]
-    if(length(index) == 0) next
-    ###
+  error_out = F
+  
+  if(gibbs == F){ # Rejection sampling
     
-    if(gibbs == F){
-      u0[,index] = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                   matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-                                   y[select], tau[select], nMC)
-    }else{
+    for(i in 1:d){
+      
+      if(error_out){
+        next
+      }
+      
+      select = group == i
+      index = seq(i, ncol(Z), by = d)
+      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
+      index = index[which(diag(cov) != 0)]
+      if(length(index) == 0) next
+      
+      draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
+                              y[select], tau[select], nMC, trace)
+      
+      # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
+      if(nrow(draws) == nMC){
+        u0[,index] = draws
+      }else{ # If too small an acceptance rate
+        cat("switched to gibbs sampling (single round) \n")
+        error_out = T
+        next
+      }
+      
+    }
+    
+    # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
+    # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
+    if(error_out){
+      for(i in 1:d){
+        select = group == i
+        index = seq(i, ncol(Z), by = d)
+        ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
+        index = index[which(diag(cov) != 0)]
+        if(length(index) == 0) next
+        
+        u0[,index] = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+                                           matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
+                                           y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace) 
+      }
+    }
+    
+  }else{ # Gibbs sampling
+    for(i in 1:d){
+      select = group == i
+      index = seq(i, ncol(Z), by = d)
+      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
+      index = index[which(diag(cov) != 0)]
+      if(length(index) == 0) next
+      
       u0[,index] = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                         y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE]))) #as.numeric(colMeans(uold[,index, drop = FALSE])))
-    }    
+                                         y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace)
+    }
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   
-  return(u0)
+  if(gibbs == F){
+    cat("switch: ", error_out, "\n")
+  }
+  
+  # return(u0)
+  # switch: variable indicating if switched from rejection sampling to gibbs sampling
+  return(list(u0 = u0, switch = error_out))
 }
 

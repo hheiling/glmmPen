@@ -14,7 +14,7 @@ Description: Fits penalized high and low dimensional generalized linear mixed mo
     Supports fitting of logistic regression models and MCP penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
-Imports: stringr
+Imports: stringr, reshape2, ggplot2
 Depends: lme4, irr, ncvreg, mvtnorm, ROCR, grpreg, glmnet, inline, bigalgebra,
     Rcpp, RcppArmadillo, bigmemory, BH
 LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH

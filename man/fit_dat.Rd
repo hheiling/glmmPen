@@ -5,12 +5,10 @@
 \title{Fit a penalized generalized mixed model (pGLMM) via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
-fit_dat(dat, lambda0_scad = 0, lambda1_scad = 0, conv = 0.001,
-  nMC = 1000, family = "binomial", type = "hmmcov", trace = 0,
-  initcov = NULL, glmIALconv = 1e-12, d = 2, group, alpha = 1,
-  vartol = 0.1, nMC_max = 5000, returnMC = F, ufull = NULL,
-  coeffull = NULL, gibbs = F, maxitEM = 100, pnonzerovar = 0,
-  ufullinit = NULL)
+fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
+  family = "binomial", trace = 0, penalty = "grMCP", alpha = 1,
+  nMC_max = 5000, returnMC = F, ufull = NULL, coeffull = NULL,
+  gibbs = T, maxitEM = 100, ufullinit = NULL)
 }
 \arguments{
 \item{dat}{Input list object specifying y (response vector), X (matrix of all covariates), 

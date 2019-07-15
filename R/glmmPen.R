@@ -1,16 +1,16 @@
 #' @importFrom stringr str_to_lower
-#' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export
-glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
-                  offset = NULL, weights = NULL, # penalty,
-                  lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T, gibbs = T,
-                  maxitEM = 100, trace = 0, vartol = 0.00, conv = 0.001, pnonzerovar = 0, 
-                  alpha = 1){
+glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omit,
+                  offset = NULL, weights = NULL, penalty = "grMCP",
+                  nMC = 100, nMC_max = 2000, returnMC = T,
+                  maxitEM = 100, trace = 0, conv = 0.001, 
+                  alpha = 1, gibbs = NULL, control = lambdaControl()
+                  ){
   # Things to address / Questions to answer:
-  ## dat$pnonzero and pnonzerovar should equal ... ?
   ## Add option for different penalties
   ## Specify what fit_dat output will be
   ## Provide option for offset, weights
+  ## gibbs T / F: internally specify T or F depending on X and Z dimensions
   
   # Input modification and restriction for family
   if(is.character(family)){
@@ -35,235 +35,122 @@ glmmPen = function(formula, data, family = "binomial", na.action = "na.omit",
   if(nMC_max < nMC){
     warning("nMC_max should not be smaller than nMC \n", immediate. = T)
   }
-  if(lambda0 < 0 | lambda1 < 0){
-    stop("lambda0 and lambda1 cannot be negative")
-  }
-
-  # Deal with NAs
-  if(na.action == "na.omit"){ # Need to use character? Is na.action a function? ...
-    na.omit(data)
-  }else{
-    warning("This function not equipted to deal with NA values. \n
-            Please check that data does not contain NA values. \n", immediate. = T)
-  }
 
   # Convert formula and data to useful forms to plug into fit_dat
-  ## substitute | for +
-  mod_frame_full = subbars(formula)
-  ## Add offset = offset, weights = weights in model.frame function?
-  frame_full = model.frame(mod_frame_full, data = data)
-
-  ## Identify random effects
-  ### If no | (no random effects listed) then stop - mkBlist called by mkReTrms give this error
-  reExprs = findbars(formula)
-  reTrms = mkReTrms(reExprs, frame_full)
-  # t(Zt) from mkReTrms: columns organized by group level, then vars within group level
-  Zt = reTrms$Zt
-  group = reTrms$flist
+  fD_out = formulaData(formula, data, na.action)
   
-  # Change group condition below?
-  if(length(reTrms$flist) > 1){
-    stop("procedure can only handle one group")
+  ## Convert group to numeric factor - for fit_dat
+  ## Even if already numeric, convert to levels 1,2,3,... (consecutive integers)
+  group_num = as.factor(as.numeric(fD_out$group))
+  # if(any(is.character(fD_out$group))){
+  #   group = as.factor(as.numeric(fD_out$group))
+  # }else{
+  #   group = fD_out$group
+  # }
+
+  data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, group = group_num)
+  
+  coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
+  
+  if(is.null(gibbs)){
+    if(length(fD_out$cnms) > 20){
+      gibbs = T
+    }else{
+      gibbs = F
+    }
+  }else if(!is.logical(gibbs)){
+    stop("gibbs is a logical variable; must be TRUE or FALSE")
+  }
+  
+  if(gibbs){
+    sampling = "Gibbs Sampling"
   }else{
-    group = reTrms$flist[[1]]
-    group_name = names(reTrms$flist)
+    sampling = "Rejection Sampling"
   }
   
-  d = nlevels(group[[1]])
-  Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
-  # Want Z columns organized by vars, then levels of group within vars
-  for(lev in 1:d){
-    Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = d, length.out = nrow(Zt)/d),])
-  }
-  Z_dense = Matrix::as.matrix(Z) # Convert Z to dense matrix
-  
-  ## Get fixed effects X matrix
-  formula_nobars = nobars(formula)
-  X = model.matrix(formula_nobars, data)
-  # Problem if variable specified in formula is the intercept / a constant column 
-  # and -1 not included in formula
-  constant_cols = X[,apply(X, 2, var, na.rm=TRUE) == 0]
-  ## Change to matrix (X not data.frame)
-  if(class(constant_cols) == "matrix"){ # If true, more than one column with zero variance
-    stop("Variable(s) in formula has zero variance (constant column).
-         Either remove this variable from formula or specify -1 in formula")
-  } # If only one column, class(constant_cols) == "numeric"
-
-  ## Make sure colnames random effects subset of colnames X
-  cnms = reTrms$cnms[[1]]
-  if(sum(!(cnms %in% colnames(X))) > 0){
-    stop("random effects must be a subset of fixed effects")
-  }
-
-  ## Creating response variable Y
-  Y = model.response(frame_full)
-  ### Other options if including offset and/or weights?
-  ### Use mkRespMod if offset / weights used
-  if(is.null(offset) && is.null(weights)){
-    Y = model.response(frame_full)
-  }else{
-    # This currently doesn't work; need to experiment with and fix
-    # Y = lme4::mkRespMod(frame_full, family = family, y = model.response(frame_full),
-    #               offset = offset, weights = weights)
-    stop("glmmPen function currently not enabled to use offset and weight parameters")
-  }
-
-  data_input = list(y = Y, X = X, Z = Z_dense, group = group, pnonzero = ncol(X))
-  
-  coef_names = list(fixed = colnames(X), random = cnms, group = group_name)
   
   # Things that should be included in call:
   ## formula, data, any other items included in glmmPen function call
   call = match.call(expand.dots = F)
-
-  # Call fit_dat function - adjust to use match.call object?
-  # fit_dat object found in "/R/fit_dat.R" file
-  fit = fit_dat(dat = data_input, lambda0_scad = lambda0, lambda1_scad = lambda1, nMC = nMC,
-                   family = family, group = group, trace = trace, vartol = vartol,
-                   conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
-                   pnonzerovar = ncol(Z), maxitEM = maxitEM, alpha = alpha)
+  
+  # rho = environment()
+  if(!is.list(control) | !inherits(control, "pglmmControl")){
+    stop("control parameter must be a list of type lambdaControl() or selectControl()")
+  }
+  # print(inherits(control, "lambdaControl"))
+  if(inherits(control, "lambdaControl")){
+    lambda0 = control$lambda0
+    lambda1 = control$lambda1
+    if(lambda0 < 0 | lambda1 < 0){
+      stop("lambda0 and lambda1 cannot be negative")
+    }
+    # Call fit_dat function
+    # fit_dat object found in "/R/fit_dat.R" file
+    fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
+                  family = family, trace = trace, penalty = penalty,
+                  conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
+                  maxitEM = maxitEM, alpha = alpha)
+  }else if(inherits(control, "selectControl")){
+    stop("selectControl option not yet available")
+    
+    if(is.null(control$lambda0_seq)){
+      # Calculate lambda0_range
+      const = 10^-3
+      lam_max = 2
+      lam_min = const * lam_max
+      lambda0_range = seq(from = log(lam_max), to = log(lam_min), length.out = 40)
+    }else{
+      lambda0_range = control$lambda0_seq
+      if(!is.numeric(lambda0_range) | any(lambda0_range < 0)){
+        stop("lambda0_seq must be a positive numeric sequence")
+      }
+    }
+    if(is.null(control$lambda1_seq)){
+      # Calculate lambda0_range
+      const = 10^-3
+      lam_max = 2
+      lam_min = const * lam_max
+      lambda1_range = seq(from = log(lam_max), to = log(lam_min), length.out = 40)
+    }else{
+      lambda1_range = control$lambda1_seq
+      if(!is.numeric(lambda1_range) | any(lambda1_range < 0)){
+        stop("lambda1_seq must be a positive numeric sequence")
+      }
+    }
+    
+    fit = select_tune(dat = data_input, lambda0_range = lambda0_range, lambda1 = lambda1_range,
+                      penalty = penalty, returnMC = returnMC,
+                      nMC = nMC, nMC_max = nMC_max, family = family, trace = trace,
+                      ufull = NULL, coeffull = NULL, gibbs = gibbs,
+                      maxitEM = maxitEM, alpha = alpha)
+    
+  }
   
   # Things that should be included in fit_dat:
   ## (fill in later)
 
   # Format Output - create pglmmObj object
-  output = c(fit, list(call = call, formula = formula, data = data, Y = Y, X = X, Z = Z,
-                       group = reTrms$flist, coef_names = coef_names, family = family,
-                       offset = offset, weights = weights, frame = frame_full))
+  output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y, 
+                       X = fD_out$X, Z = fD_out$Z, group = fD_out$flist, 
+                       coef_names = coef_names, family = family,
+                       offset = offset, weights = weights, frame = fD_out$frame,
+                       sampling = sampling))
 
-  
   out_object = pglmmObj$new(output)
   return(out_object)
 
 }
 
-# @export
-# glmmPen_test = function(formula, data, family = "binomial", na.action = "na.omit",
-#                    offset = NULL, weights = NULL, fitdat_output, # penalty,
-#                    lambda0 = 0, lambda1 = 0, nMC = 100, nMC_max = 2000, returnMC = T, gibbs = T,
-#                    maxitEM = 100, trace = 0, vartol = 0.00, conv = 0.001, pnonzerovar = 0, 
-#                    alpha = 1){
-#   # Things to address / Questions to answer:
-#   ## dat$pnonzero and pnonzerovar should equal ... ?
-#   ## Add option for different penalties
-#   ## Specify what fit_dat output will be
-#   ## Provide option for offset, weights
-#   
-#   # Input modification and restriction for family
-#   if(is.character(family)){
-#     # library(stringr)
-#     family = str_to_lower(family)
-#   }
-#   if(is.function(family)){
-#     family = family$family
-#   }
-#   if(!(family %in% c("binomial"))){
-#     print(family)
-#     stop("'family' not recognized")
-#   }
-#   
-#   # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
-#   if(class(data) != "data.frame"){
-#     stop("data must be of class 'data.frame'")
-#   }
-#   if(sum(c(nMC, nMC_max, maxitEM) %% 1) > 0 | sum(c(nMC, nMC_max, maxitEM) <= 0) > 0){
-#     stop("nMC, nMC_max, and maxitEM must be positive integers")
-#   }
-#   if(nMC_max < nMC){
-#     warning("nMC_max should not be smaller than nMC \n", immediate. = T)
-#   }
-#   if(lambda0 < 0 | lambda1 < 0){
-#     stop("lambda0 and lambda1 cannot be negative")
-#   }
-#   
-#   # Deal with NAs
-#   if(na.action == "na.omit"){ # Need to use character? Is na.action a function? ...
-#     na.omit(data)
-#   }else{
-#     warning("This function not equipted to deal with NA values. \n
-#             Please check that data does not contain NA values. \n", immediate. = T)
-#   }
-#   
-#   # Convert formula and data to useful forms to plug into fit_dat
-#   ## substitute | for +
-#   mod_frame_full = subbars(formula)
-#   ## Add offset = offset, weights = weights in model.frame function?
-#   frame_full = model.frame(mod_frame_full, data = data)
-#   
-#   ## Identify random effects
-#   ### If no | (no random effects listed) then stop(suggestion: use glmnet or ncvreg package instead)
-#   reExprs = findbars(formula)
-#   reGrpList = mkReTrms_glmmPen(reExprs, frame_full)
-#   
-#   Z = t(as.matrix(reGrpList$Zt))
-#   
-#   # Change group condition below?
-#   if(length(reGrpList$flist) > 1){
-#     stop("procedure can only handle one group")
-#   }else{
-#     group = reGrpList$flist[[1]]
-#     group_name = names(reGrpList$flist)
-#   }
-#   
-#   ## Get fixed effects X matrix
-#   formula_nobars = nobars(formula)
-#   X = model.matrix(formula_nobars, data)
-#   # Problem if variable specified in formula is the intercept / a constant column 
-#   # and -1 not included in formula
-#   constant_cols = X[,apply(X, 2, var, na.rm=TRUE) == 0]
-#   ## Change to matrix (X not data.frame)
-#   if(class(constant_cols) == "matrix"){ # If true, more than one column with zero variance
-#     stop("Variable(s) in formula has zero variance (constant column).
-#          Either remove this variable from formula or specify -1 in formula")
-#   } # If only one column, class(constant_cols) == "numeric"
-#   
-#   ## Make sure colnames random effects subset of colnames X
-#   cnms = reGrpList$cnms[[1]]
-#   if(sum(!(cnms %in% colnames(X))) > 0){
-#     stop("random effects must be a subset of fixed effects")
-#   }
-#   
-#   ## Creating response variable Y
-#   Y = model.response(frame_full)
-#   ### Other options if including offset and/or weights?
-#   ### Use mkRespMod if offset / weights used
-#   if(is.null(offset) && is.null(weights)){
-#     Y = model.response(frame_full)
-#   }else{
-#     # This currently doesn't work; need to experiment with and fix
-#     # Y = lme4::mkRespMod(frame_full, family = family, y = model.response(frame_full),
-#     #               offset = offset, weights = weights)
-#     stop("glmmPen function currently not enabled to use offset and weight parameters")
-#   }
-#   
-#   data_input = list(y = Y, X = X, Z = Z, group = group, pnonzero = ncol(X))
-#   
-#   coef_names = list(fixed = colnames(X), random = cnms, group = group_name)
-#   
-#   # Things that should be included in call:
-#   ## formula, data, any other items included in glmmPen function call
-#   call = match.call(expand.dots = F)
-#   
-#   # Call fit_dat function - adjust to use match.call object?
-#   # fit_dat object found in "/R/fit_dat.R" file
-#   # fit = fit_dat(dat = data_input, lambda0_scad = lambda0, lambda1_scad = lambda1, nMC = nMC,
-#   #               family = family, group = group, trace = trace, vartol = vartol,
-#   #               conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
-#   #               pnonzerovar = ncol(Z), maxitEM = maxitEM, alpha = alpha)
-#   
-#   fit = fitdat_output
-#   
-#   # Things that should be included in fit_dat:
-#   ## (fill in later)
-#   
-#   # Format Output - create pglmmObj object
-#   output = c(fit, list(call = call, formula = formula, data = data, Y = Y, X = X, Z = Z,
-#                        group = reGrpList$flist, coef_names = coef_names, family = family,
-#                        offset = offset, weights = weights, frame = frame_full))
-#   
-#   
-#   out_object = pglmmObj$new(output)
-#   return(out_object)
-#   
-#   }
-# 
+#' @export
+lambdaControl = function(lambda0 = 0, lambda1 = 0){
+  structure(list(lambda0 = lambda0, lambda1 = lambda1), 
+            class = c("lambdaControl","pglmmControl"))
+}
+
+#' @export
+selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL){
+  structure(list(lambda0_seq = lambda0_seq,
+                 lambda1_seq = lambda1_seq),
+            class = c("selectControl", "pglmmControl"))
+}
+

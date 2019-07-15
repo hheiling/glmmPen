@@ -10,7 +10,8 @@ NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
                           arma::vec y, // vector
                           arma::vec t, // vector
                           int NMC, // integer
-                          arma::vec u0){ // matrix
+                          arma::vec u0, //matrix
+                          int trace){ // integer
   arma::mat fitted = f;
   arma::mat Z=z;
   arma::vec Y=y;
@@ -32,6 +33,7 @@ NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
   double sumn = 0;
   // double stao = 0;
   double w = 0;
+  double acc_rate = 0;
   double ep = 0; 
   double e0 = 0;
   arma::mat out(nMC, q);
@@ -95,6 +97,12 @@ NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
     }
     index++;
     
+  }
+  
+  // Info for acceptance rate:
+  if(trace == 2){
+    acc_rate = ((double)naccept) / index;
+    Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
   }
   
   return(wrap(out));

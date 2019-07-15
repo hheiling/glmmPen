@@ -10,13 +10,13 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
                               arma::mat z, // matrix
                               arma::vec y, // vector
                               arma::vec t, // vector
-                              int NMC) {
+                              int NMC, //integer
+                              int trace){ //integer
   arma::mat fitted=f;
   arma::mat Z=z;
   arma::vec Y=y;
   arma::vec tau =t;
   int nMC = NMC;
-  
   
   int q = Z.n_cols;
   int n = Z.n_rows;
@@ -27,7 +27,9 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
   double sum = 0;
   double stao = 0;
   double w = 0;
+  double acc_rate = 0;
   arma::mat out(nMC, q);
+  arma::mat error_out(nMC-3, q);
   arma::vec e(q);
   arma::vec etae(n);
   
@@ -39,6 +41,13 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
     
     if((naccept == 0) & (index > pow(10,8))){
       break;
+    }
+    
+    if(index == pow(10,6)){
+      acc_rate = ((double)naccept) / index;
+      if(acc_rate < pow(10,-3)){
+        break;
+      }
     }
     
     //populate e
@@ -63,8 +72,19 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
       naccept++;
     }
     index++;
-    //Rprintf("%d %d  ", index, naccept);
     
   } 
-  return(wrap(out));
+  
+  // Info for acceptance rate:
+  if(trace == 2){
+    acc_rate = ((double)naccept) / index;
+    Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
+  }
+  
+  if(naccept == nMC){
+    return(wrap(out));
+  }else{
+    return(wrap(error_out));
+  }
+  
 }
