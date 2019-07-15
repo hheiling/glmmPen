@@ -18,7 +18,6 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
   arma::vec tau =t;
   int nMC = NMC;
   
-  
   int q = Z.n_cols;
   int n = Z.n_rows;
   

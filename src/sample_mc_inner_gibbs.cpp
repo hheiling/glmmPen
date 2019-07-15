@@ -10,8 +10,8 @@ NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
                           arma::vec y, // vector
                           arma::vec t, // vector
                           int NMC, // integer
-                          int trace, // integer
-                          arma::vec u0){ // matrix
+                          arma::vec u0, //matrix
+                          int trace){ // integer
   arma::mat fitted = f;
   arma::mat Z=z;
   arma::vec Y=y;
