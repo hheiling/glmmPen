@@ -126,8 +126,9 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   fitted_mat = as.matrix(X %*% fit$coef[1:ncol(X)])
   #generate samples for each i
   
+  error_out = F
+  
   if(gibbs == F){ # Rejection sampling
-    error_out = F
     
     for(i in 1:d){
       
