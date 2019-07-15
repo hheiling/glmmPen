@@ -387,7 +387,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
              extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   if(returnMC == T) out$u = u
   
-  cat(sprintf("rej_to_gibbs counter: %i \n"), rej_to_gibbs)
+  cat(sprintf("rej_to_gibbs counter: %i \n", rej_to_gibbs))
   
   return(out)
 }
