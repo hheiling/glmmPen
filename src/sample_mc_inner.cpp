@@ -30,6 +30,7 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
   double w = 0;
   double acc_rate = 0;
   arma::mat out(nMC, q);
+  arma::mat error_out(nMC-3, q);
   arma::vec e(q);
   arma::vec etae(n);
   
@@ -81,8 +82,13 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
     Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
   }
   
-  acc_rate = naccept / index;
-  Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
+  // acc_rate = naccept / index;
+  Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, naccept / index);
   
-  return(wrap(out));
+  if(naccept == nMC){
+    return(wrap(out));
+  }else{
+    return(wrap(error_out));
+  }
+  
 }
