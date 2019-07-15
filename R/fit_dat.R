@@ -300,7 +300,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                               d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
     u = u0 = samplemc_out$u0
     # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
-    if((gibbs == F) & samplemc_out$switch){ 
+    if(samplemc_out$switch){ 
       rej_to_gibbs = rej_to_gibbs + 1
     }
     
