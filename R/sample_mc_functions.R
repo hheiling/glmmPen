@@ -187,8 +187,10 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
     }
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-
-  cat("switch: ", error_out, "\n")
+  
+  if(gibbs == F){
+    cat("switch: ", error_out, "\n")
+  }
   
   # return(u0)
   # switch: variable indicating if switched from rejection sampling to gibbs sampling

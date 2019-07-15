@@ -38,6 +38,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     nTotal = NULL
   }
   
+  inital_gibbs = gibbs
+  
   if(ncol(Z)/d <= 15){
     # create J, q2 x q*(q+1)/2
     J = Matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2, sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2)
@@ -121,6 +123,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     if(!any(is.na(Znew2))) finish = 1
   }
   
+  # intitialize switch-from-rejection-sampling-to-gibbs-sampling counter
+  rej_to_gibbs = 0
+  
   if((!is.null(ufull) | !is.null(ufullinit)) & !is.null(coeffull)){
     if(!is.null(ufullinit)){
       print("using u from previous model to intialize")
@@ -137,6 +142,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                               d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
                               uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
     u = u0 = samplemc_out$u0
+    
+    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
+    if(samplemc_out$switch){ 
+      rej_to_gibbs = rej_to_gibbs + 1
+      cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+    }
     
   }
   #u = bmmat(u)
@@ -158,14 +169,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # initialize zero count vectors
   c0 = rep(0, length(coef))
   
-  # intitialize switch-from-rejection-sampling-to-gibbs-sampling counter
-  rej_to_gibbs = 0
-  
   for(i in 1:maxitEM){
     
-    if(rej_to_gibbs > 2){
+    if(rej_to_gibbs == 3){
       gibbs = T
       cat("permanently switched from rejection sampling to gibbs sampling \n")
+      rej_to_gibbs = rej_to_gibbs + 1
     }
     
     oldll = ll0
@@ -296,13 +305,14 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     lim = quantile(q, c(0.025, 0.975))
     
     ### E stepf
-    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                               d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
     u = u0 = samplemc_out$u0
+    
     # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
     if(samplemc_out$switch){ 
       rej_to_gibbs = rej_to_gibbs + 1
-      cat("intermediate rej_to_gibbs: ", rej_to_gibbs, "\n")
+      cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
     }
     
     nMC2 = nrow(u)
@@ -382,7 +392,14 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
              extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   if(returnMC == T) out$u = u
   
-  cat(sprintf("ending rej_to_gibbs counter: %i \n", rej_to_gibbs))
+  if(initial_gibbs == F){
+    if(rej_to_gibbs <= 3){
+      cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs))
+    }else{
+      # To correct for additional rej_to_gibbs + 1 when rej_to_gibbs = 3
+      cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs-1))
+    }
+  }
   
   return(out)
 }
