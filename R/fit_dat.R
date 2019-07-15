@@ -131,19 +131,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                               d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
     u = u0 = samplemc_out$u0
-    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
-    if((gibbs == F) & samplemc_out$switch){ 
-      rej_to_gibbs = rej_to_gibbs + 1
-    }
+    
   }else{
     samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                               d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
                               uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
     u = u0 = samplemc_out$u0
-    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
-    if((gibbs == F) & samplemc_out$switch){ 
-      rej_to_gibbs = rej_to_gibbs + 1
-    }
+    
   }
   #u = bmmat(u)
   nMC2 = nrow(u)  
