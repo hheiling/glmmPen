@@ -169,7 +169,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   for(i in 1:maxitEM){
     
-    if((rej_to_gibbs > 2) & (gibbs == F)){
+    if(rej_to_gibbs > 2){
       gibbs = T
       print("switched from rejection sampling to gibbs sampling \n")
     }
