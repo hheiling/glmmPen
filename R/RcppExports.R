@@ -5,8 +5,8 @@ sample_mc_inner <- function(f, z, y, t, NMC, trace) {
     .Call('_glmmPen_sample_mc_inner', PACKAGE = 'glmmPen', f, z, y, t, NMC, trace)
 }
 
-sample_mc_inner_gibbs <- function(f, z, y, t, NMC, trace, u0) {
-    .Call('_glmmPen_sample_mc_inner_gibbs', PACKAGE = 'glmmPen', f, z, y, t, NMC, trace, u0)
+sample_mc_inner_gibbs <- function(f, z, y, t, NMC, u0, trace) {
+    .Call('_glmmPen_sample_mc_inner_gibbs', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, trace)
 }
 
 arma_test_value <- function(x) {
