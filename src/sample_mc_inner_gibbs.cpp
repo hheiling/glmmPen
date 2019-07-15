@@ -100,8 +100,8 @@ NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
   }
   
   // Info for acceptance rate:
-  if(trace > 1){
-    acc_rate = naccept / index;
+  if(trace == 2){
+    acc_rate = ((double)naccept) / index;
     Rprintf("index: %d, naccept: %d, accept. rate: %d  \n", index, naccept, acc_rate);
   }
   
