@@ -38,7 +38,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     nTotal = NULL
   }
   
-  inital_gibbs = gibbs
+  initial_gibbs = gibbs
   
   if(ncol(Z)/d <= 15){
     # create J, q2 x q*(q+1)/2
