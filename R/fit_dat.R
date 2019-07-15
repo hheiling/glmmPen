@@ -392,7 +392,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
              extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   if(returnMC == T) out$u = u
   
-  if(initial_gibbs == F){
+  if((initial_gibbs == F) && rej_to_gibbs > 0){
     if(rej_to_gibbs <= 3){
       cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs))
     }else{
