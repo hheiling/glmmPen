@@ -44,8 +44,8 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
       break;
     }
     
-    if(index == round(0.25*pow(10,8))){
-      acc_rate = naccept / index;
+    if(index == round(0.1*pow(10,8))){
+      acc_rate = ((double)naccept) / index;
       if(acc_rate < pow(10,-3)){
         break;
       }
@@ -78,12 +78,12 @@ NumericMatrix sample_mc_inner(arma::mat f, // matrix
   
   // Info for acceptance rate:
   if(trace > 1){
-    acc_rate = naccept / index;
+    acc_rate = ((double)naccept) / index;
     Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
   }
   
   // acc_rate = naccept / index;
-  Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, naccept / index);
+  Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate = ((double)naccept) / index);
   
   if(naccept == nMC){
     return(wrap(out));
