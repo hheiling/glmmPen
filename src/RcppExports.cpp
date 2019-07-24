@@ -6,6 +6,47 @@
 
 using namespace Rcpp;
 
+// logLik_cpp
+double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int M, const arma::vec& group, unsigned int n_levels, unsigned int df, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::vec& coef_q, const arma::vec& cols, arma::sp_mat& J, const char* family);
+RcppExport SEXP _glmmPen_logLik_cpp(SEXP U_meansSEXP, SEXP sigmaSEXP, SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP dfSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP coef_qSEXP, SEXP colsSEXP, SEXP JSEXP, SEXP familySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type U_means(U_meansSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type n_levels(n_levelsSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type df(dfSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eta_fef(eta_fefSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type coef_q(coef_qSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type cols(colsSEXP);
+    Rcpp::traits::input_parameter< arma::sp_mat& >::type J(JSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    rcpp_result_gen = Rcpp::wrap(logLik_cpp(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, coef_q, cols, J, family));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Znew_mat
+arma::mat Znew_mat(const arma::vec& U, const arma::mat& Z, const arma::vec& g, const arma::vec& cols, unsigned int n, unsigned int q, unsigned int d, arma::sp_mat& J);
+RcppExport SEXP _glmmPen_Znew_mat(SEXP USEXP, SEXP ZSEXP, SEXP gSEXP, SEXP colsSEXP, SEXP nSEXP, SEXP qSEXP, SEXP dSEXP, SEXP JSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type U(USEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g(gSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type cols(colsSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type q(qSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type d(dSEXP);
+    Rcpp::traits::input_parameter< arma::sp_mat& >::type J(JSEXP);
+    rcpp_result_gen = Rcpp::wrap(Znew_mat(U, Z, g, cols, n, q, d, J));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_mc_inner
 NumericMatrix sample_mc_inner(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, int trace);
 RcppExport SEXP _glmmPen_sample_mc_inner(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP traceSEXP) {
@@ -104,6 +145,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_glmmPen_logLik_cpp", (DL_FUNC) &_glmmPen_logLik_cpp, 13},
+    {"_glmmPen_Znew_mat", (DL_FUNC) &_glmmPen_Znew_mat, 8},
     {"_glmmPen_sample_mc_inner", (DL_FUNC) &_glmmPen_sample_mc_inner, 6},
     {"_glmmPen_sample_mc_inner_gibbs", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs, 7},
     {"_glmmPen_arma_test_value", (DL_FUNC) &_glmmPen_arma_test_value, 1},

@@ -16,8 +16,8 @@ License: GPL (>= 2)
 Encoding: UTF-8
 Imports: stringr, reshape2, ggplot2
 Depends: lme4, irr, ncvreg, mvtnorm, ROCR, grpreg, glmnet, inline, bigalgebra,
-    Rcpp, RcppArmadillo, bigmemory, BH
-LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH
+    Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
+LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
 RoxygenNote: 6.1.0.9000
 NeedsCompilation: yes
 Packaged: 2019-01-25 20:03:59 UTC; hheiling

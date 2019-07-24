@@ -11,10 +11,12 @@ fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   gibbs = T, maxitEM = 100, ufullinit = NULL)
 }
 \arguments{
-\item{dat}{Input list object specifying y (response vector), X (matrix of all covariates), 
-Z (matrix of covariates with possible random effects), and group (vector whose value indicates 
+\item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
+Z (model matrix for the random effects), and group (vector whose value indicates 
 the study, batch, or other group identity to which on observation belongs), with each row an 
 observation}
+
+\item{lambda0}{}
 }
 \description{
 Fit a penalized generalized mixed model (pGLMM) via Monte Carlo Expectation Conditional 

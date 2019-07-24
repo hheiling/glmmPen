@@ -2,10 +2,11 @@
 #' Fit a penalized generalized mixed model (pGLMM) via Monte Carlo Expectation Conditional 
 #' Minimization (MCECM)
 #' 
-#' @param dat Input list object specifying y (response vector), X (matrix of all covariates), 
-#' Z (matrix of covariates with possible random effects), and group (vector whose value indicates 
+#' @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
+#' Z (model matrix for the random effects), and group (vector whose value indicates 
 #' the study, batch, or other group identity to which on observation belongs), with each row an 
 #' observation
+#' @param lambda0
 #' 
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
@@ -399,6 +400,10 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       # To correct for additional rej_to_gibbs + 1 when rej_to_gibbs = 3
       cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs-1))
     }
+  }
+  
+  if(initial_gibbs == F){
+    out$rej_to_gibbs = rej_to_gibbs
   }
   
   return(out)
