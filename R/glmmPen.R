@@ -62,13 +62,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     stop("gibbs is a logical variable; must be TRUE or FALSE")
   }
   
-  if(gibbs){
-    sampling = "Gibbs Sampling"
-  }else{
-    sampling = "Rejection Sampling"
-  }
-  
-  
   # Things that should be included in call:
   ## formula, data, any other items included in glmmPen function call
   call = match.call(expand.dots = F)
@@ -128,6 +121,16 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   
   # Things that should be included in fit_dat:
   ## (fill in later)
+  
+  if(gibbs){
+    sampling = "Gibbs Sampling"
+  }else{
+    if(fit$rej_to_gibbs < 3){
+      sampling = "Rejection Sampling"
+    }else{
+      sampling = "Gibbs Sampling"
+    }
+  }
 
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y, 
