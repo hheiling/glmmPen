@@ -1,3 +1,4 @@
+ 
 #' @export
 sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", group, d, nZ, okindex ){
   # Things to address:
@@ -91,6 +92,33 @@ sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", gro
   return(u0)
 }
 
+#' Calculate Monte Carlo draws
+#' 
+#' \code{sample.mc2} calculates the Monte Carlo draws by either Rejection sampling or 
+#' Metropolis-within-Gibbs sampling needed for Monte Carlo Expectation Conditional Minimization (MCECM)
+#'
+#' @inheritParams fit_dat
+#' @param fit a grpreg fit object (set \code{\link[grpreg]{grpreg}})
+#' @param cov the random effects covariance matrix estimated from the last M step of the EM algorithm
+#' @param y a numeric vector of the response variable
+#' @param X a model matrix of the fixed effects covariates
+#' @param Z a sparse model matrix of the random effects
+#' @param group a factor vector of the grouping variable, converted to a factor of 
+#' consecutive numeric integers
+#' @param d integer, the number of groups present (number factors of the group vector)
+#' @param okindex ?
+#' @param uold a matrix of the Monte Carlo draws from the last E step of the EM algorithm
+#' 
+#' @return a list made of the following components:
+#' \describe{
+#' \item{u0}{a matrix of the Monte Carlo draws (from Rejection sampling if gibbs = F, or 
+#' from Metropolis-within-Gibbs sampling if gibbs = T). Number rows = nMC, number columns = 
+#' (number random effects)x(number groups). Organization of columns: first by random effect variable,
+#' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
+#' \item{switch}{logical, did the sampling scheme switch from Rejection sampling to 
+#' Metropolis-within-Gibbs sampling?}
+#' }
+#'
 #' @export
 sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
                       gibbs = F , uold){
