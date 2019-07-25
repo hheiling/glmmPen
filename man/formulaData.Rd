@@ -8,9 +8,10 @@ formulaData(formula, data = NULL, na.action)
 }
 \arguments{
 \item{formula}{a two-sided linear formula object describing both the fixed-effects and 
-random-effects part of th emodel, with the response on hte left of a ~ operator and the terms, 
+random-effects part of the model, with the response on the left of a ~ operator and the terms, 
 sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
-("|") separating expression for design matrices from grouping factors. Only one grouping factor 
+("|") separating expression for design matrices from grouping factors. (\code{formula} should be 
+of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}.) Only one grouping factor 
 will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.}
 
 \item{data}{an optional data frame containing the variables named in \code{formula}. Although 
@@ -23,14 +24,14 @@ options \code{na.omit} and \code{na.pass} are recognized by this function.}
 \value{
 a list with the following elements:
 \itemize{
-\item{@param y a numeric vector of the response variable}
-\item{@param X a model matrix with the fixed and random effects covariates}
-\item{@param Z a sparse model matrix for the random effects}
-\item{@param group a factor vector of the grouping variable}
-\item{@param cnms a vector of column names of the random effects}
-\item{@param group_name character name of the group variable}
-\item{@param flist a list of grouping factors using inf the random-effects terms}
-\item{@param frame a model frame including all fixed and random covariates, the response, and the grouping variable}
+\item{\code{y} a numeric vector of the response variable}
+\item{\code{X} a model matrix with the fixed covariates}
+\item{\code{Z} a sparse model matrix for the random effects}
+\item{\code{group} a factor vector of the grouping variable}
+\item{\code{cnms} a vector of column names of the random effects}
+\item{\code{group_name} character name of the group variable}
+\item{\code{flist} a list of grouping factors using inf the random-effects terms}
+\item{\code{frame} a model frame including all fixed and random covariates, the response, and the grouping variable}
 }
 }
 \description{
