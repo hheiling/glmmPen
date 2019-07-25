@@ -1,3 +1,30 @@
+
+#' Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+#' Minimization (MCECM)
+#' 
+#' \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
+#' Conditional Minimization (MCECM)
+#' 
+#' @inheritParams formulaData
+#' @inheritParams fit_dat
+#' @param offset an optional vector of an \emph{a priori} known component to be included in the 
+#' linear predictor during fitting. One or more \code{\link[stats]{offset}} terms can be included in 
+#' formula instead or as well. If more than one is specified, their sum is use. 
+#' See \code{\link[stats]{model.offset}}.
+#' @param weights an optional vector of 'prior weights' to be used in the fitting process.
+#' Should be \code{NULL} or a numeric vector.
+#' @param control a list (of correct class, resulting from lambdaControl() or selectControl()) 
+#' containing control parameters. If the user wants to run the algorithm using one specific set of
+#' penalty parameters \code{lambda0} and \code{lambda1}, then use \code{lambdaControl()}. 
+#' If the user wants to run the algorithm over multiple possible \code{lambda0} and \code{lambda1},
+#' then use \code{lambdaControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
+#' documentation for details
+#' 
+## #' @inheritSection fit_dat
+#' 
+#' @return An reference class object of class \code{\link{pglmmObj}} for which many methods are 
+#' available (e.g. \code{methods(class = "pglmmObj")})
+#'  
 #' @importFrom stringr str_to_lower
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omit,
@@ -144,12 +171,31 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
 
 }
 
+#' @name lambdaControl
+#' @aliases selectControl
+#' 
+#' @title Control of Penalized Generalized Linear Mixed Model Fitting
+#' 
+#' Constructs control structures for penalized mixed model fitting.
+#' 
+#' @inheritParams fit_dat
+#' @param lambda0_seq a range of non-negative numeric penalty parameter for the fixed 
+#' effects parameters. If \code{NULL}, then a range will be calculated as described by (...).
+#' @param lambda1_seq a range of non-negative numeric penalty parameter for the grouped random 
+#' effects covariance parameters. If \code{NULL}, then a range will be calculated as described 
+#' by (...).
+#' 
+#' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
+#' containing penalization parameter values, presented either as an individual set or as a range of
+#' possible values.
+#' 
 #' @export
 lambdaControl = function(lambda0 = 0, lambda1 = 0){
   structure(list(lambda0 = lambda0, lambda1 = lambda1), 
             class = c("lambdaControl","pglmmControl"))
 }
 
+#' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL){
   structure(list(lambda0_seq = lambda0_seq,
