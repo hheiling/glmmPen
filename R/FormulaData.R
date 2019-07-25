@@ -17,16 +17,15 @@
 #' options \code{na.omit} and \code{na.pass} are recognized by this function.
 #' 
 #' @return a list with the following elements:
-#' \itemize{
-#' \item{\code{y} a numeric vector of the response variable}
-#' \item{\code{X} a model matrix with the fixed covariates}
-#' \item{\code{Z} a sparse model matrix for the random effects}
-#' \item{\code{group} a factor vector of the grouping variable}
-#' \item{\code{cnms} a vector of column names of the random effects}
-#' \item{\code{group_name} character name of the group variable}
-#' \item{\code{flist} a list of grouping factors using inf the random-effects terms}
-#' \item{\code{frame} a model frame including all fixed and random covariates, the response, and the grouping variable}
-#' }
+#' \item{y}{a numeric vector of the response variable}
+#' \item{X}{a model matrix with the fixed covariates}
+#' \item{Z}{a sparse model matrix for the random effects}
+#' \item{group}{a factor vector of the grouping variable}
+#' \item{cnms}{a vector of column names of the random effects}
+#' \item{group_name}{character name of the group variable}
+#' \item{flist}{a list of grouping factors using inf the random-effects terms}
+#' \item{frame}{a model frame including all fixed and random covariates, the response, and the 
+#' grouping variable}
 #' 
 #' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export

@@ -32,26 +32,24 @@
 #' Accepted families: binomial, poisson
 #' 
 #' @return a list with the following elements:
-#' \itemize{
-#' \item{\code{fit} a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
-#' \item{\code{coef} a numeric vector of coefficients of fixed effects estimates and 
+#' \item{fit}{a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
+#' \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
 #' non-zero estimates of the lower-triangular cholesky decomposition of the random effects
 #' covariance matrix (in vector form)}
-#' \item{\code{sigma} random effects covariance matrix}
-#' \item{\code{lambda0, lambda1} the penalty parameters input into the function}
-#' \item{\code{covgroup} ?}
-#' \item{\code{J} a sparse matrix of dimension q^2 x (q(q+1)/2) (where q = number of random effects) that 
+#' \item{sigma}{random effects covariance matrix}
+#' \item{lambda0, lambda1}{the penalty parameters input into the function}
+#' \item{covgroup}{?}
+#' \item{J}{a sparse matrix of dimension q^2 x (q(q+1)/2) (where q = number of random effects) that 
 #' transforms the non-zero elements of the lower-triangular cholesky decomposition of the random 
 #' effects covariance matrix into a vector}
-#' \item{\code{ll} estimate of the log likelihood, calculated by integrating over the Monte Carlo draws}
-#' \item{\code{BICh} the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
-#' \item{\code{u} a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
+#' \item{ll}{estimate of the log likelihood, calculated by integrating over the Monte Carlo draws}
+#' \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
+#' \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 #' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
 #' Output if \code{returnMC} = \code{TRUE}}
-#' \item{\code{rej_to_gibbs} logical, did the Monte Carlo sampling switch from Rejection sampling 
+#' \item{rej_to_gibbs}{logical, did the Monte Carlo sampling switch from Rejection sampling 
 #' to Metropolis-within-Gibbs sampling due to unacceptably small acceptance rates in the Rejection sampling?
 #' Output only if started initially with Rejection sampling}
-#' }
 #' 
 #' 
 #' @export
