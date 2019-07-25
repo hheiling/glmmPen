@@ -110,14 +110,12 @@ sample.mc = function(fit, cov, y, X, Z, nMC, trace = 0, family = "binomial", gro
 #' @param uold a matrix of the Monte Carlo draws from the last E step of the EM algorithm
 #' 
 #' @return a list made of the following components:
-#' \itemize{
 #' \item{u0}{a matrix of the Monte Carlo draws (from Rejection sampling if gibbs = F, or 
 #' from Metropolis-within-Gibbs sampling if gibbs = T). Number rows = nMC, number columns = 
 #' (number random effects)x(number groups). Organization of columns: first by random effect variable,
 #' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
 #' \item{switch}{logical, did the sampling scheme switch from Rejection sampling to 
 #' Metropolis-within-Gibbs sampling?}
-#' }
 #'
 #' @export
 sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,

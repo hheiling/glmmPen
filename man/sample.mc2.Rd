@@ -42,14 +42,12 @@ consecutive numeric integers}
 }
 \value{
 a list made of the following components:
-\itemize{
 \item{u0}{a matrix of the Monte Carlo draws (from Rejection sampling if gibbs = F, or 
 from Metropolis-within-Gibbs sampling if gibbs = T). Number rows = nMC, number columns = 
 (number random effects)x(number groups). Organization of columns: first by random effect variable,
 then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
 \item{switch}{logical, did the sampling scheme switch from Rejection sampling to 
 Metropolis-within-Gibbs sampling?}
-}
 }
 \description{
 \code{sample.mc2} calculates the Monte Carlo draws by either Rejection sampling or 
