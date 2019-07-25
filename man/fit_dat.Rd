@@ -2,12 +2,12 @@
 % Please edit documentation in R/fit_dat.R
 \name{fit_dat}
 \alias{fit_dat}
-\title{Fit a penalized generalized mixed model (pGLMM) via Monte Carlo Expectation Conditional 
+\title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
 fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   family = "binomial", trace = 0, penalty = "grMCP", alpha = 1,
-  nMC_max = 5000, returnMC = F, ufull = NULL, coeffull = NULL,
+  nMC_max = 5000, returnMC = T, ufull = NULL, coeffull = NULL,
   gibbs = T, maxitEM = 100, ufullinit = NULL)
 }
 \arguments{
@@ -16,9 +16,65 @@ Z (model matrix for the random effects), and group (vector whose value indicates
 the study, batch, or other group identity to which on observation belongs), with each row an 
 observation}
 
-\item{lambda0}{}
+\item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
+
+\item{lambda1}{a non-negative numeric penalty parameter for the grouped random effects
+covariance parameters}
+
+\item{conv}{a non-negative numeric convergence criteria for the convergence of the 
+log likelihood in the EM algorithm}
+
+\item{nMC}{a positive integer for the initial number of Monte Carlo draws}
+
+\item{family}{a description of the error distribution and link function to be used in the model. 
+For \code{fit_dat} this can be a character string naming a family function or a fmaily function. 
+See \code{family} options in the Details section.}
+
+\item{trace}{an integer specifying print output to include as function runs. Default value is 0 
+(details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
+of the Monte Carlo draws computed in \code{\link{sample.mc2}})}
+
+\item{penalty}{character descripting the type of penalty to use in the variable selection procedure}
+
+\item{alpha}{?}
+
+\item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws}
+
+\item{returnMC}{logical, should the final Monte Carlo draws be returned? Default \code{TRUE}.}
+
+\item{gibbs}{logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
+(if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?}
+
+\item{maxitEM}{a positive integer for the maximum number of allowed EM iterations}
+}
+\value{
+a list with the following elements:
+\itemize{
+\item{\code{fit} a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
+\item{\code{coef} a numeric vector of coefficients of fixed effects estimates and 
+non-zero estimates of the lower-triangular cholesky decomposition of the random effects
+covariance matrix (in vector form)}
+\item{\code{sigma} random effects covariance matrix}
+\item{\code{lambda0, lambda1} the penalty parameters input into the function}
+\item{\code{covgroup} ?}
+\item{\code{J} a sparse matrix of dimension q^2 x (q(q+1)/2) (where q = number of random effects) that 
+transforms the non-zero elements of the lower-triangular cholesky decomposition of the random 
+effects covariance matrix into a vector}
+\item{\code{ll} estimate of the log likelihood, calculated by integrating over the Monte Carlo draws}
+\item{\code{BICh} the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
+\item{\code{u} a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
+then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
+Output if \code{returnMC} = \code{TRUE}}
+\item{\code{rej_to_gibbs} logical, did the Monte Carlo sampling switch from Rejection sampling 
+to Metropolis-within-Gibbs sampling due to unacceptably small acceptance rates in the Rejection sampling?
+Output only if started initially with Rejection sampling}
+}
 }
 \description{
-Fit a penalized generalized mixed model (pGLMM) via Monte Carlo Expectation Conditional 
-Minimization (MCECM)
+Description
 }
+\section{Details}{
+ 
+Accepted families: binomial, poisson
+}
+
