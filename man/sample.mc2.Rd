@@ -42,7 +42,7 @@ consecutive numeric integers}
 }
 \value{
 a list made of the following components:
-\describe{
+\itemize{
 \item{u0}{a matrix of the Monte Carlo draws (from Rejection sampling if gibbs = F, or 
 from Metropolis-within-Gibbs sampling if gibbs = T). Number rows = nMC, number columns = 
 (number random effects)x(number groups). Organization of columns: first by random effect variable,
