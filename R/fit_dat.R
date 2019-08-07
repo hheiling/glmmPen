@@ -57,7 +57,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                    family = "binomial", trace = 0, penalty = "grMCP",
                    alpha = 1, nMC_max = 5000, 
                    returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                   ufullinit = NULL){
+                   ufullinit = NULL,
+                   c = 1, M = 10^5){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -427,7 +428,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # if(returnMC == T) out$u = u
   
   # Change to ll = logLik_imp
-  ll = 0
+  ll = logLik_imp(y, X, Z, U = u, sigma = cov, group, coef, J, family, df = 10, c, M)
+  
   # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
   # d = nlevels(group) = number independent subjects/groups
   BICh = -2*ll + sum(diag(cov) != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
@@ -451,4 +453,35 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   }
   
   return(out)
+}
+
+
+# Log-likelihood approximation using importance sampling
+#' @export
+logLik_imp = function(y, X, Z, U, sigma, group, coef, J, family, df, c = 1, M){
+  
+  # Set-up calculations
+  d = nlevels(group)
+  cols = seq(from = as.numeric(group[1]), to = ncol(Z), by = d)
+  
+  # Ignore columns of U (and Z) corresponding to random effects penalized to 0 variance 
+  U_means_all = colMeans(U)
+  non_zero = (diag(sigma) != 0)
+  non_zero_ext = rep(non_zero, each = d)
+  U_means = U_means_all[non_zero_ext]
+  
+  # Reduced sigma: remove rows and columns with diag = 0
+  sigma_red = c*sigma[non_zero,non_zero]
+  
+  # Gamma = cholesky decomposition of sigma (lower-triangular)
+  Gamma = t(chol(sigma_red))
+  
+  # Calculated fixed effects contribution to eta (linear predictor)
+  eta_fef = X %*% coef[1:ncol(X)]
+  
+  ll = logLik_cpp(U_means, sigma_red, M, group, d, df, y, eta_fef, Z[,non_zero_ext], 
+                  Gamma, J, family)
+  
+  return(ll)
+  
 }
