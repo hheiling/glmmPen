@@ -3,7 +3,8 @@
 select_tune = function(dat, nMC, lambda0_range,lambda1_range, family, 
                        penalty, returnMC = T,
                        conv, nMC_max, trace = 0, ufull = NULL, coeffull = NULL, 
-                       gibbs = T, maxitEM = 50, alpha = 1){
+                       gibbs = T, maxitEM = 50, alpha = 1,
+                       c = 1, M = 10^5){
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
@@ -37,7 +38,8 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
                         trace = trace, conv = conv, nMC_max = nMC_max, 
                         ufull = ufull, coeffull = coeffull0, 
                         gibbs = gibbs, maxitEM = maxitEM + maxitEM*(j==1), 
-                        returnMC = returnMC, ufullinit = ufullinit, alpha = alpha))
+                        returnMC = returnMC, ufullinit = ufullinit, alpha = alpha,
+                        c, M))
       
       if(is.character(out)) next
       
