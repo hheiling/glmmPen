@@ -67,7 +67,8 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       res[(i-1)*(n2)+j,5] = sum(out$coef[2:ncol(dat$X)] !=0)
       res[(i-1)*(n2)+j,6] = sum(diag(out$sigma) !=0)
       res[(i-1)*(n2)+j,7] = sum(out$coef !=0)
-      if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
+      # if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
+      if(maxitEM > 1) res[(i-1)*(n2)+j,8] = out$ll
       res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
       outl[[(i-1)*(n2)+j]] = 1#out
       coef = rbind(coef, out$coef)
