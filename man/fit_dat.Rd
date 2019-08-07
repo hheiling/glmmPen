@@ -8,7 +8,7 @@ Minimization (MCECM)}
 fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   family = "binomial", trace = 0, penalty = "grMCP", alpha = 1,
   nMC_max = 5000, returnMC = T, ufull = NULL, coeffull = NULL,
-  gibbs = T, maxitEM = 100, ufullinit = NULL)
+  gibbs = T, maxitEM = 100, ufullinit = NULL, c = 1, M = 10^5)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
