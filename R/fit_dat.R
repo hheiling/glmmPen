@@ -433,6 +433,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
   # d = nlevels(group) = number independent subjects/groups
   BICh = -2*ll + sum(diag(cov) != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
+  # Usual BIC
+  # BIC = -2*ll + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
   out = list(fit = fit, coef = coef, sigma = cov,  
              lambda0 = lambda0, lambda1 = lambda1, 
              covgroup = covgroup, J = J, ll = ll, BICh = BICh,
