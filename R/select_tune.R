@@ -10,7 +10,7 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
   n2 = length(lambda1_range)
   BICold = BIC = BIC2old2 = BIC2= Inf
   res = matrix(0, n1*n2, 9)
-  res2 = matrix(0, n2, 4) 
+  # res2 = matrix(0, n2, 4) 
   coef = NULL
   outl = list()
   for(i in 1:n1){
@@ -73,41 +73,49 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       outl[[(i-1)*(n2)+j]] = 1#out
       coef = rbind(coef, out$coef)
       print(res[(i-1)*(n2)+j,])
+      colnames(res) = c("lambda0","lambda1","BICh","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef",
+                        "LogLik_2","BIC_regular")
+      
     }
   }
   
-  library(ncvreg)
-  if(n2 > 1){ 
-    outcv = try(cv.ncvreg(y = dat$y, X = dat$X[,-1], family = family, nlambda = n2, alpha = alpha))
-    if(is.character(outcv)){
-      out2 = NULL
-    }else{
-      bicglm = 2*outcv$fit$loss + 
-        log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
-      lambda.min = outcv$fit$lambda[which.min(bicglm)]
-      out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
-    }
-    outind = list()
-    for(jj in 1:max(as.numeric(dat$group))){
-      outcv = try(cv.ncvreg(y = dat$y[dat$group == jj], X = dat$X[dat$group == jj,-1], family = family, nlambda = n2, alpha = alpha))
-      if(is.character(outcv)){
-        outind[[jj]] = NULL
-      }else{	
-        bicglm = 2*outcv$fit$loss + log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
-        lambda.min = outcv$fit$lambda[which.min(bicglm)]
-        outind[[jj]] = try(ncvreg(y = dat$y[dat$group == jj], X = dat$X[dat$group == jj,-1], family = family, lambda = lambda.min, alpha = alpha))
-        if(is.character(outind[[jj]])){
-          outind[[jj]] = list(beta = outcv$fit$beta[,which.min(bicglm)])
-        }
-      }
-    }
-    
-  }else{
-    lambda.min = 0.000001
-    outcv = NULL
-    outind = NULL
-    out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
-  }
+  # print("Start of ncvreg code for internal comparison")
+  # 
+  # library(ncvreg)
+  # if(n2 > 1){ 
+  #   outcv = try(cv.ncvreg(y = dat$y, X = dat$X[,-1], family = family, nlambda = n2, alpha = alpha))
+  #   if(is.character(outcv)){
+  #     out2 = NULL
+  #   }else{
+  #     bicglm = 2*outcv$fit$loss + 
+  #       log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
+  #     lambda.min = outcv$fit$lambda[which.min(bicglm)]
+  #     out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
+  #   }
+  #   outind = list()
+  #   for(jj in 1:max(as.numeric(dat$group))){
+  #     outcv = try(cv.ncvreg(y = dat$y[dat$group == jj], X = dat$X[dat$group == jj,-1], family = family, nlambda = n2, alpha = alpha))
+  #     
+  #     if(is.character(outcv)){
+  #       outind[[jj]] = NULL
+  #     }else{	
+  #       bicglm = 2*outcv$fit$loss + log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
+  #       lambda.min = outcv$fit$lambda[which.min(bicglm)]
+  #       outind[[jj]] = try(ncvreg(y = dat$y[dat$group == jj], X = dat$X[dat$group == jj,-1], family = family, lambda = lambda.min, alpha = alpha))
+  #       if(is.character(outind[[jj]])){
+  #         outind[[jj]] = list(beta = outcv$fit$beta[,which.min(bicglm)])
+  #       }
+  #     }
+  #   }
+  #   
+  # }else{
+  #   lambda.min = 0.000001
+  #   outcv = NULL
+  #   outind = NULL
+  #   out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
+  # }
   
-  return(list(result = res, out = fout, res2 = outcv, out2 = out2, coef = coef, outind = outind))
+  # return(list(result = res, out = fout, res2 = outcv, out2 = out2, coef = coef, outind = outind))
+  
+  return(list(result = res, out = fout, coef = coef))
 }
