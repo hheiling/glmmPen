@@ -243,13 +243,38 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     oldcoef = coef
     
-    y2 = y[rep(1:nrow(X), each = nrow(u))]
-    X2 =  cbind(as.matrix(X[rep(1:nrow(X), each = nrow(u)),-1]), Matrix::as.matrix(Znew))
-    fit = glm(y2 ~ X2, family = f)
-    
-    coef = as.numeric(fit$coef) 
-    fit$coef = coef
-    fit$w2use = which(coef[-1] != 0)
+      fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
+                    penalty="grMCP", family="binomial",lambda = lambda1, 
+                    offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), alpha = alpha, active = active0, 
+                    initbeta = c(0,coef[-c(1:ncol(X))]))
+      gc()
+      coef = rep(0,length(covgroup) + ncol(X))
+      coef[-c(1:ncol(X))] = fit0$beta[-1]
+      c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
+      
+      fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
+      gc()
+      coef[c(1:ncol(X))] = fit1$beta
+      c0[c(1:ncol(X))] = c0[c(1:ncol(X))] + (fit1$beta == 0)^2
+      fit = fit1
+      fit$coef = coef
+      
+      # need to compile code first before running.  Actives will default to 1 to test, then uncomment the below to skip groups
+      # update active set every 5 iterations
+      if(floor(i/5) == ceiling(i/5)){
+        active1[which(c0[c(2:ncol(X))] == 5)] = 0
+        active1[which(c0[c(2:ncol(X))] < 5)] = 1
+        
+        for(kk in 1:max(covgroup)){
+          active0[kk] = (all(c0[-c(1:ncol(X))][covgroup == kk]<5))^2
+        }
+        print(length(covgroup))
+        print(length(c0[-c(1:ncol(X))]))
+        print(active1)
+        print(active0)
+        # reset c0
+        c0 = rep(0, length(coef))
+      }
     
     problem = F
     if(any(is.na(coef))){
@@ -469,20 +494,33 @@ logLik_imp = function(y, X, Z, U, sigma, group, coef, J, family, df, c = 1, M){
   # Ignore columns of U (and Z) corresponding to random effects penalized to 0 variance 
   U_means_all = colMeans(U)
   non_zero = (diag(sigma) != 0)
-  non_zero_ext = rep(non_zero, each = d)
-  U_means = U_means_all[non_zero_ext]
   
-  # Reduced sigma: remove rows and columns with diag = 0
-  sigma_red = c*sigma[non_zero,non_zero]
-  
-  # Gamma = cholesky decomposition of sigma (lower-triangular)
-  Gamma = t(chol(sigma_red))
-  
-  # Calculated fixed effects contribution to eta (linear predictor)
-  eta_fef = X %*% coef[1:ncol(X)]
-  
-  ll = logLik_cpp(U_means, sigma_red, M, group, d, df, y, eta_fef, Z[,non_zero_ext], 
-                  Gamma, J, family)
+  if(sum(non_zero) > 0){
+    
+    non_zero_ext = rep(non_zero, each = d)
+    U_means = U_means_all[non_zero_ext]
+    
+    # Reduced sigma: remove rows and columns with diag = 0
+    sigma_red = c*sigma[non_zero,non_zero]
+    
+    # Gamma = cholesky decomposition of sigma (lower-triangular)
+    Gamma = t(chol(sigma_red))
+    
+    # Calculated fixed effects contribution to eta (linear predictor)
+    eta_fef = X %*% coef[1:ncol(X)]
+    
+    ll = logLik_cpp(U_means, sigma_red, M, group, d, df, y, eta_fef, Z[,non_zero_ext], 
+                    Gamma, J, family)
+  }else{
+    
+    eta_fef = X %*% coef[1:ncol(X)]
+    
+    if(family == "binomial"){
+      ll = sum(dbinom(y, size = 1, prob = exp(eta_fef) / (1+exp(eta_fef)), log = T))
+    }else if(family == "poisson"){
+      ll = sum(dpois(y, lambda = exp(eta_fef), log = T))
+    }
+  }
   
   return(ll)
   
