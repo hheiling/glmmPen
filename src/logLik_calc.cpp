@@ -10,7 +10,7 @@ double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int
                   const arma::vec& group, unsigned int n_levels, unsigned int df,
                   const arma::vec& y, const arma::vec& eta_fef, 
                   const arma::mat& Z, const arma::mat& Gamma,
-                  arma::sp_mat& J, const char* family){
+                  const char* family){
   
   unsigned int s = 0;
   unsigned int i = 0;
@@ -24,6 +24,7 @@ double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int
   
   arma::mat samples(M, r);
   arma::uvec samp_index(num_vars);
+  arma::uvec samp_index2(num_vars);
   arma::vec mvt_means(num_vars);
   arma::uvec index(num_vars);
   arma::mat samps(M,num_vars);
@@ -33,6 +34,9 @@ double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int
   
   arma::vec Z_i(r);
   arma::vec eta(M);
+  NumericVector prob(M);
+  NumericVector prob_cap1(M);
+  NumericVector prob_cap2(M);
   
   const char* bin = "binomial";
   const char* pois = "poisson";
@@ -66,16 +70,22 @@ double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int
     // Choose relevant columns of Z and samples
     for(v = 0; v < num_vars; v++){
       index(v) = grp + v*d;
+      samp_index2(v) = grp*num_vars + v;
     }
     
     // Calculate Linear Predictor
     Z_i = Z.row(i).t();
-    eta = eta_fef(i) + samples.cols(index) * Gamma * Z_i(index);
+    eta = eta_fef(i) + samples.cols(samp_index2) * Gamma * Z_i(index);
     
     // Calculate log-density, multiply by standardized weights, and sum
     if(std::strcmp(family, bin) == 0){
-      for(s = 0; s < M; s++){
-        ll = ll + R::dbinom(y(i), 1, (exp(eta(s)) / (1+exp(eta(s)))), true) * wts(s, grp);
+      // Calculate prob, and cap so that no element < 10^-16 or > 1 - 10^-16
+      // Reasoning: avoids dbinom result equalling -Inf
+      prob = exp(eta) / (1+exp(eta));
+      prob_cap1 = ifelse((prob < pow(10,-16)), pow(10,-16), prob);
+      prob_cap2 = ifelse((prob_cap1 > (1-pow(10,-16))), (1-pow(10,-16)), prob_cap1);
+      for(s = 0; s < M; s++){ 
+        ll = ll + R::dbinom(y(i), 1, prob_cap2(s), true) * wts(s, grp);
       }
     }else if(std::strcmp(family, pois) == 0){
       for(s = 0; s < M; s++){
@@ -84,7 +94,6 @@ double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int
     }
     
   }
-  
   
   return(ll);
 }
