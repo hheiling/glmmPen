@@ -7,8 +7,8 @@
 using namespace Rcpp;
 
 // logLik_cpp
-double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int M, const arma::vec& group, unsigned int n_levels, unsigned int df, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::mat& Gamma, arma::sp_mat& J, const char* family);
-RcppExport SEXP _glmmPen_logLik_cpp(SEXP U_meansSEXP, SEXP sigmaSEXP, SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP dfSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP GammaSEXP, SEXP JSEXP, SEXP familySEXP) {
+double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int M, const arma::vec& group, unsigned int n_levels, unsigned int df, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::mat& Gamma, const char* family);
+RcppExport SEXP _glmmPen_logLik_cpp(SEXP U_meansSEXP, SEXP sigmaSEXP, SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP dfSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP GammaSEXP, SEXP familySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,9 +22,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::vec& >::type eta_fef(eta_fefSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type Gamma(GammaSEXP);
-    Rcpp::traits::input_parameter< arma::sp_mat& >::type J(JSEXP);
     Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
-    rcpp_result_gen = Rcpp::wrap(logLik_cpp(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, J, family));
+    rcpp_result_gen = Rcpp::wrap(logLik_cpp(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -126,7 +125,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_glmmPen_logLik_cpp", (DL_FUNC) &_glmmPen_logLik_cpp, 12},
+    {"_glmmPen_logLik_cpp", (DL_FUNC) &_glmmPen_logLik_cpp, 11},
     {"_glmmPen_sample_mc_inner", (DL_FUNC) &_glmmPen_sample_mc_inner, 6},
     {"_glmmPen_sample_mc_inner_gibbs", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs, 7},
     {"_glmmPen_arma_test_value", (DL_FUNC) &_glmmPen_arma_test_value, 1},
