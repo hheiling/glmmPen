@@ -51,7 +51,7 @@ formulaData = function(formula, data = NULL, na.action){
           data = data
       }else{
         print(na.action)
-        stop("specified na.action is not available for 'predict' function")
+        stop("na.action must be na.omit or na.pass for formulaData function")
       }
       
       ## Full data frame with fixed effects, random effects, and group var
