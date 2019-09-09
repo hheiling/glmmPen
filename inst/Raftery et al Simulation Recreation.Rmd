@@ -84,7 +84,7 @@ draws = function(mu0, alpha, M, y){
 Once we have the MCMC samples, we can plug them into the (modified) harmonic mean functions. Returned value should be near target value given above.
 
 ```{r}
-HM = function(MCMC, y){
+HM_sect2 = function(MCMC, y){
   mu = MCMC[,1]
   psi = MCMC[,2] # precision of y; inverse of variance of y
   sd_y = sqrt(1/psi)
@@ -97,7 +97,7 @@ HM = function(MCMC, y){
   return(mean(inv_dens))
 }
 
-mod_HM = function(MCMC, y, mu0, alpha, p){
+mod_HM_sect2 = function(MCMC, y, mu0, alpha, p){
   mu = MCMC[,1]
   psi = MCMC[,2]
   sd_y = sqrt(1/psi)
@@ -134,8 +134,8 @@ Results:
 library(mvtnorm)
 mcmc_samps = draws(mu0 = 0, alpha = 2, 10^4, y = 5)
 
-HM(mcmc_samps, 0)
-mod_HM(mcmc_samps, y = 5, mu0 = 0, alpha = 2, p = 0.98)
+HM_sect2(mcmc_samps, 0)
+mod_HM_sect2(mcmc_samps, y = 5, mu0 = 0, alpha = 2, p = 0.98)
 ```
 
 # Section 4.2 Example
@@ -199,40 +199,49 @@ exp(target) # marginal/integrated likelihood
 ```{r}
 
 HM = function(posterior, y){
+  # Define variables
   d = ncol(y)
   n = nrow(y)
   M = nrow(posterior)
   I = diag(x = 1, nrow = d)
-  # post_mean = colMeans(posterior)
   
   ll = 0
   dens = matrix(0, nrow = n, ncol = M)
+  # For each posterior draw u, calculate y|u density
+  ## Organization: row = y_i, column = draw_s
   for(s in 1:M){
     dens[,s] = dmvnorm(y, mean = posterior[s,], sigma = I)
   }
-  
+  # Find inverse of densities
   inv_dens = 1/dens
+  # Sum inverse densities for each individual - inverse likelihood for each individual
   inv_lik = rowMeans(inv_dens)
+  # Inverse of inverse-likelihood = likelihood
   lik = 1 / inv_lik
+  # Sum log of individual likelihoods
   ll = sum(log(lik))
   
   return(ll)
 }
 
 mod_HM = function(posterior, y, mu0, p){
-  
+  # Define variables
   n = nrow(y)
   M = nrow(posterior)
   d = ncol(y)
   I = diag(x=1,nrow=d)
   
   ll = 0
+  # Organization of density matrix: rows = individuals, columns = posterior draws
   dens = matrix(0, nrow = n, ncol = M)
   
+  # Calculate posterior modes and covariance (for numerator)
   post_means = colMeans(posterior)
   post_cov = cov(posterior)
   
+  # Denominator component - prior evaluated at posterior sample values
   prior = matrix(dmvnorm(posterior, mean = rep(mu0, times = d), sigma = I), nrow = 1)
+  # Calculation of truncated normal - numerator
   wt_norm = dmvnorm(posterior, mean = post_means, sigma = post_cov)
   region = apply(posterior, 1, function(x) t(x - post_means) %*% solve(post_cov) %*% 
                    (x - post_means))
@@ -245,8 +254,11 @@ mod_HM = function(posterior, y, mu0, p){
     dens[,s] = dmvnorm(y, mean = posterior[s,], sigma = I)
   }
   
+  # Calculate f* / (denity * prior)
   components = trunc_norm[rep(1, times = n),] / (dens * prior[rep(1, times = n),])
+  # Sum these components over all posterior draws to get inverse-likelihood for each individual
   inv_lik = rowMeans(components)
+  # Find likelihood (inverse of inverse), then sum logs of these likelihoods
   ll = sum(log(1/inv_lik))
   
   return(ll)
@@ -257,6 +269,54 @@ mod_HM = function(posterior, y, mu0, p){
 HM(post_mu, y)
 mod_HM(post_mu, y, mu0=0.15, p=0.98)
 ```
+
+# Naim's Code
+
+```{r}
+alpha = 2
+mu = 0
+y = 0
+n_0 = 1
+lambda = n_0 / (1+n_0)
+M = 10000
+# taken from https://statswithr.github.io/book/inference-and-decision-making-with-multiple-parameters.html#sec:NG-MC
+# translated our parameters into theirs
+m_0 = mu; n_0 = n_0;  s2_0 = 1; v_0 = alpha
+# sample summaries
+Y = y
+ybar = mean(Y)
+s2 = 0#var(Y)
+n = length(Y)
+# posterior hyperparamters
+n_n = n_0 + n
+m_n = (n*ybar + n_0*m_0)/n_n
+v_n = v_0 + n
+s2_n = ((n-1)*s2 + v_0*s2_0 + n_0*n*(m_0 - ybar)^2/n_n)/v_n
+# drawing from the posterior, note that the source I am using assume rate instead of scale
+psip  = rgamma(M, shape = v_0/2, rate = v_0/2)
+mup = rnorm(M, mean = m_n, sd = sqrt(1/psip)/sqrt(n_n)) 
+mcmc_samps2 = cbind(mup, psip)
+mcmc_samps = draws(m_0, 2, M, y)
+summary(mcmc_samps2)
+summary(mcmc_samps) # from hillary's code, similar 
+par(mfrow = c(2, 1))
+hist(mcmc_samps2[,1], breaks = 1000, xlim = c(-5, 5))
+hist(mcmc_samps[,1], breaks = 1000, xlim = c(-5, 5))
+# calcull
+lik2 = dnorm(Y,mean = mcmc_samps2[,1],sd = sqrt(1/mcmc_samps2[,2]))
+lik = dnorm(Y,mean = mcmc_samps[,1],sd = sqrt(1/mcmc_samps[,2]))
+#HM
+mean(1/lik2)^-1
+mean(1/lik)^-1
+# Modified HM
+1/mod_HM_sect2(mcmc_samps2, y = y, mu0 = mu, alpha = alpha, p = 0.98)
+1/mod_HM_sect2(mcmc_samps, y = y, mu0 = mu, alpha = alpha, p = 0.98)
+
+# truth
+f_y
+```
+
+
 
 
 The End
