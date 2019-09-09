@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Section 2 Example
+
 Recreation of one of the simulations in Section 2 of Raftery et al. (Estimating the integrating likelihood via posterior simulation using the harmonic mean identity)
 
 Description of simulation: We are interested in the marginal likelihood for a single data point y
@@ -135,5 +137,126 @@ mcmc_samps = draws(mu0 = 0, alpha = 2, 10^4, y = 5)
 HM(mcmc_samps, 0)
 mod_HM(mcmc_samps, y = 5, mu0 = 0, alpha = 2, p = 0.98)
 ```
+
+# Section 4.2 Example
+
+y distribution: 
+
+$$ y_1,...,y_n \sim N(\mu,I) $$
+
+Prior for mean:
+
+$$ \mu \sim N(0,I) $$
+Posterior for mean:
+
+$$ \mu|y \sim N \left ( \frac{n \bar y}{n+1}, \frac{I}{n+1} \right ) $$
+True log integrated likelihood value:
+
+$$ \ell(y) = log(f(y)) = \frac{d}{2} log \left( \frac{n}{(n+1)2\pi} \right ) - \frac{n}{2(n+1)} \sum_{j=1}^d \bar y_j^2 $$
+
+Let us assign the following values to the hyperparameters:
+
+$ \mu = 0.15, n = 50, d = 3 $
+
+## Evaluate Target Log-Likelihood log(f(y)) and Related Values
+
+The function:
+
+```{r}
+
+ll = function(d, n, y){
+  y_means = colMeans(y)
+  ll = d/2 * log(n/(2*pi*(n+1))) - n/(2*(n+1)) * sum(y_means^2)
+}
+
+```
+
+## Sample y and posterior samples of $\mu$
+
+Also, evaluate target loglik
+
+```{r}
+library(mvtnorm)
+mu0 = 0.15 # for all dimensions of y
+n = 100
+d = 3
+I = diag(x = 1, nrow = d)
+M = 10^4
+
+y = rmvnorm(n = n, mean = rep(mu0, times = d), sigma = I)
+
+post_mu = rmvnorm(n = M, mean = colSums(y)/(n+1), sigma = I/(n+1))
+
+# Target log-lik:
+target = ll(d, n, y)
+target # log-lik
+exp(target) # marginal/integrated likelihood
+1/exp(target) # inverse of marginal likelihood
+```
+
+## (Modified) Harmonic Mean Estimate
+
+```{r}
+
+HM = function(posterior, y){
+  d = ncol(y)
+  n = nrow(y)
+  M = nrow(posterior)
+  I = diag(x = 1, nrow = d)
+  # post_mean = colMeans(posterior)
+  
+  ll = 0
+  dens = matrix(0, nrow = n, ncol = M)
+  for(s in 1:M){
+    dens[,s] = dmvnorm(y, mean = posterior[s,], sigma = I)
+  }
+  
+  inv_dens = 1/dens
+  inv_lik = rowMeans(inv_dens)
+  lik = 1 / inv_lik
+  ll = sum(log(lik))
+  
+  return(ll)
+}
+
+mod_HM = function(posterior, y, mu0, p){
+  
+  n = nrow(y)
+  M = nrow(posterior)
+  d = ncol(y)
+  I = diag(x=1,nrow=d)
+  
+  ll = 0
+  dens = matrix(0, nrow = n, ncol = M)
+  
+  post_means = colMeans(posterior)
+  post_cov = cov(posterior)
+  
+  prior = matrix(dmvnorm(posterior, mean = rep(mu0, times = d), sigma = I), nrow = 1)
+  wt_norm = dmvnorm(posterior, mean = post_means, sigma = post_cov)
+  region = apply(posterior, 1, function(x) t(x - post_means) %*% solve(post_cov) %*% 
+                   (x - post_means))
+  cutoff = qchisq(p=p, df=d)
+  trunc_norm = matrix(ifelse(region>cutoff, 0, wt_norm), nrow = 1)
+  print("proportion truncated:")
+  print(sum(region>cutoff) / length(region))
+  
+  for(s in 1:M){
+    dens[,s] = dmvnorm(y, mean = posterior[s,], sigma = I)
+  }
+  
+  components = trunc_norm[rep(1, times = n),] / (dens * prior[rep(1, times = n),])
+  inv_lik = rowMeans(components)
+  ll = sum(log(1/inv_lik))
+  
+  return(ll)
+}
+```
+
+```{r}
+HM(post_mu, y)
+mod_HM(post_mu, y, mu0=0.15, p=0.98)
+```
+
 
 The End
