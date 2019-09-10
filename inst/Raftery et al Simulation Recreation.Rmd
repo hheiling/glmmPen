@@ -164,9 +164,8 @@ The function:
 
 ```{r}
 
-ll = function(d, n, y){
-  y_means = colMeans(y)
-  ll = d/2 * log(n/(2*pi*(n+1))) - n/(2*(n+1)) * sum(y_means^2)
+ll = function(d, n, y_bar){
+  ll = d/2 * log(n/(2*pi*(n+1))) - n/(2*(n+1)) * sum(y_bar^2)
 }
 
 ```
@@ -183,12 +182,13 @@ d = 3
 I = diag(x = 1, nrow = d)
 M = 10^4
 
-y = rmvnorm(n = n, mean = rep(mu0, times = d), sigma = I)
+set.seed(1)
+y_bar = rmvnorm(n = 1, mean = rep(mu0, times = d), sigma = I/n)
 
-post_mu = rmvnorm(n = M, mean = colSums(y)/(n+1), sigma = I/(n+1))
+post_mu = rmvnorm(n = M, mean = y_bar/(n+1), sigma = I/(n+1))
 
 # Target log-lik:
-target = ll(d, n, y)
+target = ll(d, n, y_bar)
 target # log-lik
 exp(target) # marginal/integrated likelihood
 1/exp(target) # inverse of marginal likelihood
@@ -200,74 +200,71 @@ exp(target) # marginal/integrated likelihood
 
 HM = function(posterior, y){
   # Define variables
-  d = ncol(y)
-  n = nrow(y)
+  d = length(y)
   M = nrow(posterior)
   I = diag(x = 1, nrow = d)
   
   ll = 0
-  dens = matrix(0, nrow = n, ncol = M)
+  dens = numeric(M)
   # For each posterior draw u, calculate y|u density
-  ## Organization: row = y_i, column = draw_s
   for(s in 1:M){
-    dens[,s] = dmvnorm(y, mean = posterior[s,], sigma = I)
+    dens[s] = dmvnorm(y_bar, mean = posterior[s,], sigma = I)
   }
   # Find inverse of densities
   inv_dens = 1/dens
-  # Sum inverse densities for each individual - inverse likelihood for each individual
-  inv_lik = rowMeans(inv_dens)
+  # Sum inverse densities
+  inv_lik = mean(inv_dens)
   # Inverse of inverse-likelihood = likelihood
   lik = 1 / inv_lik
   # Sum log of individual likelihoods
-  ll = sum(log(lik))
+  ll = log(lik)
   
   return(ll)
 }
 
 mod_HM = function(posterior, y, mu0, p){
   # Define variables
-  n = nrow(y)
+  # n = nrow(y)
   M = nrow(posterior)
-  d = ncol(y)
+  d = length(y)
   I = diag(x=1,nrow=d)
   
   ll = 0
-  # Organization of density matrix: rows = individuals, columns = posterior draws
-  dens = matrix(0, nrow = n, ncol = M)
+  dens = numeric(M)
   
   # Calculate posterior modes and covariance (for numerator)
   post_means = colMeans(posterior)
   post_cov = cov(posterior)
   
   # Denominator component - prior evaluated at posterior sample values
-  prior = matrix(dmvnorm(posterior, mean = rep(mu0, times = d), sigma = I), nrow = 1)
+  prior = dmvnorm(posterior, mean = rep(mu0, times = d), sigma = I)
   # Calculation of truncated normal - numerator
   wt_norm = dmvnorm(posterior, mean = post_means, sigma = post_cov)
   region = apply(posterior, 1, function(x) t(x - post_means) %*% solve(post_cov) %*% 
                    (x - post_means))
   cutoff = qchisq(p=p, df=d)
-  trunc_norm = matrix(ifelse(region>cutoff, 0, wt_norm), nrow = 1)
+  trunc_norm = ifelse(region>cutoff, 0, wt_norm)
   print("proportion truncated:")
   print(sum(region>cutoff) / length(region))
   
   for(s in 1:M){
-    dens[,s] = dmvnorm(y, mean = posterior[s,], sigma = I)
+    dens[s] = dmvnorm(y, mean = posterior[s,], sigma = I)
   }
   
   # Calculate f* / (denity * prior)
-  components = trunc_norm[rep(1, times = n),] / (dens * prior[rep(1, times = n),])
-  # Sum these components over all posterior draws to get inverse-likelihood for each individual
-  inv_lik = rowMeans(components)
+  components = trunc_norm / (dens * prior)
+  # Sum these components over all posterior draws to get inverse-likelihood 
+  inv_lik = mean(components)
   # Find likelihood (inverse of inverse), then sum logs of these likelihoods
-  ll = sum(log(1/inv_lik))
+  ll = log(1/inv_lik)
   
   return(ll)
 }
 ```
 
 ```{r}
-HM(post_mu, y)
-mod_HM(post_mu, y, mu0=0.15, p=0.98)
+HM(post_mu, y_bar)
+mod_HM(post_mu, y_bar, mu0=0.15, p=0.98)
 ```
 
 # Naim's Code
