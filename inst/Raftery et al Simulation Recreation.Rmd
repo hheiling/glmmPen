@@ -143,6 +143,7 @@ mod_HM_sect2(mcmc_samps, y = 5, mu0 = 0, alpha = 2, p = 0.98)
 y distribution: 
 
 $$ y_1,...,y_n \sim N(\mu,I) $$
+$$ \bar y \sim N(\mu, I/n) $$ 
 
 Prior for mean:
 
@@ -152,7 +153,7 @@ Posterior for mean:
 $$ \mu|y \sim N \left ( \frac{n \bar y}{n+1}, \frac{I}{n+1} \right ) $$
 True log integrated likelihood value:
 
-$$ \ell(y) = log(f(y)) = \frac{d}{2} log \left( \frac{n}{(n+1)2\pi} \right ) - \frac{n}{2(n+1)} \sum_{j=1}^d \bar y_j^2 $$
+$$ \ell(\bar y) = log(f(\bar y)) = \frac{d}{2} log \left( \frac{n}{(n+1)2\pi} \right ) - \frac{n}{2(n+1)} \sum_{j=1}^d \bar y_j^2 $$
 
 Let us assign the following values to the hyperparameters:
 
@@ -185,13 +186,13 @@ M = 10^4
 set.seed(1)
 y_bar = rmvnorm(n = 1, mean = rep(mu0, times = d), sigma = I/n)
 
-post_mu = rmvnorm(n = M, mean = y_bar/(n+1), sigma = I/(n+1))
+post_mu = rmvnorm(n = M, mean = n*y_bar/(n+1), sigma = I/(n+1))
 
 # Target log-lik:
 target = ll(d, n, y_bar)
 target # log-lik
-exp(target) # marginal/integrated likelihood
-1/exp(target) # inverse of marginal likelihood
+# exp(target) # marginal/integrated likelihood
+# 1/exp(target) # inverse of marginal likelihood
 ```
 
 ## (Modified) Harmonic Mean Estimate
@@ -243,7 +244,7 @@ mod_HM = function(posterior, y, mu0, p){
   region = apply(posterior, 1, function(x) t(x - post_means) %*% solve(post_cov) %*% 
                    (x - post_means))
   cutoff = qchisq(p=p, df=d)
-  trunc_norm = ifelse(region>cutoff, 0, wt_norm)
+  trunc_norm = ifelse(region>cutoff, 0, wt_norm) / p
   print("proportion truncated:")
   print(sum(region>cutoff) / length(region))
   
@@ -260,14 +261,134 @@ mod_HM = function(posterior, y, mu0, p){
   
   return(ll)
 }
+
+############# 
+# for experimentation purposes only
+# mod_HM_test = function(posterior, y, mu0, p){
+#   # Define variables
+#   # n = nrow(y)
+#   M = nrow(posterior)
+#   d = length(y)
+#   I = diag(x=1,nrow=d)
+#   
+#   ll = 0
+#   dens = numeric(M)
+#   
+#   # Calculate posterior modes and covariance (for numerator)
+#   post_means = colMeans(posterior)
+#   post_cov = cov(posterior)
+#   
+#   # Denominator component - prior evaluated at posterior sample values
+#   prior = dmvnorm(posterior, mean = rep(mu0, times = d), sigma = I)
+#   # Calculation of truncated normal - numerator
+#   wt_norm = dmvnorm(posterior, mean = post_means, sigma = post_cov, log = F)
+#   print(summary(wt_norm))
+#   region = apply(posterior, 1, function(x) t(x - post_means) %*% solve(post_cov) %*% 
+#                    (x - post_means))
+#   cutoff = qchisq(p=p, df=d)
+#   trunc_norm = ifelse(region>cutoff, 0, wt_norm) / p 
+#   
+#   print("proportion truncated:")
+#   print(sum(region>cutoff) / length(region))
+#   
+#   for(s in 1:M){
+#     dens[s] = dmvnorm(y, mean = posterior[s,], sigma = I)
+#   }
+#   
+#   # Calculate f* / (denity * prior)
+#   components = trunc_norm / (dens * prior)
+#   print(summary(trunc_norm / dens / prior))
+#   # Sum these components over all posterior draws to get inverse-likelihood 
+#   inv_lik = mean(components)
+#   # Find likelihood (inverse of inverse), then sum logs of these likelihoods
+#   ll = log(1/inv_lik)
+#   
+#   return(ll)
+# }
+
 ```
 
 ```{r}
 HM(post_mu, y_bar)
-mod_HM(post_mu, y_bar, mu0=0.15, p=0.98)
+mod_HM(post_mu, y_bar, mu0=0.15, p=0.97)
+
+mod_HM_test(post_mu, y_bar, mu0 = 0.15, p = 0.98)
 ```
 
-# Naim's Code
+# Raftery et al Second Method - using 4.2 example
+
+## Method:
+
+We will be using the same y and $\mu | y$ set-up specified earlier for example 4.2.
+
+Given B independent samples from the posterior distribution, we can calculate the log densities of y (or in this case, $\bar y$) when evaluated at each of the posterior samples (density of $ \bar y | \mu^t$ for posterior samples t = {1,...,M}). 
+
+$$ \ell_t = log(f(\bar y| \mu^t)) = \frac{d}{2} log(n/(2 \pi)) - \frac{n}{2} \sum_{j=1}^d (\bar y_j - \mu_j^t)^2 $$
+
+Using equation (20) in the article (pg. 15), we can find the following estimate of the log marginal likelihood (for fixed effects model):
+
+$$ log(\hat f_{BICM}(\bar y)) = \bar \ell - s_{\ell}^2(log(n) - 1) $$
+where the above quantities (sample mean and variance) are:
+
+$$ \bar \ell = \frac{1}{M} \sum_{t=1}^M \ell_t $$
+$$ s_{\ell}^2 = \frac{1}{M-1} \sum_{t=1}^M (\ell_t - \bar \ell)^2 $$
+
+Note: The $ s_{\ell}^2 $ is supposed to be an estimate of $d/2$, where d is the true number of parameters. In this case, the number of parameters d should be the length of the mean vector (and the length of the $\bar y$ vector). Consequently, if d = 3, $s_{\ell}^2$ should be about 1.5.
+
+## Code 
+
+```{r}
+library(mvtnorm)
+mu0 = 0.15 # for all dimensions of y
+n = 300
+d = 17
+I = diag(x = 1, nrow = d)
+M = 10^5
+
+set.seed(1)
+y_bar = rmvnorm(n = 1, mean = rep(mu0, times = d), sigma = I/n)
+
+post_mu = rmvnorm(n = M, mean = n*y_bar/(n+1), sigma = I/(n+1))
+
+# Target log-lik:
+target = ll(d, n, y_bar)
+target # log-lik
+```
+
+```{r}
+
+ll_BICM = function(posterior, y_bar, n){
+  # Define variables
+  d = length(y_bar)
+  M = nrow(posterior)
+  
+  y_bar_mat = matrix(y_bar, nrow = 1)
+  diff = (y_bar_mat[rep(1, times = M),] - posterior)
+  
+  ll_t = d/2 * log(n/(2*pi)) - n/2 * rowSums(diff^2)
+  ll_bar = mean(ll_t)
+  cat("ll_bar: ", ll_bar, "\n")
+  ll_var = var(ll_t)
+  cat("estimate of d:", ll_var*2, "; true d:", d, "\n")
+  # ll_var = d/2
+  
+  # BICM estimate of log integrated likelihood - equation (20) pg. 15
+  ll_bicm = ll_bar - ll_var * (log(n) - 1)
+  
+  # lognormal estimate of the integrated likelihood - equation (29) pg. 18
+  ## Paper said this could be useful when there is very high dimensionality in the 
+  ## theta paramter of interest - for us, if alpha is high dimensional
+  ll_ln = ll_bar - 0.5 * (ll_var)
+  
+  return(list(BICM = ll_bicm, LogNorm = ll_ln))
+}
+
+ll_BICM(post_mu, y_bar, n = n)
+
+```
+
+
+# Naim's Code for Section 2 Example
 
 ```{r}
 alpha = 2
