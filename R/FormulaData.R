@@ -91,15 +91,6 @@ formulaData = function(formula, data = NULL, na.action){
     ## Get fixed effects X matrix
     ## mm = model.matrix
     mm = model.matrix(formula_nobars)
-    # if(length(unique(attr(mm, "assign"))) != length(attr(mm, "assign"))){
-    #   # Find duplicates
-    #   dup = attr(mm,"assign")[duplicated(attr(mm,"assign"))]
-    #   trms = attr(terms(f_full), "term.labels")[dup]
-    #   # Remove prefixes to colnames
-    #   for(t in trms){
-    #     colnames(mm) = gsub(t, "", colnames(mm))
-    #   }
-    # }
     
     # Deal with NAs
     if(identical(na.action, na.omit) | identical(na.action, "na.omit")){  
