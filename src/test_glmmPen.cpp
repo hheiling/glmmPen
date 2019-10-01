@@ -15,6 +15,7 @@ void arma_test_ref( arma::mat& x){}
 // [[Rcpp::export]]
 void arma_test_const_ref( const arma::mat& x){}
 
+//' @export
 // [[Rcpp::export]]
 void Znew_gen2( const arma::mat& U, const arma::mat& Z, const arma::vec& g, const arma::vec& cols, 
                 unsigned int n, unsigned int q, unsigned int d, SEXP pBigMat, 
