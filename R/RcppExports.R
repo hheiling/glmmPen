@@ -5,6 +5,14 @@ logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Ga
     .Call('_glmmPen_logLik_cpp', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
 }
 
+logLik_modif <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
+    .Call('_glmmPen_logLik_modif', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
+}
+
+logLik_MCI <- function(M, group, n_levels, y, eta_fef, Z, Gamma, family) {
+    .Call('_glmmPen_logLik_MCI', PACKAGE = 'glmmPen', M, group, n_levels, y, eta_fef, Z, Gamma, family)
+}
+
 #' Obtaining Rejection Sampling Monte Carlo Draws
 #' 
 #' Description
@@ -47,6 +55,7 @@ arma_test_const_ref <- function(x) {
     invisible(.Call('_glmmPen_arma_test_const_ref', PACKAGE = 'glmmPen', x))
 }
 
+#' @export
 Znew_gen2 <- function(U, Z, g, cols, n, q, d, pBigMat, J) {
     invisible(.Call('_glmmPen_Znew_gen2', PACKAGE = 'glmmPen', U, Z, g, cols, n, q, d, pBigMat, J))
 }

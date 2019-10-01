@@ -27,6 +27,45 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// logLik_modif
+double logLik_modif(const arma::vec& U_means, const arma::mat& sigma, unsigned int M, const arma::vec& group, unsigned int n_levels, unsigned int df, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::mat& Gamma, const char* family);
+RcppExport SEXP _glmmPen_logLik_modif(SEXP U_meansSEXP, SEXP sigmaSEXP, SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP dfSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP GammaSEXP, SEXP familySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type U_means(U_meansSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type n_levels(n_levelsSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type df(dfSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eta_fef(eta_fefSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Gamma(GammaSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    rcpp_result_gen = Rcpp::wrap(logLik_modif(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family));
+    return rcpp_result_gen;
+END_RCPP
+}
+// logLik_MCI
+double logLik_MCI(unsigned int M, const arma::vec& group, unsigned int n_levels, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::mat& Gamma, const char* family);
+RcppExport SEXP _glmmPen_logLik_MCI(SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP GammaSEXP, SEXP familySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< unsigned int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type n_levels(n_levelsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type eta_fef(eta_fefSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Gamma(GammaSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    rcpp_result_gen = Rcpp::wrap(logLik_MCI(M, group, n_levels, y, eta_fef, Z, Gamma, family));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_mc_inner
 NumericMatrix sample_mc_inner(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, int trace);
 RcppExport SEXP _glmmPen_sample_mc_inner(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP traceSEXP) {
@@ -126,6 +165,8 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_logLik_cpp", (DL_FUNC) &_glmmPen_logLik_cpp, 11},
+    {"_glmmPen_logLik_modif", (DL_FUNC) &_glmmPen_logLik_modif, 11},
+    {"_glmmPen_logLik_MCI", (DL_FUNC) &_glmmPen_logLik_MCI, 8},
     {"_glmmPen_sample_mc_inner", (DL_FUNC) &_glmmPen_sample_mc_inner, 6},
     {"_glmmPen_sample_mc_inner_gibbs", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs, 7},
     {"_glmmPen_arma_test_value", (DL_FUNC) &_glmmPen_arma_test_value, 1},

@@ -368,9 +368,9 @@ ll_BICM = function(posterior, y_bar, n){
   ll_t = d/2 * log(n/(2*pi)) - n/2 * rowSums(diff^2)
   ll_bar = mean(ll_t)
   cat("ll_bar: ", ll_bar, "\n")
-  ll_var = var(ll_t)
-  cat("estimate of d:", ll_var*2, "; true d:", d, "\n")
-  # ll_var = d/2
+  # ll_var = var(ll_t)
+  # cat("estimate of d:", ll_var*2, "; true d:", d, "\n")
+  ll_var = d/2
   
   # BICM estimate of log integrated likelihood - equation (20) pg. 15
   ll_bicm = ll_bar - ll_var * (log(n) - 1)
@@ -385,8 +385,58 @@ ll_BICM = function(posterior, y_bar, n){
 
 ll_BICM(post_mu, y_bar, n = n)
 
+HM(post_mu, y_bar)
+
 ```
 
+# Arithmetic Mean Approach (Anna Pajor) - Code by Naim
+
+Assumption: using same example set-up as the 4.2 example.
+
+## Code 
+
+Set-up and target: 
+
+```{r}
+library(mvtnorm)
+mu0 = 0.15 # for all dimensions of y
+n = 300
+d = 25
+I = diag(x = 1, nrow = d)
+M = 10^5
+
+set.seed(1)
+y_bar = rmvnorm(n = 1, mean = rep(mu0, times = d), sigma = I/n)
+
+post_mu = rmvnorm(n = M, mean = n*y_bar/(n+1), sigma = I/(n+1))
+
+# Target log-lik:
+target = ll(d, n, y_bar)
+target # log-lik
+```
+
+CAME estimate code:
+
+```{r}
+## Corrected Arithmetic mean estimator
+# determine bounds as the max of each dim
+bounds = apply(post_mu, 2, range) 
+inbounds = function(x){mean(x > bounds[1,] & x < bounds[2,]) == 1}
+# sample from prior
+prior = rmvnorm(nrow(post_mu), sigma = I)
+# calculate density and indicator
+dens = apply(prior, 1, FUN = function(x){dmvnorm(y_bar, mean = x, sigma = I/n)})
+ind = apply(prior, 1, inbounds)^2
+mean(dens*ind) # regular CAME
+log(mean(dens*ind))
+# now try importance sampling
+imp = rmvnorm(nrow(post_mu),mean = colMeans(post_mu) ,sigma = cov(post_mu))
+# importance weighted densite
+dens = apply(imp, 1, FUN = function(x){dmvnorm(y_bar, mean = x, sigma = I/n)})*dmvnorm(imp)/dmvnorm(imp,mean = colMeans(post_mu) ,sigma = cov(post_mu) )
+ind = apply(imp, 1, inbounds)^2
+mean(dens*ind) # IS CAME, much more accurate, use this one
+log(mean(dens*ind)) 
+```
 
 # Naim's Code for Section 2 Example
 
