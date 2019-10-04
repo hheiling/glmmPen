@@ -53,12 +53,12 @@
 #' 
 #' 
 #' @export
-fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
-                   family = "binomial", trace = 0, penalty = "grMCP",
-                   alpha = 1, nMC_max = 5000, 
-                   returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                   ufullinit = NULL,
-                   c = 1, M = 10^5){
+fit_dat_new2 = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
+                        family = "binomial", trace = 0, penalty = "grMCP",
+                        alpha = 1, nMC_max = 5000, 
+                        returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
+                        ufullinit = NULL,
+                        c = 1, M = 10^5){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -137,7 +137,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     fit00 = fit
   }else{
-    fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
+    if(ncol(X) > 2){
+      fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
+    }else{
+      fit = grpreg(matrix(X[,-1], nrow = nrow(X)), y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
+    }
+    
     fit00 = fit # naive fit
     
     coef = as.numeric(fit$beta)
@@ -145,9 +150,16 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     if(trace == 1) print(coef)
     
-    vars = rep(10^-10, ncol(Z)/d)
-    cov = var = diag(vars)
-    gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
+    if(ncol(Z)/d > 1){
+      vars = rep(10^-10, ncol(Z)/d)
+      cov = var = diag(vars)
+      gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
+    }else{
+      vars = 10^-10
+      cov = var
+      gamma = var
+    }
+    
     
     ok = which(vars > 0)# & coef[1:ncol(X)] != 0)
     if(length(ok) == 0) ok = 1 # at least include the random intercept
@@ -243,38 +255,43 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     oldcoef = coef
     
-      fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
-                    penalty="grMCP", family="binomial",lambda = lambda1, 
-                    offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), alpha = alpha, active = active0, 
-                    initbeta = c(0,coef[-c(1:ncol(X))]))
-      gc()
-      coef = rep(0,length(covgroup) + ncol(X))
-      coef[-c(1:ncol(X))] = fit0$beta[-1]
-      c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
-      
+    fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
+                  penalty="grMCP", family="binomial",lambda = lambda1, 
+                  offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), alpha = alpha, active = active0, 
+                  initbeta = c(0,coef[-c(1:ncol(X))]))
+    gc()
+    coef = rep(0,length(covgroup) + ncol(X))
+    coef[-c(1:ncol(X))] = fit0$beta[-1]
+    c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
+    
+    if(ncol(X) > 2){
       fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-      gc()
-      coef[c(1:ncol(X))] = fit1$beta
-      c0[c(1:ncol(X))] = c0[c(1:ncol(X))] + (fit1$beta == 0)^2
-      fit = fit1
-      fit$coef = coef
+    }else{
+      fit1 = grpreg(matrix(X[rep(1:nrow(X), each = nrow(u)),-1], nrow = nrow(X)*nrow(u)), y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
       
-      # need to compile code first before running.  Actives will default to 1 to test, then uncomment the below to skip groups
-      # update active set every 5 iterations
-      if(floor(i/5) == ceiling(i/5)){
-        active1[which(c0[c(2:ncol(X))] == 5)] = 0
-        active1[which(c0[c(2:ncol(X))] < 5)] = 1
-        
-        for(kk in 1:max(covgroup)){
-          active0[kk] = (all(c0[-c(1:ncol(X))][covgroup == kk]<5))^2
-        }
-        print(length(covgroup))
-        print(length(c0[-c(1:ncol(X))]))
-        print(active1)
-        print(active0)
-        # reset c0
-        c0 = rep(0, length(coef))
+    }
+    gc()
+    coef[c(1:ncol(X))] = fit1$beta
+    c0[c(1:ncol(X))] = c0[c(1:ncol(X))] + (fit1$beta == 0)^2
+    fit = fit1
+    fit$coef = coef
+    
+    # need to compile code first before running.  Actives will default to 1 to test, then uncomment the below to skip groups
+    # update active set every 5 iterations
+    if(floor(i/5) == ceiling(i/5)){
+      active1[which(c0[c(2:ncol(X))] == 5)] = 0
+      active1[which(c0[c(2:ncol(X))] < 5)] = 1
+      
+      for(kk in 1:max(covgroup)){
+        active0[kk] = (all(c0[-c(1:ncol(X))][covgroup == kk]<5))^2
       }
+      print(length(covgroup))
+      print(length(c0[-c(1:ncol(X))]))
+      print(active1)
+      print(active0)
+      # reset c0
+      c0 = rep(0, length(coef))
+    }
     
     problem = F
     if(any(is.na(coef))){
@@ -443,7 +460,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     gc()
   }
   
-
+  
   print(sqrt(diag(cov)[1:3]))
   returnMC
   # out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
