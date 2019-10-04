@@ -53,7 +53,7 @@
 #' 
 #' 
 #' @export
-fit_dat_new2 = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
+fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
                         family = "binomial", trace = 0, penalty = "grMCP",
                         alpha = 1, nMC_max = 5000, 
                         returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
