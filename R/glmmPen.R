@@ -74,8 +74,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   # }else{
   #   group = fD_out$group
   # }
-
-  data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, group = group_num)
+  
+  # Standardize X and Z
+  std_out = XZ_std(fD_out, group_num)
+  
+  data_input = list(y = fD_out$y, X = std_out$X_std, Z = std_out$Z_std, group = group_num)
   
   coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
   
@@ -97,7 +100,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   if(!is.list(control) | !inherits(control, "pglmmControl")){
     stop("control parameter must be a list of type lambdaControl() or selectControl()")
   }
-  # print(inherits(control, "lambdaControl"))
+  
   if(inherits(control, "lambdaControl")){
     lambda0 = control$lambda0
     lambda1 = control$lambda1
@@ -105,20 +108,17 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       stop("lambda0 and lambda1 cannot be negative")
     }
     # Call fit_dat function
-    # fit_dat object found in "/R/fit_dat.R" file
+    # fit_dat function found in "/R/fit_dat.R" file
     fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
                   family = family, trace = trace, penalty = penalty,
                   conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
                   maxitEM = maxitEM, alpha = alpha)
+    
   }else if(inherits(control, "selectControl")){
     stop("selectControl option not yet available")
     
     if(is.null(control$lambda0_seq)){
-      # Calculate lambda0_range
-      const = 10^-3
-      lam_max = 2
-      lam_min = const * lam_max
-      lambda0_range = seq(from = log(lam_max), to = log(lam_min), length.out = 40)
+      lambda0_range = LambdaRange(X = data_input$X, y = data_input$y, nlambda = control$nlambda)
     }else{
       lambda0_range = control$lambda0_seq
       if(!is.numeric(lambda0_range) | any(lambda0_range < 0)){
@@ -126,11 +126,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       }
     }
     if(is.null(control$lambda1_seq)){
-      # Calculate lambda0_range
-      const = 10^-3
-      lam_max = 2
-      lam_min = const * lam_max
-      lambda1_range = seq(from = log(lam_max), to = log(lam_min), length.out = 40)
+      lambda1_range = lambda0_range
     }else{
       lambda1_range = control$lambda1_seq
       if(!is.numeric(lambda1_range) | any(lambda1_range < 0)){
@@ -158,13 +154,13 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       sampling = "Gibbs Sampling"
     }
   }
-
+  
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y, 
                        X = fD_out$X, Z = fD_out$Z, group = fD_out$flist, 
                        coef_names = coef_names, family = family,
                        offset = offset, weights = weights, frame = fD_out$frame,
-                       sampling = sampling))
+                       sampling = sampling, std_out = std_out))
 
   out_object = pglmmObj$new(output)
   return(out_object)
@@ -197,9 +193,73 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 
 #' @rdname lambdaControl
 #' @export
-selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL){
+selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 40){
   structure(list(lambda0_seq = lambda0_seq,
-                 lambda1_seq = lambda1_seq),
+                 lambda1_seq = lambda1_seq,
+                 nlambda = nlambda),
             class = c("selectControl", "pglmmControl"))
 }
 
+#' @importFrom ncvreg std
+#' @export
+XZ_std = function(fD_out, group_num){
+  # Standardize X - ncvreg::std method
+  X = fD_out$X
+  X_std = cbind(1, std(X[,-1]))
+  X_center = attr(X_std, "center")
+  X_scale = attr(X_std, "scale")
+  # Note: X_std = (X - X_center) / X_scale
+  
+  var_subset = (colnames(X) %in% fD_out$cnms)
+  Z_center = X_center[var_subset]
+  Z_scale = X_scale[var_subset]
+  
+  # Standardize Z using X_std output
+  Z_sparse = fD_out$Z
+  d = nlevels(group_num)
+  num_vars = ncol(Z_sparse) / d
+  
+  Z_std = Matrix(data = NA, nrow = nrow(Z_sparse), ncol = ncol(Z_sparse), sparse = T)
+  
+  for(v in 1:num_vars){ 
+    if("(Intercept)" %in% cnms) next # Don't need to scale intercept
+    cols = seq(from = (v - 1)*d + 1, to = v*d, by = 1)
+    for(k in 1:nlevels(group_num)){
+      ids = (group_num == k)
+      Z_std[ids, cols[k]] = (Z_sparse[ids, cols[k]] - Z_center[v-1]) / Z_scale[v-1]
+    }
+  }
+  
+  return(list(X_std = X_std, Z_std = Z_std, X_center = X_center, X_scale = X_scale,
+              Z_center = Z_center, Z_scale = Z_scale))
+}
+
+
+#' @importFrom ncvreg setupLambda
+#' @export
+LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 40,
+                       penalty.factor = NULL){
+  # Borrowed elements from `ncvreg` function
+  n = nrow(X)
+  p = ncol(X)
+  
+  if(family == "gaussian"){
+    yy = y = mean(y)
+  }else{
+    yy = y
+  }
+  
+  if(is.null(lambda.min)){
+    lambda.min = ifelse(n>p, 0.001, 0.05)
+  }
+  
+  if(is.null(penalty.factor)){
+    penalty.factor = rep(1, p)
+  }
+  
+  # lambda = calcLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+  lambda = setupLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+  
+  return(lambda)
+  
+}
