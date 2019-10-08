@@ -9,7 +9,7 @@ Constructs control structures for penalized mixed model fitting.}
 \usage{
 lambdaControl(lambda0 = 0, lambda1 = 0)
 
-selectControl(lambda0_seq = NULL, lambda1_seq = NULL)
+selectControl(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 40)
 }
 \arguments{
 \item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
