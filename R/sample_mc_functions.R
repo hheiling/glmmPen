@@ -62,6 +62,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   #generate samples for each i
   
   error_out = F
+  gibbs_accept_rate = rep(NA, times = d)
   
   if(gibbs == F){ # Rejection sampling
     
@@ -102,9 +103,11 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         index = index[which(diag(cov) != 0)]
         if(length(index) == 0) next
         
-        u0[,index] = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+        gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                           y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace) 
+                                           y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace)
+        u0[,index] = gibbs_list$u
+        gibbs_accept_rate[i] = gibbs_list$acc_rate
       }
     }
     
@@ -116,9 +119,11 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       index = index[which(diag(cov) != 0)]
       if(length(index) == 0) next
       
-      u0[,index] = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+      gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace)
+      u0[,index] = gibbs_list$u
+      gibbs_accept_rate[i] = gibbs_list$acc_rate
     }
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
@@ -129,6 +134,11 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   
   # return(u0)
   # switch: variable indicating if switched from rejection sampling to gibbs sampling
-  return(list(u0 = u0, switch = error_out))
+  if(trace == 2 && !anyNA(gibbs_accept_rate)){
+    return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, switch = error_out))
+  }else{
+    return(list(u0 = u0, switch = error_out))
+  }
+  
 }
 
