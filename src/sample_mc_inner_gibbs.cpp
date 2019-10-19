@@ -4,14 +4,17 @@
 
 using namespace Rcpp;
 
+// Original: NumericMatrix sample_mc_inner_gibbs(...)
+
 // [[Rcpp::export]]
-NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
+List sample_mc_inner_gibbs(arma::mat f, // matrix
                           arma::mat z, // matrix
                           arma::vec y, // vector
                           arma::vec t, // vector
                           int NMC, // integer
                           arma::vec u0, //matrix
                           int trace){ // integer
+  
   arma::mat fitted = f;
   arma::mat Z=z;
   arma::vec Y=y;
@@ -100,10 +103,12 @@ NumericMatrix sample_mc_inner_gibbs(arma::mat f, // matrix
   }
   
   // Info for acceptance rate:
+  acc_rate = ((double)naccept) / index;
   if(trace == 2){
-    acc_rate = ((double)naccept) / index;
     Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
   }
   
-  return(wrap(out));
+  return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate));
+  // return(wrap(out));
+  
 }
