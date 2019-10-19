@@ -57,8 +57,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                         family = "binomial", trace = 0, penalty = "grMCP",
                         alpha = 1, nMC_max = 5000, 
                         returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                        ufullinit = NULL,
-                        c = 1, M = 10^5){
+                        ufullinit = NULL){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -469,8 +468,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   #              BIC20, covgroup = covgroup, J = J)
   # if(returnMC == T) out$u = u
   
-  # Change to ll = logLik_imp
-  ll = logLik_imp(y, X, Z, U = u, sigma = cov, group, coef, family, df = 10, c, M)
+  # Change ll to Pajor method
+  # ll = logLik_imp(y, X, Z, U = u, sigma = cov, group, coef, family, df = 10, c, M)
+  ll = NA
   
   # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
   # d = nlevels(group) = number independent subjects/groups
