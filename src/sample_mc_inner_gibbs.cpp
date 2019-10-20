@@ -36,7 +36,6 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
   double sumn = 0;
   // double stao = 0;
   double w = 0;
-  double acc_rate = 0;
   double ep = 0; 
   double e0 = 0;
   arma::mat out(nMC, q);
@@ -46,6 +45,7 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
   arma::vec etaen(n);
   arma::vec index2(q);
   arma::vec var(q);
+  arma::vec acc_rate(q);
   
   RNGScope scope;
   
@@ -103,10 +103,13 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
   }
   
   // Info for acceptance rate:
-  acc_rate = ((double)naccept) / index;
-  if(trace == 2){
-    Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
+  for(i = 0; i < q; i++){
+    acc_rate(i) = index2(i) / index;
   }
+
+  // if(trace == 2){
+  //   Rprintf("index: %d, naccept: %d, accept. rate: %f  \n", index, naccept, acc_rate);
+  // }
   
   return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate));
   // return(wrap(out));

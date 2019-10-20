@@ -62,7 +62,8 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   #generate samples for each i
   
   error_out = F
-  gibbs_accept_rate = rep(NA, times = d)
+  q = ncol(Z) / d
+  gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
   
   if(gibbs == F){ # Rejection sampling
     
@@ -107,7 +108,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace)
         u0[,index] = gibbs_list$u
-        gibbs_accept_rate[i] = gibbs_list$acc_rate
+        gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
       }
     }
     
@@ -123,7 +124,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), trace)
       u0[,index] = gibbs_list$u
-      gibbs_accept_rate[i] = gibbs_list$acc_rate
+      gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
     }
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
