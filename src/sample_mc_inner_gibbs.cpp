@@ -53,7 +53,7 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
   for(i = 0; i < q; i++){
     e(i) = uold(i);
     index2(i) = 0.0;
-    var(i) = 2.0;
+    var(i) = 1.5;
   }
   
   //iteratively update e
