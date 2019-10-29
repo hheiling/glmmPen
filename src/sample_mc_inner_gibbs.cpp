@@ -175,6 +175,8 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
     acc_rate(i) = 0.0;
   }
   
+   Rprintf("End initialization of e, index2, and acc_rate \n");
+  
   //iteratively update e
   while(naccept < nMC){
     
