@@ -172,6 +172,7 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
   for(i = 0; i < q; i++){
     e(i) = uold(i);
     index2(i) = 0.0;
+    acc_rate(i) = 0.0;
   }
   
   //iteratively update e
@@ -209,12 +210,13 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       if(w < sumn - sum){
         // ep left in e(i)
         index2(j) = index2(j) + 1.0;
-        Rprintf("index2 %u: %d \n", j, index2(j));
       }else{
         e(j) = e0;
       }
       //  }
     }
+    
+    Rprintf("index2 %u: %f \n", j, index2(j));
     
     if(index == 1+5*naccept){
       out.row(naccept) = e.t();
@@ -229,8 +231,7 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       batch = batch + batch_length;
       Rprintf("Updated batch information \n");
       // Determine acceptance rate for latest batch
-      Rprintf("index2 %u : %f \n", j, index2(j));
-      Rprintf("initial acc_rate: %f \n", acc_rate(j)); 
+      Rprintf("For proposal update: index2 %u : %f \n", j, index2(j));
       acc_rate(j) = index2(j) / batch_length;
       Rprintf("Determined acceptance rate for latest batch \n");
       // Update proposal variance (separate for each variable)
