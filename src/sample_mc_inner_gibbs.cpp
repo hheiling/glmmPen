@@ -131,8 +131,6 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
                            double batch,
                            int trace){ // integer
   
-  Rprintf("Input of variables okay \n");
-  
   arma::mat fitted = f;
   arma::mat Z=z;
   arma::vec Y=y;
@@ -168,8 +166,6 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
   arma::vec var = proposal_var; // Initially, proposal_var = 1.0 for each variable
   arma::vec acc_rate(q);
   
-  Rprintf("Declaration of variables okay \n");
-  
   RNGScope scope;
   
   //initialize e 
@@ -181,7 +177,7 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
   //iteratively update e
   while(naccept < nMC){
     
-    for(j = 0;j < q; j++){
+    for(j = 0; j < q; j++){
       
       // calculate etae
       etae = fitted + Z*e;
@@ -209,8 +205,6 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       sum = sum + R::dnorm4(e0, 0.0, 1.0, 1) + R::dnorm4(ep, 0.0, var(j), 1) ;
       sumn = sumn + R::dnorm4(ep, 0.0, 1.0, 1) + R::dnorm4(e0, 0.0, var(j), 1)  ;
       
-      Rprintf("Metropolis Ratio calculation okay \n");
-      
       // check for acceptance
       if(w < sumn - sum){
         // ep left in e(i)
@@ -234,6 +228,8 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       batch = batch + batch_length;
       Rprintf("Updated batch information \n");
       // Determine acceptance rate for latest batch
+      Rprintf("index2 %u : %f \n", j, index2(j));
+      Rprintf("initial acc_rate: %f \n", acc_rate(j)); 
       acc_rate(j) = index2(j) / batch_length;
       Rprintf("Determined acceptance rate for latest batch \n");
       // Update proposal variance (separate for each variable)
