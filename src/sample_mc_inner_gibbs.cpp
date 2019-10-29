@@ -222,16 +222,15 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
     }
     index++;
     
-    for(j = 0; j < q; j++){
-      // Updated proposal variance
-      if(index % (int)batch_length == 0){
-        Rprintf("Beginning of update to proposal variance \n");
+    // Update proposal variance
+    if(index % (int)batch_length == 0){
+      Rprintf("Beginning of update to proposal variance \n");
+      
+      for(j = 0; j < q; j++){
         // Update batch information 
         batch = batch + batch_length;
-        Rprintf("Updated batch information \n");
         // Determine acceptance rate for latest batch
         acc_rate(j) = index2(j) / batch_length;
-        Rprintf("Determined acceptance rate for latest batch \n");
         // Update proposal variance (separate for each variable)
         increment = sqrt(1 / batch);
         if(increment < 0.01){
@@ -239,23 +238,22 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
         }else{
           delta = 0.01;
         }
-        Rprintf("Determined latest increment value \n");
         if(acc_rate(j) > 0.5){
           var(j) = var(j) * exp(-2*delta);
         }else if(acc_rate(j) < 0.4){
           var(j) = var(j) * exp(2*delta);
         }
-        Rprintf("Updated proposal variance \n");
         // Re-set index2 - new acceptance rate for next batch
         index2(j) = 0.0;
-      }
-    }
-    
-    
-  }
+      } // End j for loop
+        
+      Rprintf("End if statement \n");
+    } // End if(index % (int)batch_lenth)
+      
+  } // End while loop
+  Rprintf("End while loop \n");
   
-  return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate,
-                      Named("proposal_var") = var));
+  return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var));
   
   
 }
