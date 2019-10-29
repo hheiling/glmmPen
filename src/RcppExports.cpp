@@ -99,6 +99,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_mc_inner_gibbs2
+List sample_mc_inner_gibbs2(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, arma::vec u0, arma::vec proposal_var, double batch, int trace);
+RcppExport SEXP _glmmPen_sample_mc_inner_gibbs2(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP u0SEXP, SEXP proposal_varSEXP, SEXP batchSEXP, SEXP traceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type f(fSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type t(tSEXP);
+    Rcpp::traits::input_parameter< int >::type NMC(NMCSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type u0(u0SEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type proposal_var(proposal_varSEXP);
+    Rcpp::traits::input_parameter< double >::type batch(batchSEXP);
+    Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_mc_inner_gibbs2(f, z, y, t, NMC, u0, proposal_var, batch, trace));
+    return rcpp_result_gen;
+END_RCPP
+}
 // arma_test_value
 void arma_test_value(arma::mat x);
 RcppExport SEXP _glmmPen_arma_test_value(SEXP xSEXP) {
@@ -169,6 +188,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_logLik_MCI", (DL_FUNC) &_glmmPen_logLik_MCI, 8},
     {"_glmmPen_sample_mc_inner", (DL_FUNC) &_glmmPen_sample_mc_inner, 6},
     {"_glmmPen_sample_mc_inner_gibbs", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs, 7},
+    {"_glmmPen_sample_mc_inner_gibbs2", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs2, 9},
     {"_glmmPen_arma_test_value", (DL_FUNC) &_glmmPen_arma_test_value, 1},
     {"_glmmPen_arma_test_ref", (DL_FUNC) &_glmmPen_arma_test_ref, 1},
     {"_glmmPen_arma_test_const_ref", (DL_FUNC) &_glmmPen_arma_test_const_ref, 1},
