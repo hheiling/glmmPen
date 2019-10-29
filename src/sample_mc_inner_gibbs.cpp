@@ -222,34 +222,35 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
     }
     index++;
     
-    // Updated proposal variance
-    if(index % (int)batch_length == 0){
-      Rprintf("Beginning of update to proposal variance \n");
-      // Update batch information 
-      batch = batch + batch_length;
-      Rprintf("Updated batch information \n");
-      // Determine acceptance rate for latest batch
-      Rprintf("j: %u", j);
-      Rprintf("index2(j): %f", index2(j));
-      acc_rate(j) = index2(j) / batch_length;
-      Rprintf("Determined acceptance rate for latest batch \n");
-      // Update proposal variance (separate for each variable)
-      increment = sqrt(1 / batch);
-      if(increment < 0.01){
-        delta = increment;
-      }else{
-        delta = 0.01;
+    for(j = 0; j < q; j++){
+      // Updated proposal variance
+      if(index % (int)batch_length == 0){
+        Rprintf("Beginning of update to proposal variance \n");
+        // Update batch information 
+        batch = batch + batch_length;
+        Rprintf("Updated batch information \n");
+        // Determine acceptance rate for latest batch
+        acc_rate(j) = index2(j) / batch_length;
+        Rprintf("Determined acceptance rate for latest batch \n");
+        // Update proposal variance (separate for each variable)
+        increment = sqrt(1 / batch);
+        if(increment < 0.01){
+          delta = increment;
+        }else{
+          delta = 0.01;
+        }
+        Rprintf("Determined latest increment value \n");
+        if(acc_rate(j) > 0.5){
+          var(j) = var(j) * exp(-2*delta);
+        }else if(acc_rate(j) < 0.4){
+          var(j) = var(j) * exp(2*delta);
+        }
+        Rprintf("Updated proposal variance \n");
+        // Re-set index2 - new acceptance rate for next batch
+        index2(j) = 0.0;
       }
-      Rprintf("Determined latest increment value \n");
-      if(acc_rate(j) > 0.5){
-        var(j) = var(j) * exp(-2*delta);
-      }else if(acc_rate(j) < 0.4){
-        var(j) = var(j) * exp(2*delta);
-      }
-      Rprintf("Updated proposal variance \n");
-      // Re-set index2 - new acceptance rate for next batch
-      index2(j) = 0.0;
     }
+    
     
   }
   
