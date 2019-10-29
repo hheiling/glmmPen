@@ -234,7 +234,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                            proposal_var[i,var_index], batch, trace)
         u0[,index] = gibbs_list$u
         gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-        proposal_var[i,var_index] = gibbs_list$proposal_var
+        # proposal_var[i,var_index] = gibbs_list$proposal_var
         batch = gibbs_list$batch
       }
     }
@@ -254,7 +254,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                          proposal_var[i,var_index], batch, trace)
       u0[,index] = gibbs_list$u
       gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-      proposal_var[i,var_index] = gibbs_list$proposal_var
+      # proposal_var[i,var_index] = gibbs_list$proposal_var
       batch = gibbs_list$batch
     }
   }
@@ -265,11 +265,18 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   }
   
   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
+  # if(!anyNA(gibbs_accept_rate)){
+  #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
+  #               switch = error_out, proposal_var = proposal_var))
+  # }else{
+  #   return(list(u0 = u0, switch = error_out, proposal_var = proposal_var))
+  # }
+  
   if(!anyNA(gibbs_accept_rate)){
     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-                switch = error_out, proposal_var = proposal_var))
+                switch = error_out))
   }else{
-    return(list(u0 = u0, switch = error_out, proposal_var = proposal_var))
+    return(list(u0 = u0, switch = error_out))
   }
   
 }

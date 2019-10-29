@@ -224,7 +224,6 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
     
     // Update proposal variance
     if(index % (int)batch_length == 0){
-      Rprintf("Beginning of update to proposal variance \n");
       
       for(j = 0; j < q; j++){
         // Update batch information 
@@ -247,13 +246,13 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
         index2(j) = 0.0;
       } // End j for loop
         
-      Rprintf("End if statement \n");
     } // End if(index % (int)batch_lenth)
       
   } // End while loop
-  Rprintf("End while loop \n");
   
-  return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var));
+  Rprintf("End while loop \n");
+  // return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var));
+  return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate));
   
   
 }
