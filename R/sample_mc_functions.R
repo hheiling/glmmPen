@@ -228,7 +228,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         if(length(index) == 0) next
         var_index = which(diag(cov) != 0)
         
-        gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+        gibbs_list = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                            proposal_var[var_index], batch, trace)
@@ -248,7 +248,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       if(length(index) == 0) next
       var_index = which(diag(cov) != 0)
       
-      gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+      gibbs_list = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                          proposal_var[var_index], batch, trace)
