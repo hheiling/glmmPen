@@ -209,6 +209,7 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       if(w < sumn - sum){
         // ep left in e(i)
         index2(j) = index2(j) + 1.0;
+        Rprintf("index2 %u: %d \n", j, index2(j));
       }else{
         e(j) = e0;
       }
