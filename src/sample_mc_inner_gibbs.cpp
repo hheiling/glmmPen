@@ -131,6 +131,8 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
                            double batch,
                            int trace){ // integer
   
+  Rprintf("Input of variables okay \n");
+  
   arma::mat fitted = f;
   arma::mat Z=z;
   arma::vec Y=y;
@@ -165,6 +167,8 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
   arma::vec index2(q);
   arma::vec var = proposal_var; // Initially, proposal_var = 1.0 for each variable
   arma::vec acc_rate(q);
+  
+  Rprintf("Declaration of variables okay \n");
   
   RNGScope scope;
   
@@ -205,6 +209,8 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       sum = sum + R::dnorm4(e0, 0.0, 1.0, 1) + R::dnorm4(ep, 0.0, var(j), 1) ;
       sumn = sumn + R::dnorm4(ep, 0.0, 1.0, 1) + R::dnorm4(e0, 0.0, var(j), 1)  ;
       
+      Rprintf("Metropolis Ratio calculation okay \n");
+      
       // check for acceptance
       if(w < sumn - sum){
         // ep left in e(i)
@@ -223,10 +229,13 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
     
     // Updated proposal variance
     if(index % (int)batch_length == 0){
+      Rprintf("Beginning of update to proposal variance \n");
       // Update batch information 
       batch = batch + batch_length;
+      Rprintf("Updated batch information \n");
       // Determine acceptance rate for latest batch
       acc_rate(j) = index2(j) / batch_length;
+      Rprintf("Determined acceptance rate for latest batch \n");
       // Update proposal variance (separate for each variable)
       increment = sqrt(1 / batch);
       if(increment < 0.01){
@@ -234,12 +243,13 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
       }else{
         delta = 0.01;
       }
+      Rprintf("Determined latest increment value \n");
       if(acc_rate(j) > 0.5){
         var(j) = var(j) * exp(-2*delta);
       }else if(acc_rate(j) < 0.4){
         var(j) = var(j) * exp(2*delta);
       }
-      
+      Rprintf("Updated proposal variance \n");
       // Re-set index2 - new acceptance rate for next batch
       index2(j) = 0.0;
     }
