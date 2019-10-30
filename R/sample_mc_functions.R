@@ -232,8 +232,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                            matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
-        print("Finished sample_mc_inner_gibbs2")
-        print(class(gibbs_output))
+        
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
@@ -254,11 +253,14 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                          matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
-      print("Finished sample_mc_inner_gibbs2")
-      print(class(gibbs_output))
+      
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
+      print("gibbs acceptance rate")
+      print(gibbs_accept_rate[i,])
       proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
+      print("updated proposal var")
+      print(proposal_var[i,var_index])
       batch = batch + nMC %/% 100
     }
   }
