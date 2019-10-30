@@ -246,6 +246,9 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
         index2(j) = 0.0;
       } // End j for loop
         
+      Rcout << "Updated acceptance rate is" << std::endl << acc_rate;
+      Rcout << "Updated propsal variance is" << std::endl << proposal_var;
+      
     } // End if(index % (int)batch_lenth)
       
   } // End while loop
@@ -258,7 +261,7 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
   
   Rcout << "Acceptance rate is" << std::endl << acc_rate;
   Rcout << "Updated propsal variance is" << std::endl << proposal_var;
-  Rcout << "Last line of gibbs samples is" << std::endl << out.row(naccept);
+  Rcout << "One of last lines of gibbs samples is" << std::endl << out.row(naccept-3);
     
   return acc_rate; 
   
