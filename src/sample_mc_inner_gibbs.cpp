@@ -121,7 +121,7 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
 
 // Adaptive change in proposal variation
 // [[Rcpp::export]]
-Rcpp::List sample_mc_inner_gibbs2(arma::mat f, // matrix
+NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::mat z, // matrix
                            arma::vec y, // vector
                            arma::vec t, // vector
@@ -253,9 +253,9 @@ Rcpp::List sample_mc_inner_gibbs2(arma::mat f, // matrix
   Rprintf("End while loop \n");
   Rcpp::List L = List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var);
   Rprintf("Creation of List okay \n");
-  Rprintf("Length of list: %u", L.length()); 
-  Rprintf("Size of list: %u", L.size());
+  Rprintf("Length of list: %u \n", L.length()); 
+  Rprintf("Size of list: %u \n", L.size());
     
-  return L;
+  return wrap(out);
   
 }
