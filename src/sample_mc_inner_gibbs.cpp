@@ -121,7 +121,7 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
 
 // Adaptive change in proposal variation
 // [[Rcpp::export]]
-NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
+arma::mat sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::mat z, // matrix
                            arma::vec y, // vector
                            arma::vec t, // vector
@@ -269,6 +269,6 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   out.row(nMC-2) = acc_rate; // Second-to-last row
   out.row(nMC-1) = var; // Last row
     
-  return(wrap(out)); 
+  return(out); 
   
 }
