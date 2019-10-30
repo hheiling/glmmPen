@@ -224,7 +224,7 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
     
     // Update proposal variance
     if(index % (int)batch_length == 0){
-      
+      Rcout << "index2 at new batch" << std::endl << index2;
       for(j = 0; j < q; j++){
         // Update batch information 
         batch = batch + batch_length;
@@ -247,7 +247,7 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
       } // End j for loop
         
       Rcout << "Updated acceptance rate is" << std::endl << acc_rate;
-      Rcout << "Updated propsal variance is" << std::endl << proposal_var;
+      Rcout << "Updated propsal variance is" << std::endl << var;
       
     } // End if(index % (int)batch_lenth)
       
@@ -260,7 +260,7 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
   Rprintf("Size of list: %u \n", L.size());
   
   Rcout << "Acceptance rate is" << std::endl << acc_rate;
-  Rcout << "Updated propsal variance is" << std::endl << proposal_var;
+  Rcout << "Updated propsal variance is" << std::endl << var;
   Rcout << "One of last lines of gibbs samples is" << std::endl << out.row(naccept-3);
     
   return acc_rate; 
