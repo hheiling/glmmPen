@@ -255,6 +255,10 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
   Rprintf("Creation of List okay \n");
   Rprintf("Length of list: %u \n", L.length()); 
   Rprintf("Size of list: %u \n", L.size());
+  
+  Rcout << "Acceptance rate is" << std::endl << acc_rate;
+  Rcout << "Updated propsal variance is" << std::endl << proposal_var;
+  Rcout << "Last line of gibbs samples is" << std::endl << out.row(naccept);
     
   return acc_rate; 
   
