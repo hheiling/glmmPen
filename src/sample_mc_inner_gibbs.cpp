@@ -163,7 +163,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   arma::vec etae(n);
   arma::vec etaen(n);
   arma::vec index2(q);
-  arma::rowvec var = proposal_var; // Initially, proposal_var = 1.0 for each variable
+  arma::rowvec var = proposal_var; // At beginning of EM algorithm, proposal_var = 1.0 for each variable
   arma::rowvec acc_rate(q);
   
   RNGScope scope;
@@ -205,6 +205,9 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
       
       sum = sum + R::dnorm4(e0, 0.0, 1.0, 1) + R::dnorm4(ep, 0.0, var(j), 1) ;
       sumn = sumn + R::dnorm4(ep, 0.0, 1.0, 1) + R::dnorm4(e0, 0.0, var(j), 1)  ;
+        // Question: does dnorm4 use variance or standard deviation?
+        // Assume same as R version of dnorm: use standard deviation
+        // Should change "var" name to reflect this when this is confirmed
       
       // check for acceptance
       if(w < sumn - sum){
@@ -213,8 +216,8 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
       }else{
         e(j) = e0;
       }
-      //  }
-    }
+      
+    } // End j for loop
     
     if(index == 1+5*naccept){
       out.row(naccept) = e.t();
@@ -230,23 +233,36 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         batch = batch + batch_length;
         // Determine acceptance rate for latest batch
         acc_rate(j) = index2(j) / batch_length;
+        
         // Update proposal variance (separate for each variable)
+        // delta = min(0.01, (T_b)^(-1/2))
         increment = sqrt(1 / batch);
         if(increment < 0.01){
           delta = increment;
         }else{
           delta = 0.01;
         }
+        
+        // Update proposal standard deviation (variance?) based on acceptance rate for last batch
+        // log(std_dev) +/- delta --> std_dev * exp(+/- delta)
         if(acc_rate(j) > 0.5){
-          var(j) = var(j) * exp(-delta); // Or 2 delta - does dnorm use SD or var?
+          var(j) = var(j) * exp(-delta); // Or 2 delta - does dnorm4 use SD or var?
         }else if(acc_rate(j) < 0.4){
-          var(j) = var(j) * exp(delta); // Or 2 delta - does dnorm use SD or var?
+          var(j) = var(j) * exp(delta); // Or 2 delta - does dnorm4 use SD or var?
         }
+        
+        // Set min and max cap of log(standard deviation)
+        if(log(var(j)) > 1.0){
+          var(j) = exp(1.0);
+        }else if(log(var(j)) < -1.0){
+          var(j) = exp(-1.0);
+        }
+        
         // Re-set index2 - new acceptance rate for next batch
         index2(j) = 0.0;
-      } // End j for loop
         
-      
+      } // End j for loop (w/in if statement)
+        
     } // End if(index % (int)batch_lenth)
       
   } // End while loop
