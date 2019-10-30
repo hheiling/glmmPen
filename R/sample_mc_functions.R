@@ -228,15 +228,15 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         if(length(index) == 0) next
         var_index = which(diag(cov) != 0)
         
-        gibbs_combo_mat = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+        gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                            matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
         print("Finished sample_mc_inner_gibbs2")
-        print(class(gibbs_combo_mat))
-        u0[,index] = gibbs_combo_mat[1:nMC,]
-        gibbs_accept_rate[i,] = matrix(gibbs_combo_mat[(nMC+1),], nrow = 1)
-        proposal_var[i,var_index] = matrix(gibbs_combo_mat[(nMC+2),], nrow = 1)
+        print(class(gibbs_output))
+        u0[,index] = gibbs_output[1:nMC,]
+        gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
+        proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
         batch = batch + nMC %/% 100
       }
     }
@@ -250,15 +250,15 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       if(length(index) == 0) next
       var_index = which(diag(cov) != 0)
       
-      gibbs_list = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+      gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                          matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
       print("Finished sample_mc_inner_gibbs2")
-      print(class(gibbs_combo_mat))
-      u0[,index] = gibbs_combo_mat[1:nMC,]
-      gibbs_accept_rate[i,] = matrix(gibbs_combo_mat[(nMC+1),], nrow = 1)
-      proposal_var[i,var_index] = matrix(gibbs_combo_mat[(nMC+2),], nrow = 1)
+      print(class(gibbs_output))
+      u0[,index] = gibbs_output[1:nMC,]
+      gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
+      proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       batch = batch + nMC %/% 100
     }
   }
