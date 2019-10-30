@@ -276,7 +276,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   #   return(list(u0 = u0, switch = error_out, proposal_var = proposal_var))
   # }
   
-  if(!anyNA(gibbs_accept_rate)){
+  if(error_out == T | gibbs == T){
     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
                 switch = error_out, updated_batch = batch))
   }else{
