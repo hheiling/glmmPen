@@ -127,7 +127,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::vec t, // vector
                            int NMC, // integer
                            arma::vec u0, //matrix
-                           arma::rowvec proposal_var, // vector
+                           arma::rowvec proposal_var, // row vector
                            double batch,
                            int trace){ // integer
   

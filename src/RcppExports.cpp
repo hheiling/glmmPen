@@ -100,7 +100,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_mc_inner_gibbs2
-NumericMatrix sample_mc_inner_gibbs2(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, arma::vec u0, arma::vec proposal_var, double batch, int trace);
+NumericMatrix sample_mc_inner_gibbs2(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, arma::vec u0, arma::rowvec proposal_var, double batch, int trace);
 RcppExport SEXP _glmmPen_sample_mc_inner_gibbs2(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP u0SEXP, SEXP proposal_varSEXP, SEXP batchSEXP, SEXP traceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -111,7 +111,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type t(tSEXP);
     Rcpp::traits::input_parameter< int >::type NMC(NMCSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type u0(u0SEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type proposal_var(proposal_varSEXP);
+    Rcpp::traits::input_parameter< arma::rowvec >::type proposal_var(proposal_varSEXP);
     Rcpp::traits::input_parameter< double >::type batch(batchSEXP);
     Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
     rcpp_result_gen = Rcpp::wrap(sample_mc_inner_gibbs2(f, z, y, t, NMC, u0, proposal_var, batch, trace));
