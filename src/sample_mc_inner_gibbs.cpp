@@ -121,7 +121,7 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
 
 // Adaptive change in proposal variation
 // [[Rcpp::export]]
-arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
+Rcpp::List sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::mat z, // matrix
                            arma::vec y, // vector
                            arma::vec t, // vector
@@ -156,7 +156,7 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
   double e0 = 0;
   double delta = 0;
   double increment = 0;
-  double batch_length = 50.0;
+  double batch_length = 100.0;
   arma::mat out(nMC, q);
   arma::vec e(q);
   arma::vec rate(q);
@@ -238,9 +238,9 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
           delta = 0.01;
         }
         if(acc_rate(j) > 0.5){
-          var(j) = var(j) * exp(-2*delta);
+          var(j) = var(j) * exp(-delta); // Or 2 delta - does dnorm use SD or var?
         }else if(acc_rate(j) < 0.4){
-          var(j) = var(j) * exp(2*delta);
+          var(j) = var(j) * exp(delta); // Or 2 delta - does dnorm use SD or var?
         }
         // Re-set index2 - new acceptance rate for next batch
         index2(j) = 0.0;
@@ -254,7 +254,10 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
   } // End while loop
   
   Rprintf("End while loop \n");
-  Rcpp::List L = List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var);
+  Rcpp::List L = Rcpp::List::create(Rcpp::Named("u") = out, 
+                                    Rcpp::Named("acc_rate") = acc_rate, 
+                                    Rcpp::Named("proposal_var") = var);
+  
   Rprintf("Creation of List okay \n");
   Rprintf("Length of list: %u \n", L.length()); 
   Rprintf("Size of list: %u \n", L.size());
@@ -263,6 +266,6 @@ arma::vec sample_mc_inner_gibbs2(arma::mat f, // matrix
   Rcout << "Updated propsal variance is" << std::endl << var;
   Rcout << "One of last lines of gibbs samples is" << std::endl << out.row(naccept-3);
     
-  return acc_rate; 
+  return L; 
   
 }
