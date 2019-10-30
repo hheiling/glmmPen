@@ -251,8 +251,8 @@ List sample_mc_inner_gibbs2(arma::mat f, // matrix
   } // End while loop
   
   Rprintf("End while loop \n");
-  // return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var));
-  return(List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate));
-  
+  List L = List::create(Named("u") = wrap(out), Named("acc_rate") = acc_rate, Named("proposal_var") = var);
+  Rprintf("Creation of List okay \n");
+  return L;
   
 }
