@@ -232,6 +232,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                            proposal_var[i,var_index], batch, trace)
+        print("Finished sample_mc_inner_gibbs2")
         u0[,index] = gibbs_list$u
         gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
         # proposal_var[i,var_index] = gibbs_list$proposal_var
@@ -252,6 +253,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                          proposal_var[i,var_index], batch, trace)
+      print("Finished sample_mc_inner_gibbs2")
       u0[,index] = gibbs_list$u
       gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
       # proposal_var[i,var_index] = gibbs_list$proposal_var
