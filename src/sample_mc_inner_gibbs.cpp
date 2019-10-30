@@ -127,7 +127,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::vec t, // vector
                            int NMC, // integer
                            arma::vec u0, //matrix
-                           arma::vec proposal_var, // vector
+                           arma::rowvec proposal_var, // vector
                            double batch,
                            int trace){ // integer
   
@@ -163,8 +163,8 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   arma::vec etae(n);
   arma::vec etaen(n);
   arma::vec index2(q);
-  arma::vec var = proposal_var; // Initially, proposal_var = 1.0 for each variable
-  arma::vec acc_rate(q);
+  arma::rowvec var = proposal_var; // Initially, proposal_var = 1.0 for each variable
+  arma::rowvec acc_rate(q);
   
   RNGScope scope;
   
@@ -266,8 +266,8 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   Rcout << "Updated propsal variance is" << std::endl << var;
   Rcout << "One of last lines of gibbs samples is" << std::endl << out.row(naccept-3);
   
-  out.row(naccept-2) = acc_rate;
-  out.row(naccept-1) = var;
+  out.row(nMC-2) = acc_rate; // Second-to-last row
+  out.row(nMC-1) = var; // Last row
     
   return(wrap(out)); 
   

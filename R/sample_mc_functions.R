@@ -228,15 +228,15 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         if(length(index) == 0) next
         var_index = which(diag(cov) != 0)
         
-        gibbs_list = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+        gibbs_combo_mat = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                           proposal_var[i,var_index], batch, trace)
+                                           matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
         print("Finished sample_mc_inner_gibbs2")
-        u0[,index] = gibbs_list$u
-        gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-        # proposal_var[i,var_index] = gibbs_list$proposal_var
-        batch = gibbs_list$batch
+        u0[,index] = gibbs_combo_mat[1:nMC,]
+        gibbs_accept_rate[i,] = matrix(gibbs_combo_mat[(nMC+1),], nrow = 1)
+        proposal_var[i,var_index] = matrix(gibbs_combo_mat[(nMC+2),], nrow = 1)
+        batch = batch + nMC %/% 100
       }
     }
     
@@ -252,12 +252,12 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       gibbs_list = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                         proposal_var[i,var_index], batch, trace)
+                                         matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
       print("Finished sample_mc_inner_gibbs2")
-      u0[,index] = gibbs_list$u
-      gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-      # proposal_var[i,var_index] = gibbs_list$proposal_var
-      batch = gibbs_list$batch
+      u0[,index] = gibbs_combo_mat[1:nMC,]
+      gibbs_accept_rate[i,] = matrix(gibbs_combo_mat[(nMC+1),], nrow = 1)
+      proposal_var[i,var_index] = matrix(gibbs_combo_mat[(nMC+2),], nrow = 1)
+      batch = batch + nMC %/% 100
     }
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
@@ -276,7 +276,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   
   if(!anyNA(gibbs_accept_rate)){
     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-                switch = error_out))
+                switch = error_out, updated_batch = batch))
   }else{
     return(list(u0 = u0, switch = error_out))
   }
