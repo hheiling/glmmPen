@@ -121,7 +121,7 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
 
 // Adaptive change in proposal variation
 // [[Rcpp::export]]
-Rcpp::List sample_mc_inner_gibbs2(arma::mat f, // matrix
+NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::mat z, // matrix
                            arma::vec y, // vector
                            arma::vec t, // vector
@@ -157,7 +157,7 @@ Rcpp::List sample_mc_inner_gibbs2(arma::mat f, // matrix
   double delta = 0;
   double increment = 0;
   double batch_length = 100.0;
-  arma::mat out(nMC, q);
+  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_var, respectively
   arma::vec e(q);
   arma::vec rate(q);
   arma::vec etae(n);
@@ -246,26 +246,29 @@ Rcpp::List sample_mc_inner_gibbs2(arma::mat f, // matrix
         index2(j) = 0.0;
       } // End j for loop
         
-      Rcout << "Updated acceptance rate is" << std::endl << acc_rate;
-      Rcout << "Updated propsal variance is" << std::endl << var;
+      // Rcout << "Updated acceptance rate is" << std::endl << acc_rate;
+      // Rcout << "Updated propsal variance is" << std::endl << var;
       
     } // End if(index % (int)batch_lenth)
       
   } // End while loop
   
-  Rprintf("End while loop \n");
-  Rcpp::List L = Rcpp::List::create(Rcpp::Named("u") = out, 
-                                    Rcpp::Named("acc_rate") = acc_rate, 
-                                    Rcpp::Named("proposal_var") = var);
-  
-  Rprintf("Creation of List okay \n");
-  Rprintf("Length of list: %u \n", L.length()); 
-  Rprintf("Size of list: %u \n", L.size());
+  // Rprintf("End while loop \n");
+  // Rcpp::List L = Rcpp::List::create(Rcpp::Named("u") = out, 
+  //                                   Rcpp::Named("acc_rate") = acc_rate, 
+  //                                   Rcpp::Named("proposal_var") = var);
+  // 
+  // Rprintf("Creation of List okay \n");
+  // Rprintf("Length of list: %u \n", L.length()); 
+  // Rprintf("Size of list: %u \n", L.size());
   
   Rcout << "Acceptance rate is" << std::endl << acc_rate;
   Rcout << "Updated propsal variance is" << std::endl << var;
   Rcout << "One of last lines of gibbs samples is" << std::endl << out.row(naccept-3);
+  
+  out.row(naccept-2) = acc_rate;
+  out.row(naccept-1) = var;
     
-  return L; 
+  return(wrap(out)); 
   
 }
