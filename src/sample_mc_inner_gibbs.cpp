@@ -378,8 +378,12 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
     
   } // End while loop
   
+  // Calculate acceptance rate
+  for(j = 0; j<q; j++){
+    acc_rate(j) = index2(j) / index;
+  }
+  
   Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
-  Rcout << "Final Updated Proposal Var" << std::endl << var;
   
   out.row(nMC) = acc_rate; // Second-to-last row
   out.row(nMC+1) = var; // Last row
