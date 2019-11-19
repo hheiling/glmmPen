@@ -151,7 +151,7 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
 
 #' @export
 sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-                      gibbs = F , uold, proposal_var, batch){
+                      gibbs = F , uold, proposal_SD, batch){
   
   f = get(family, mode = "function", envir = parent.frame())
   
@@ -231,11 +231,11 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                           matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
+                                           matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
         
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-        proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
+        proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
         batch = batch + nMC %/% 100
       }
     }
@@ -252,11 +252,11 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                         matrix(proposal_var[i,var_index], nrow = 1), batch, trace)
+                                         matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
       
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-      proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
+      proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       batch = batch + nMC %/% 100
     }
   }
@@ -269,15 +269,15 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
   # if(!anyNA(gibbs_accept_rate)){
   #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-  #               switch = error_out, proposal_var = proposal_var))
+  #               switch = error_out, proposal_SD = proposal_SD))
   # }else{
-  #   return(list(u0 = u0, switch = error_out, proposal_var = proposal_var))
+  #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
   # }
   
   if(error_out == T | gibbs == T){
     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
                 switch = error_out, updated_batch = batch,
-                proposal_var = proposal_var))
+                proposal_SD = proposal_SD))
   }else{
     return(list(u0 = u0, switch = error_out))
   }
@@ -290,7 +290,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
 
 #' @export
 sample.mc_test = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-                      gibbs = F , uold, proposal_var){
+                      gibbs = F , uold, proposal_SD){
   
   f = get(family, mode = "function", envir = parent.frame())
   
@@ -370,11 +370,11 @@ sample.mc_test = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, gr
         gibbs_output = sample_mc_inner_gibbs_test(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                               y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                              matrix(proposal_var[i,var_index], nrow = 1), trace)
+                                              matrix(proposal_SD[i,var_index], nrow = 1), trace)
         
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-        proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
+        proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
         
       }
     }
@@ -391,11 +391,11 @@ sample.mc_test = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, gr
       gibbs_output = sample_mc_inner_gibbs_test(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                             matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                             y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                            matrix(proposal_var[i,var_index], nrow = 1), trace)
+                                            matrix(proposal_SD[i,var_index], nrow = 1), trace)
       
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-      proposal_var[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
+      proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       
     }
   }
@@ -408,14 +408,14 @@ sample.mc_test = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, gr
   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
   # if(!anyNA(gibbs_accept_rate)){
   #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-  #               switch = error_out, proposal_var = proposal_var))
+  #               switch = error_out, proposal_SD = proposal_SD))
   # }else{
-  #   return(list(u0 = u0, switch = error_out, proposal_var = proposal_var))
+  #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
   # }
   
   if(error_out == T | gibbs == T){
     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-                switch = error_out, proposal_var = proposal_var))
+                switch = error_out, proposal_SD = proposal_SD))
   }else{
     return(list(u0 = u0, switch = error_out))
   }

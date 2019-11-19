@@ -127,7 +127,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
                            arma::vec t, // vector
                            int NMC, // integer
                            arma::vec u0, //matrix
-                           arma::rowvec proposal_var, // row vector
+                           arma::rowvec proposal_SD, // row vector
                            double batch,
                            int trace){ // integer
   
@@ -154,13 +154,13 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   double delta = 0;
   double increment = 0;
   double batch_length = 100.0;
-  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_var, respectively
+  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_SD, respectively
   arma::vec e(q);
   arma::vec rate(q);
   arma::vec etae(n);
   arma::vec etaen(n);
   arma::vec accept_index(q);
-  arma::rowvec var = proposal_var; // At beginning of EM algorithm, proposal_var = 1.0 for each variable
+  arma::rowvec SD = proposal_SD; // At beginning of EM algorithm, proposal_SD = 1.0 for each variable
   arma::rowvec acc_rate(q);
   
   RNGScope scope;
@@ -187,7 +187,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
       w = log(R::runif(0.0,1.0));
       
       // generate proposal e
-      ep = R::rnorm(0.0, var(j));
+      ep = R::rnorm(0.0, SD(j));
       e(j) = ep;
       
       // calculate updated etae (using new proposed value of e)
@@ -202,18 +202,16 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         sumn = sumn + R::dbinom(Y(l), 1.0, exp(etaen(l))/(1+exp(etaen(l))), 1);
       }
       
-      sum = sum + R::dnorm(e0, 0.0, 1.0, 1) + R::dnorm(ep, 0.0, var(j), 1) ;
-      sumn = sumn + R::dnorm(ep, 0.0, 1.0, 1) + R::dnorm(e0, 0.0, var(j), 1)  ;
-
-        // Question: use variance or standard deviation?
+      sum = sum + R::dnorm(e0, 0.0, 1.0, 1) + R::dnorm(ep, 0.0, SD(j), 1) ;
+      sumn = sumn + R::dnorm(ep, 0.0, 1.0, 1) + R::dnorm(e0, 0.0, SD(j), 1)  ;
         // Assume same as R version of dnorm: use standard deviation
-        // Should change "var" name to reflect this when this is confirmed
       
       // check for acceptance
       if(w < sumn - sum){
-        // ep left in e(i)
+        // ep left in e(i); accept proposal
         accept_index(j) = accept_index(j) + 1.0;
       }else{
+        // reject proposal, keep most recent accepted value
         e(j) = e0;
       }
       
@@ -226,7 +224,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
     index++;
     
     // Update proposal variance
-    if(index % (int)batch_length == 0){
+    if(index % (int)batch_length == 0){ // if index = multiple of batch_length
       
       for(j = 0; j < q; j++){
         // Update batch information 
@@ -234,28 +232,28 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         // Determine acceptance rate for latest batch
         acc_rate(j) = accept_index(j) / batch_length;
         
-        // Update proposal variance (separate for each variable)
+        // Update proposal SD (separate for each variable)
         // delta = min(0.01, (T_b)^(-1/2))
-        increment = sqrt(1 / batch);
+        increment = 1 / sqrt(batch);
         if(increment < 0.01){
           delta = increment;
         }else{
           delta = 0.01;
         }
         
-        // Update proposal standard deviation (variance?) based on acceptance rate for last batch
+        // Update proposal standard deviationbased on acceptance rate for last batch
         // log(std_dev) +/- delta --> std_dev * exp(+/- delta)
         if(acc_rate(j) > 0.5){
-          var(j) = var(j) * exp(-delta); // Or 2 delta - use SD or var?
+          SD(j) = SD(j) * exp(-delta); 
         }else if(acc_rate(j) < 0.4){
-          var(j) = var(j) * exp(delta); // Or 2 delta - use SD or var?
+          SD(j) = SD(j) * exp(delta); 
         }
         
         // Set min and max cap of log(standard deviation)
-        if(log(var(j)) > 1.0){
-          var(j) = exp(1.0);
-        }else if(log(var(j)) < -1.0){
-          var(j) = exp(-1.0);
+        if(log(SD(j)) > 1.0){
+          SD(j) = exp(1.0);
+        }else if(log(SD(j)) < -1.0){
+          SD(j) = exp(-1.0);
         }
         
         // Re-set accept_index - new acceptance rate for next batch
@@ -268,10 +266,10 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   } // End while loop
   
   Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
-  Rcout << "Final Updated Proposal Var" << std::endl << var;
+  Rcout << "Final Updated Proposal SD" << std::endl << SD;
   
   out.row(nMC) = acc_rate; // Second-to-last row
-  out.row(nMC+1) = var; // Last row
+  out.row(nMC+1) = SD; // Last row
     
   return(wrap(out)); 
   
@@ -285,7 +283,7 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
                                      arma::vec t, // vector
                                      int NMC, // integer
                                      arma::vec u0, //matrix
-                                     arma::rowvec proposal_var, // row vector
+                                     arma::rowvec proposal_SD, // row vector
                                      int trace){ // integer
   
   arma::mat fitted = f;
@@ -311,13 +309,13 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
   double e0 = 0;
   double delta = 0;
   double increment = 0;
-  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_var, respectively
+  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_SD, respectively
   arma::vec e(q);
   arma::vec rate(q);
   arma::vec etae(n);
   arma::vec etaen(n);
   arma::vec accept_index(q);
-  arma::rowvec var = proposal_var; // At beginning of EM algorithm, proposal_var = 1.0 for each variable
+  arma::rowvec SD = proposal_SD; // At beginning of EM algorithm, proposal_SD = 1.0 for each variable
   arma::rowvec acc_rate(q);
   
   RNGScope scope;
@@ -344,7 +342,7 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
       w = log(R::runif(0.0,1.0));
       
       // generate proposal e
-      ep = R::rnorm(0.0, var(j));
+      ep = R::rnorm(0.0, SD(j));
       e(j) = ep;
       
       // calculate updated etae
@@ -357,11 +355,9 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
         sumn = sumn + R::dbinom(Y(l), 1.0, exp(etaen(l))/(1+exp(etaen(l))), 1);
       }
       
-      sum = sum + R::dnorm4(e0, 0.0, 1.0, 1) + R::dnorm4(ep, 0.0, var(j), 1) ;
-      sumn = sumn + R::dnorm4(ep, 0.0, 1.0, 1) + R::dnorm4(e0, 0.0, var(j), 1)  ;
-      // Question: does dnorm4 use variance or standard deviation?
+      sum = sum + R::dnorm(e0, 0.0, 1.0, 1) + R::dnorm(ep, 0.0, SD(j), 1) ;
+      sumn = sumn + R::dnorm(ep, 0.0, 1.0, 1) + R::dnorm(e0, 0.0, SD(j), 1)  ;
       // Assume same as R version of dnorm: use standard deviation
-      // Should change "var" name to reflect this when this is confirmed
       
       // check for acceptance
       if(w < sumn - sum){
@@ -389,7 +385,7 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
   Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
   
   out.row(nMC) = acc_rate; // Second-to-last row
-  out.row(nMC+1) = var; // Last row
+  out.row(nMC+1) = SD; // Last row
   
   return(wrap(out)); 
   
