@@ -20,6 +20,7 @@ Of these 37 dataset outputs of interest, we will examine the first 7 for the mom
 ```{r}
 library(stringr)
 library(ggplot2)
+library(reshape2)
 
 # Load adaptive_vs_set_mcmc_abbrev.RData object
 # Subset of adaptive_vs_set_mcmc_noplots.RData, which is the same as 
@@ -43,7 +44,7 @@ mcmc_diagnostics = function(post_U){ # modified version of plot_mcmc.pglmmObj
   var_names = c("Intercept","X1","X2")
   grp_names = str_c("grp", 1:5)
   var_str = rep(var_names, each = d)
-  grp_str = rep(grp_names, times = q)
+  grp_str = rep(grp_names, times = var_num)
   U_cols = str_c(var_str, ":", grp_str)
   
   vars = "all"
