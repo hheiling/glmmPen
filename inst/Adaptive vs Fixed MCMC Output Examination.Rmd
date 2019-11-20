@@ -26,6 +26,7 @@ library(reshape2)
 # Subset of adaptive_vs_set_mcmc_noplots.RData, which is the same as 
 # adaptive_vs_set_mcmc.RData but without the plots
 # Gives test_results_abbrev object
+# prefix = getwd()
 load("adaptive_vs_set_mcmc_abbrev2.RData")
 output = test_results_abbrev2
 samples = output
@@ -272,7 +273,8 @@ x = c(original_rate_matrix)
 y = c(adaptive_rate_matrix)
 
 plot(x, y, xlab = "original rates", ylab = "adaptive rates",
-     main = "Comparison of acceptance rates")
+     main = "Comparison of acceptance rates", ylim = c(0,1))
+abline(a = 0, b = 1)
 
 ```
 
@@ -321,7 +323,8 @@ Note: The cap of the proposal standard deviation was (exp(-1), exp(1))
 proposal_SD = matrix(0, nrow = length(samples), ncol = d*q)
 
 for(i in 1:length(samples)){
-  proposal_SD[i,] = c(samples[[i]]$adaptive$proposal_var)
+  # proposal_SD[i,] = c(samples[[i]]$adaptive$proposal_var)
+  proposal_SD[i,] = c(samples[[i]]$adaptive$proposal_SD)
 }
 
 plot(x = c(original_rate_matrix), y = c(proposal_SD), ylim = c(0, exp(1)+0.1),
