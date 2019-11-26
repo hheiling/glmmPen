@@ -250,11 +250,11 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         }
         
         // Set min and max cap of log(standard deviation)
-        if(log(SD(j)) > 1.0){
-          SD(j) = exp(1.0);
-        }else if(log(SD(j)) < -1.0){
-          SD(j) = exp(-1.0);
-        }
+        // if(log(SD(j)) > 1.0){
+        //   SD(j) = exp(1.0);
+        // }else if(log(SD(j)) < -1.0){
+        //   SD(j) = exp(-1.0);
+        // }
         
         // Re-set accept_index - new acceptance rate for next batch
         accept_index(j) = 0.0;
