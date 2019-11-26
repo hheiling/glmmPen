@@ -234,7 +234,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         
         // Update proposal SD (separate for each variable)
         // delta = min(0.01, (T_b)^(-1/2))
-        increment = 1 / sqrt(batch);
+        increment = 1 / sqrt(batch + 8000.0);
         if(increment < 0.01){
           delta = increment;
         }else{
