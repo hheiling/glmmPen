@@ -153,7 +153,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   double e0 = 0;
   double delta = 0;
   double increment = 0;
-  double batch_length = 100.0;
+  double batch_length = 500.0; // Note: Total "retained" draws = total draws / 5
   arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_SD, respectively
   arma::vec e(q);
   arma::vec rate(q);
@@ -164,8 +164,6 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   arma::rowvec acc_rate(q);
   
   RNGScope scope;
-  
-  Rcout << "Initial Updated Proposal SD" << std::endl << SD;
   
   //initialize e 
   for(i = 0; i < q; i++){
@@ -251,10 +249,9 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
           SD(j) = SD(j) * exp(delta); 
         }
         
-        if(batch < 2000.0){
-          Rprintf("Intermediate Proposal SD(%u): %f \n", j, SD(j));
-        }
-        
+        // if(batch < 2000.0){
+        //   Rprintf("Intermediate Proposal SD(%u): %f \n", j, SD(j));
+        // }
         
         // Set min and max cap of log(standard deviation)
         if(log(SD(j)) > 1.0){
@@ -272,7 +269,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
       
   } // End while loop
   
-  // Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
+  Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
   Rcout << "Final Updated Proposal SD" << std::endl << SD;
   
   out.row(nMC) = acc_rate; // Second-to-last row
