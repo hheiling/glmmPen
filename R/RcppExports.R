@@ -43,12 +43,16 @@ sample_mc_inner_gibbs <- function(f, z, y, t, NMC, u0, trace) {
     .Call('_glmmPen_sample_mc_inner_gibbs', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, trace)
 }
 
-sample_mc_inner_gibbs2 <- function(f, z, y, t, NMC, u0, proposal_var, batch, trace) {
-    .Call('_glmmPen_sample_mc_inner_gibbs2', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_var, batch, trace)
+sample_mc_inner_gibbs2 <- function(f, z, y, t, NMC, u0, proposal_SD, batch, trace) {
+    .Call('_glmmPen_sample_mc_inner_gibbs2', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, trace)
 }
 
-sample_mc_inner_gibbs_test <- function(f, z, y, t, NMC, u0, proposal_var, trace) {
-    .Call('_glmmPen_sample_mc_inner_gibbs_test', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_var, trace)
+sample_mc_inner_gibbs_test <- function(f, z, y, t, NMC, u0, proposal_SD, trace) {
+    .Call('_glmmPen_sample_mc_inner_gibbs_test', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, trace)
+}
+
+sample_mc_inner_gibbs_rw <- function(f, z, y, t, NMC, u0, proposal_SD, batch, trace) {
+    .Call('_glmmPen_sample_mc_inner_gibbs_rw', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, trace)
 }
 
 arma_test_value <- function(x) {
