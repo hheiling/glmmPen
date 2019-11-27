@@ -311,8 +311,6 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
   double w = 0;
   double ep = 0; 
   double e0 = 0;
-  double delta = 0;
-  double increment = 0;
   arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_SD, respectively
   arma::vec e(q);
   arma::vec rate(q);
@@ -397,7 +395,7 @@ NumericMatrix sample_mc_inner_gibbs_test(arma::mat f, // matrix
 
 // Adaptive Random Walk Metropolis within Gibbs 
 // [[Rcpp::export]]
-NumericMatrix sample_mc_inner_gibbs_rw(arma::mat f, // matrix
+NumericMatrix sample_mc_gibbs_rw(arma::mat f, // matrix
                                      arma::mat z, // matrix
                                      arma::vec y, // vector
                                      arma::vec t, // vector
