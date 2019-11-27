@@ -505,7 +505,7 @@ sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, grou
         if(length(index) == 0) next
         var_index = which(diag(cov) != 0)
         
-        gibbs_output = sample_mc_gibbs3(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+        gibbs_output = sample_mc_inner_gibbs3(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                               y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                               matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
@@ -526,7 +526,7 @@ sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, grou
       if(length(index) == 0) next
       var_index = which(diag(cov) != 0)
       
-      gibbs_output = sample_mc_gibbs3(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+      gibbs_output = sample_mc_inner_gibbs3(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                             matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                             y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                             matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
