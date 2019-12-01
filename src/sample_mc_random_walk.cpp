@@ -239,9 +239,9 @@ NumericMatrix sample_mc_gibbs_rw_rs(arma::mat f, // matrix
     // j = var_index(1);
     samp = RcppArmadillo::sample(var_index, q, 0);
     
-    if(index < 10.0){
-      Rcout << "Random Scan Order" << std::endl << samp;
-    }
+    // if(index < 10.0){
+    //   Rcout << "Random Scan Order" << std::endl << samp;
+    // }
     
     for(k = 0; k < q; k++){
       
@@ -286,13 +286,13 @@ NumericMatrix sample_mc_gibbs_rw_rs(arma::mat f, // matrix
         e(j) = e0;
       }
       
-      if(index == 1+5*naccept){
-        out.row(naccept) = e.t();
-        naccept++;
-      }
-      index++;
-      
     } // End k loop
+    
+    if(index == 1+5*naccept){
+      out.row(naccept) = e.t();
+      naccept++;
+    }
+    index++;
     
     
     // Update proposal variance
