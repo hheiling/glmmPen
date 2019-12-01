@@ -428,7 +428,7 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
 
 #' @export
 sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-                      gibbs = F , uold, proposal_SD, batch){
+                      gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000){
   
   f = get(family, mode = "function", envir = parent.frame())
   
@@ -508,7 +508,8 @@ sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, grou
         gibbs_output = sample_mc_gibbs_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                               y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                              matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
+                                              matrix(proposal_SD[i,var_index], nrow = 1), batch, 
+                                          batch_length, offset, trace)
         
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
@@ -529,7 +530,8 @@ sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, grou
       gibbs_output = sample_mc_gibbs_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                             matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                             y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                            matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
+                                            matrix(proposal_SD[i,var_index], nrow = 1), batch, 
+                                        batch_length, offset, trace)
       
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
