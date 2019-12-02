@@ -403,6 +403,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   arma::rowvec acc_rate(q);
   arma::uvec var_index(q);
   arma::uvec samp(1);
+  arma::vec final_acc_rate(q);
   
   RNGScope scope;
   
@@ -476,7 +477,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
     
     
     // Update proposal variance
-    if((index % (int)batch_length == 0) && (batch < burnin)){ // if index = multiple of batch_length
+    if((index % (int)batch_length == 0) && (batch <= burnin)){ // if index = multiple of batch_length
       
       for(j = 0; j < q; j++){
         // Update batch information 
@@ -518,10 +519,12 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
     
   } // End while loop
   
+  final_acc_rate = accept_index / (index - burnin*batch_length);
+  
   Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
   Rcout << "Final Updated Proposal SD" << std::endl << SD;
   
-  out.row(nMC) = acc_rate; // Second-to-last row
+  out.row(nMC) = final_acc_rate; // Second-to-last row
   out.row(nMC+1) = SD; // Last row
   
   return(wrap(out)); 
