@@ -403,7 +403,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   arma::rowvec acc_rate(q);
   arma::uvec var_index(q);
   arma::uvec samp(1);
-  arma::vec final_acc_rate(q);
+  arma::rowvec final_acc_rate(q);
   
   RNGScope scope;
   
