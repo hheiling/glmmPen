@@ -236,8 +236,9 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-        batch = batch + nMC %/% 100
+        
       }
+      batch = batch + nMC %/% 100
     }
     
   }else{ # Gibbs sampling
@@ -257,8 +258,9 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      batch = batch + nMC %/% 100
+      
     }
+    batch = batch + nMC %/% 100
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   
@@ -514,8 +516,9 @@ sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, grou
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-        batch = batch + nMC %/% 100
+        
       }
+      batch = batch + nMC %/% 100
     }
     
   }else{ # Gibbs sampling
@@ -536,8 +539,9 @@ sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, grou
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      batch = batch + nMC %/% 100
+      
     }
+    batch = batch + nMC %/% 100
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   
@@ -656,8 +660,9 @@ sample_mc_rw_rs = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-        batch = batch + nMC %/% 100
+        
       }
+      batch = batch + nMC %/% 100
     }
     
   }else{ # Gibbs sampling
@@ -678,8 +683,9 @@ sample_mc_rw_rs = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      batch = batch + nMC %/% 100
+      
     }
+    batch = batch + nMC %/% 100
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   
@@ -800,8 +806,8 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-        batch = batch + nMC %/% 100
       }
+      # batch = batch + nMC %/% 100
     }
     
   }else{ # Gibbs sampling
@@ -822,8 +828,8 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      batch = batch + nMC %/% 100
     }
+    # batch = batch + nMC %/% 100
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   
