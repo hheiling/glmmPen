@@ -477,7 +477,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
     
     
     // Update proposal variance
-    if((index % (int)batch_length == 0) && (batch <= burnin)){ // if index = multiple of batch_length
+    if((index % (int)batch_length == 0) && (batch < burnin)){ // if index = multiple of batch_length
       
       for(j = 0; j < q; j++){
         // Update batch information 
@@ -519,7 +519,9 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
     
   } // End while loop
   
-  final_acc_rate = accept_index / (index - burnin*batch_length);
+  for(j = 0; j < q; j++){
+    final_acc_rate(j) = accept_index(j) / (index - burnin*batch_length);
+  }
   
   Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
   Rcout << "Final Updated Proposal SD" << std::endl << SD;
