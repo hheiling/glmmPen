@@ -116,9 +116,11 @@ NumericMatrix sample_mc_gibbs_rw(arma::mat f, // matrix
     // Update proposal variance
     if(index % (int)batch_length == 0){ // if index = multiple of batch_length
       
+      // Update batch information 
+      batch = batch + batch_length;
+      
       for(j = 0; j < q; j++){
-        // Update batch information 
-        batch = batch + batch_length;
+        
         // Determine acceptance rate for latest batch
         acc_rate(j) = accept_index(j) / batch_length;
         
@@ -298,9 +300,11 @@ NumericMatrix sample_mc_gibbs_rw_rs(arma::mat f, // matrix
     // Update proposal variance
     if(index % (int)batch_length == 0){ // if index = multiple of batch_length
       
+      // Update batch information 
+      batch = batch + batch_length;
+      
       for(j = 0; j < q; j++){
-        // Update batch information 
-        batch = batch + batch_length;
+        
         // Determine acceptance rate for latest batch
         acc_rate(j) = accept_index(j) / batch_length;
         
@@ -482,9 +486,11 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
     // Update proposal variance
     if((index % (int)batch_length == 0) && (batch < burnin)){ // if index = multiple of batch_length
       
+      // Update batch information 
+      batch = batch + 1.0;
+      
       for(j = 0; j < q; j++){
-        // Update batch information 
-        batch = batch + 1.0;
+        
         // Determine acceptance rate for latest batch
         acc_rate(j) = accept_index(j) / batch_length;
         
