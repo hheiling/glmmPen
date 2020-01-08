@@ -54,10 +54,10 @@
 #' 
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
-                        family = "binomial", trace = 0, penalty = "grMCP",
-                        alpha = 1, nMC_max = 5000, 
-                        returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                        ufullinit = NULL){
+                   family = "binomial", trace = 0, penalty = "grMCP",
+                   alpha = 1, nMC_max = 5000, 
+                   returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
+                   ufullinit = NULL){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -155,8 +155,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
     }else{
       vars = 10^-10
-      cov = var = diag(vars)
-      gamma = vars
+      cov = var = matrix(vars, ncol = 1)
+      gamma = var
     }
     
     
@@ -175,7 +175,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   finish = 0
   while(finish == 0){
     for(i in 1:d){
-      Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i,seq(i, ncol(Z), by = d)]%*% gamma
+      Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i, seq(i, ncol(Z), by = d)] %*% gamma
     }
     if(!any(is.na(Znew2))) finish = 1
   }
@@ -498,6 +498,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   return(out)
 }
+
 
 
 # Log-likelihood approximation using importance sampling
