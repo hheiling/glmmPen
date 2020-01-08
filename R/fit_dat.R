@@ -155,8 +155,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
     }else{
       vars = 10^-10
-      cov = var
-      gamma = matrix(var, nrow = 1, ncol = 1)
+      cov = var = diag(vars)
+      gamma = vars
     }
     
     
