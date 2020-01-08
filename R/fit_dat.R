@@ -123,7 +123,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     fit = list()
     print("using coef from full model to intialize")
     coef = coeffull
-    gamma = matrix(J%*%coef[-c(1:ncol(X))], ncol = ncol(Z)/d)
+    gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     fit$coef = coef[c(1:ncol(X))]
     ok = which(diag(var) > 0)# & coef[1:ncol(X)] != 0)
@@ -156,7 +156,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }else{
       vars = 10^-10
       cov = var
-      gamma = var
+      gamma = matrix(var, nrow = 1, ncol = 1)
     }
     
     
@@ -352,7 +352,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     if(trace == 1) print(coef)
     
     
-    gamma = matrix(J%*%coef[-c(1:ncol(X))], ncol = ncol(Z)/d)
+    gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     
     ok = which(colSums(cov)> 0) #& coef[1:ncol(X)] != 0)
