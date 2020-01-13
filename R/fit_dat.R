@@ -228,6 +228,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   # Record last 10 coef vectors (each row = coef vector for a past EM iteration)
   # Initialize with initial coef vector
+  coef = c(coef, rep(0, length(covgroup)))
   coef_record = matrix(coef, nrow = 10, ncol = length(coef), byrow = T)
   
   for(i in 1:maxitEM){
@@ -238,8 +239,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       rej_to_gibbs = rej_to_gibbs + 1
     }
     
-    # oldll = ll0
-    coef_record = rbind(coef_record[-1,], rep(0, times = length(coef)))
+    oldll = ll0
     
     if(family == "binomial"){
       nTotal = rep(1, length(y[rep(1:nrow(X), each = nrow(u))]))
@@ -257,7 +257,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     active0 = rep(1, max(covgroup))
     active1 = rep(1, ncol(X)-1)
     
-    oldcoef = coef
+    # oldcoef = coef
     
     fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
                   penalty="grMCP", family="binomial",lambda = lambda1, 
@@ -380,10 +380,14 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     #stopping rule
     # diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
     # stopping rule: based on average Euclidean distance (comparing coef from t minus 10 iterations)
-    diff[i] = sqrt(sum(coef - coef_record[1,])) / length(coef)
+    if(i <= 10){
+      diff[i] = 10^2
+    }else{
+      diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / length(coef)
+    }
     
     # Update latest record of coef
-    coef_record[10,] = coef
+    coef_record = rbind(coef_record[-1,], coef)
     
     if( sum(diff[i:max(i-2, 1)] < conv) >=3 ) break
     
@@ -507,7 +511,6 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   return(out)
 }
-
 
 
 # Log-likelihood approximation using importance sampling
