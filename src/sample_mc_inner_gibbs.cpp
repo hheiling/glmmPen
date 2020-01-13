@@ -227,7 +227,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
     if(index % (int)batch_length == 0){ // if index = multiple of batch_length
       
       // Update batch information 
-      batch = batch + batch_length;
+      batch = batch + 1.0;
       
       for(j = 0; j < q; j++){
         
@@ -236,7 +236,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         
         // Update proposal SD (separate for each variable)
         // delta = min(0.01, (T_b)^(-1/2))
-        increment = 1 / sqrt(batch + 8000.0);
+        increment = 1 / sqrt(batch*batch_length + 8000.0);
         if(increment < 0.01){
           delta = increment;
         }else{
@@ -246,9 +246,9 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         // Update proposal standard deviationbased on acceptance rate for last batch
         // log(std_dev) +/- delta --> std_dev * exp(+/- delta)
         if(acc_rate(j) > 0.5){
-          SD(j) = SD(j) * exp(-delta); 
-        }else if(acc_rate(j) < 0.4){
           SD(j) = SD(j) * exp(delta); 
+        }else if(acc_rate(j) < 0.4){
+          SD(j) = SD(j) * exp(-delta); 
         }
         
         // if(batch < 2000.0){
@@ -256,9 +256,9 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         // }
         
         // Set min and max cap of log(standard deviation)
-        if(log(SD(j)) > 1.0){
+        if(log(SD(j)) > 2.0){
           SD(j) = exp(1.0);
-        }else if(log(SD(j)) < -1.0){
+        }else if(log(SD(j)) < -2.0){
           SD(j) = exp(-1.0);
         }
         
