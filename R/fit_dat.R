@@ -212,7 +212,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u) ) + Znew2%*%t(u)
   
   
-  diff = rep(NA, 100)
+  diff = rep(NA, maxitEM)
   stopcount = 0
   
   ## this needs to get updated to reflect whatever is chosen to evaluate likelihood
@@ -226,6 +226,10 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # initialize zero count vectors
   c0 = rep(0, length(coef))
   
+  # Record last 10 coef vectors (each row = coef vector for a past EM iteration)
+  # Initialize with initial coef vector
+  coef_record = matrix(coef, nrow = 10, ncol = length(coef), byrow = T)
+  
   for(i in 1:maxitEM){
     
     if(rej_to_gibbs == 3){
@@ -234,7 +238,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       rej_to_gibbs = rej_to_gibbs + 1
     }
     
-    oldll = ll0
+    # oldll = ll0
+    coef_record = rbind(coef_record[-1,], rep(0, times = length(coef)))
     
     if(family == "binomial"){
       nTotal = rep(1, length(y[rep(1:nrow(X), each = nrow(u))]))
@@ -267,7 +272,6 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
     }else{
       fit1 = grpreg(matrix(X[rep(1:nrow(X), each = nrow(u)),-1], nrow = nrow(X)*nrow(u)), y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-      
     }
     gc()
     coef[c(1:ncol(X))] = fit1$beta
@@ -374,7 +378,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     
     #stopping rule
-    diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
+    # diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
+    # stopping rule: based on average Euclidean distance (comparing coef from t minus 10 iterations)
+    diff[i] = sqrt(sum(coef - coef_record[1,])) / length(coef)
+    
+    # Update latest record of coef
+    coef_record[10,] = coef
     
     if( sum(diff[i:max(i-2, 1)] < conv) >=3 ) break
     
