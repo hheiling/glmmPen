@@ -19,7 +19,7 @@
 #' See \code{family} options in the Details section.
 #' @param trace an integer specifying print output to include as function runs. Default value is 0 
 #' (details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-#' of the Monte Carlo draws computed in \code{\link{sample.mc2}})
+#' of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})
 #' @param penalty character descripting the type of penalty to use in the variable selection procedure
 #' @param alpha ?
 #' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws
@@ -57,7 +57,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                    family = "binomial", trace = 0, penalty = "grMCP",
                    alpha = 1, nMC_max = 5000, 
                    returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                   ufullinit = NULL){
+                   ufullinit = NULL, adapt_RW_options = adaptControl()){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -183,6 +183,19 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # intitialize switch-from-rejection-sampling-to-gibbs-sampling counter
   rej_to_gibbs = 0
   
+  # initialize adaptive Metropolis-within-Gibbs random walk parameters
+  # ignored if use rejection sampling (gibbs = F), but use if gibbs = T or
+  # use if initially rejection sampling but switch to gibbs = T
+  ## initialize proposal standard deviation
+  proposal_SD = matrix(1.0, nrow = d, ncol = nrow(Z)/d)
+  ## initialize batch number to 0
+  batch = 0.0
+  ## initialize other paramters from adaptControl()
+  batch_length = adapt_RW_options$batch_length
+  offset = adapt_RW_options$offset
+  burnin_batchnum = adapt_RW_options$burnin_batchnum
+  gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Z)/d)
+  
   if((!is.null(ufull) | !is.null(ufullinit)) & !is.null(coeffull)){
     if(!is.null(ufullinit)){
       print("using u from previous model to intialize")
@@ -190,20 +203,46 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       print("using u from full model to intialize")
       ufullinit = ufull
     }
-    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                              d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
+    
+    samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                   d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit,
+                                   proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                   offset = offset, burnin_batchnum = burnin_batchnum)
     u = u0 = samplemc_out$u0
+    
+    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+    if(gibbs | samplemc_out$swith){
+      # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+      if(samplemc_out$switch){ 
+        rej_to_gibbs = rej_to_gibbs + 1
+        cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+      }
+      
+      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+      batch = samplemc_out$updated_batch
+      proposal_SD = samplemc_out$proposal_SD
+    }
     
   }else{
-    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                              d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
-                              uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
+    
+    samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                   d = d, okindex = okindex, trace = trace, gibbs = gibbs,
+                                   uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)),
+                                   proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                   offset = offset, burnin_batchnum = burning_batchnum)
     u = u0 = samplemc_out$u0
     
-    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
-    if(samplemc_out$switch){ 
-      rej_to_gibbs = rej_to_gibbs + 1
-      cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+    if(gibbs | samplemc_out$swith){
+      # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+      if(samplemc_out$switch){ 
+        rej_to_gibbs = rej_to_gibbs + 1
+        cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+      }
+      
+      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+      batch = samplemc_out$updated_batch
+      proposal_SD = samplemc_out$proposal_SD
     }
     
   }
@@ -405,14 +444,23 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     lim = quantile(q, c(0.025, 0.975))
     
     ### E stepf
-    samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                              d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
+    samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                   d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0,
+                                   batch = batch, batch_length = batch_length, offset = offset,
+                                   burnin_batchnum = burnin_batchnum)
     u = u0 = samplemc_out$u0
     
-    # If rejection sampling and switched to gibbs sampling due to low acceptance rate 
-    if(samplemc_out$switch){ 
-      rej_to_gibbs = rej_to_gibbs + 1
-      cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+    if(gibbs | samplemc_out$swith){
+      # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+      if(samplemc_out$switch){ 
+        rej_to_gibbs = rej_to_gibbs + 1
+        cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+      }
+      
+      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+      batch = samplemc_out$updated_batch
+      proposal_SD = samplemc_out$proposal_SD
     }
     
     nMC2 = nrow(u)
@@ -490,10 +538,20 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   BICh = -2*ll + sum(diag(cov) != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
   # Usual BIC
   # BIC = -2*ll + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
-  out = list(fit = fit, coef = coef, sigma = cov,  
-             lambda0 = lambda0, lambda1 = lambda1, 
-             covgroup = covgroup, J = J, ll = ll, BICh = BICh,
-             extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
+  
+  if(gibbs){
+    out = list(fit = fit, coef = coef, sigma = cov,  
+               lambda0 = lambda0, lambda1 = lambda1, 
+               covgroup = covgroup, J = J, ll = ll, BICh = BICh,
+               extra = list(fit = fit, okindex = okindex, Znew2 = Znew2),
+               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
+  }else{
+    out = list(fit = fit, coef = coef, sigma = cov,  
+               lambda0 = lambda0, lambda1 = lambda1, 
+               covgroup = covgroup, J = J, ll = ll, BICh = BICh,
+               extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
+  }
+  
   if(returnMC == T) out$u = u
   
   if((initial_gibbs == F) && rej_to_gibbs > 0){
@@ -512,46 +570,51 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   return(out)
 }
 
+#' @export
+adaptControl = function(batch_length = 50.0, offset = 0.0, burnin_batchnum = 200){
+  structure(list(batch_length = batch_length, offset = offset, burnin_batchnum = burnin_batchnum), 
+            class = c("adaptControl"))
+}
 
 # Log-likelihood approximation using importance sampling
-#' @export
-logLik_imp = function(y, X, Z, U, sigma, group, coef, family, df, c = 1, M){
-  
-  # Set-up calculations
-  d = nlevels(group)
-  cols = seq(from = as.numeric(group[1]), to = ncol(Z), by = d)
-  
-  # Ignore columns of U (and Z) corresponding to random effects penalized to 0 variance 
-  U_means_all = colMeans(U)
-  non_zero = (diag(sigma) != 0)
-  
-  if(sum(non_zero) > 0){
-    
-    non_zero_ext = rep(non_zero, each = d)
-    U_means = U_means_all[non_zero_ext]
-    
-    # Reduced sigma: remove rows and columns with diag = 0
-    sigma_red = sigma[non_zero,non_zero]
-    
-    # Gamma = cholesky decomposition of sigma (lower-triangular)
-    Gamma = t(chol(sigma_red))
-    
-    # Calculated fixed effects contribution to eta (linear predictor)
-    eta_fef = X %*% coef[1:ncol(X)]
-    
-    ll = logLik_cpp(U_means, c*sigma_red, M, group, d, df, y, eta_fef, Z[,non_zero_ext], 
-                    Gamma, family)
-  }else{
-    
-    eta_fef = X %*% coef[1:ncol(X)]
-    
-    if(family == "binomial"){
-      ll = sum(dbinom(y, size = 1, prob = exp(eta_fef) / (1+exp(eta_fef)), log = T))
-    }else if(family == "poisson"){
-      ll = sum(dpois(y, lambda = exp(eta_fef), log = T))
-    }
-  }
-  
-  return(ll)
-  
-}
+# @export
+# logLik_imp = function(y, X, Z, U, sigma, group, coef, family, df, c = 1, M){
+#   
+#   # Set-up calculations
+#   d = nlevels(group)
+#   cols = seq(from = as.numeric(group[1]), to = ncol(Z), by = d)
+#   
+#   # Ignore columns of U (and Z) corresponding to random effects penalized to 0 variance 
+#   U_means_all = colMeans(U)
+#   non_zero = (diag(sigma) != 0)
+#   
+#   if(sum(non_zero) > 0){
+#     
+#     non_zero_ext = rep(non_zero, each = d)
+#     U_means = U_means_all[non_zero_ext]
+#     
+#     # Reduced sigma: remove rows and columns with diag = 0
+#     sigma_red = sigma[non_zero,non_zero]
+#     
+#     # Gamma = cholesky decomposition of sigma (lower-triangular)
+#     Gamma = t(chol(sigma_red))
+#     
+#     # Calculated fixed effects contribution to eta (linear predictor)
+#     eta_fef = X %*% coef[1:ncol(X)]
+#     
+#     ll = logLik_cpp(U_means, c*sigma_red, M, group, d, df, y, eta_fef, Z[,non_zero_ext], 
+#                     Gamma, family)
+#   }else{
+#     
+#     eta_fef = X %*% coef[1:ncol(X)]
+#     
+#     if(family == "binomial"){
+#       ll = sum(dbinom(y, size = 1, prob = exp(eta_fef) / (1+exp(eta_fef)), log = T))
+#     }else if(family == "poisson"){
+#       ll = sum(dpois(y, lambda = exp(eta_fef), log = T))
+#     }
+#   }
+#   
+#   return(ll)
+#   
+# }
