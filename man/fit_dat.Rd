@@ -8,7 +8,8 @@ Minimization (MCECM)}
 fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   family = "binomial", trace = 0, penalty = "grMCP", alpha = 1,
   nMC_max = 5000, returnMC = T, ufull = NULL, coeffull = NULL,
-  gibbs = T, maxitEM = 100, ufullinit = NULL)
+  gibbs = T, maxitEM = 100, ufullinit = NULL,
+  adapt_RW_options = adaptControl())
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
@@ -32,7 +33,7 @@ See \code{family} options in the Details section.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
 (details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-of the Monte Carlo draws computed in \code{\link{sample.mc2}})}
+of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
 
 \item{penalty}{character descripting the type of penalty to use in the variable selection procedure}
 

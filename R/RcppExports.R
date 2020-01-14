@@ -58,8 +58,8 @@ sample_mc_gibbs_rw_rs <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch
 }
 
 #' @export
-sample_mc_gibbs_adapt_rw <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin, trace) {
-    .Call('_glmmPen_sample_mc_gibbs_adapt_rw', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin, trace)
+sample_mc_gibbs_adapt_rw <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace) {
+    .Call('_glmmPen_sample_mc_gibbs_adapt_rw', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace)
 }
 
 arma_test_value <- function(x) {
