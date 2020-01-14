@@ -370,7 +370,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
                                        double batch,
                                        double batch_length,
                                        double offset,
-                                       double burnin,
+                                       double burnin_batchnum,
                                        int trace){ // integer
   
   arma::mat fitted = f;
@@ -484,7 +484,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
     
     
     // Update proposal variance
-    if((index % (int)batch_length == 0) && (batch < burnin)){ // if index = multiple of batch_length
+    if((index % (int)batch_length == 0) && (batch < burnin_batchnum)){ // if index = multiple of batch_length
       
       // Update batch information 
       batch = batch + 1.0;
@@ -525,7 +525,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
         // Re-set accept_index - new acceptance rate for next batch
         accept_index(j) = 0.0;
         
-        // Re-set index2 (only count index2 after burnin limit reached)
+        // Re-set index2 (only count index2 after burnin_batchnum limit reached)
         index2 = 0.0;
         
       } // End j for loop (w/in if statement)
@@ -535,12 +535,12 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   } // End while loop
   
   for(j = 0; j < q; j++){
-    // final_acc_rate(j) = accept_index(j) / (index - burnin*batch_length);
+    // final_acc_rate(j) = accept_index(j) / (index - burnin_batchnum*batch_length);
     final_acc_rate(j) = accept_index(j) / index2;
   }
   
-  Rcout << "Last Batch Acceptance Rate" << std::endl << acc_rate;
-  Rcout << "Final Updated Proposal SD" << std::endl << SD;
+  // Rcout << "Last Batch Acceptance Rate" << std::endl << acc_rate;
+  // Rcout << "Final Updated Proposal SD" << std::endl << SD;
   
   out.row(nMC) = final_acc_rate; // Second-to-last row
   out.row(nMC+1) = SD; // Last row

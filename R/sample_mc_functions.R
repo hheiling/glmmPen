@@ -720,7 +720,7 @@ sample_mc_rw_rs = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
 #' @export
 sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
                            gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000,
-                           burnin = 40){
+                           burnin_batchnum = 40){
   
   f = get(family, mode = "function", envir = parent.frame())
   
@@ -801,7 +801,7 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
                                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                              y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                              matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                             batch_length, offset, burnin, trace)
+                                             batch_length, offset, burnin_batchnum, trace)
         
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
@@ -823,7 +823,7 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
                                            matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                           batch_length, offset, burnin, trace)
+                                           batch_length, offset, burnin_batchnum, trace)
       
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
