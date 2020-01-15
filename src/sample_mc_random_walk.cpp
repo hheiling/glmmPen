@@ -397,8 +397,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   double e0 = 0;
   double delta = 0;
   double increment = 0;
-  // double batch_length = 500.0; // Note: Total "retained" draws = total draws / 5
-  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_SD, respectively
+  arma::mat out(nMC+3, q); // Last three lines = acceptance rates, updated proposal_SD, and updated batch number, respectively
   arma::vec e(q);
   arma::vec rate(q);
   arma::vec etae(n);
@@ -409,6 +408,7 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   arma::uvec var_index(q);
   arma::uvec samp(1);
   arma::rowvec final_acc_rate(q);
+  arma::rowvec batch_vec(q);
   
   RNGScope scope;
   
@@ -537,13 +537,15 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   for(j = 0; j < q; j++){
     // final_acc_rate(j) = accept_index(j) / (index - burnin_batchnum*batch_length);
     final_acc_rate(j) = accept_index(j) / index2;
+    batch_vec(j) = batch;
   }
   
   // Rcout << "Last Batch Acceptance Rate" << std::endl << acc_rate;
   // Rcout << "Final Updated Proposal SD" << std::endl << SD;
   
-  out.row(nMC) = final_acc_rate; // Second-to-last row
-  out.row(nMC+1) = SD; // Last row
+  out.row(nMC) = final_acc_rate; // Third-to-last row
+  out.row(nMC+1) = SD; // Second-to-last row
+  out.row(nMC+2) = batch_vec; // Last row
   
   return(wrap(out)); 
   

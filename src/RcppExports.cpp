@@ -161,8 +161,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_mc_gibbs_adapt_rw
-NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, arma::vec u0, arma::rowvec proposal_SD, double batch, double batch_length, double offset, double burnin, int trace);
-RcppExport SEXP _glmmPen_sample_mc_gibbs_adapt_rw(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP u0SEXP, SEXP proposal_SDSEXP, SEXP batchSEXP, SEXP batch_lengthSEXP, SEXP offsetSEXP, SEXP burninSEXP, SEXP traceSEXP) {
+NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, arma::vec u0, arma::rowvec proposal_SD, double batch, double batch_length, double offset, double burnin_batchnum, int trace);
+RcppExport SEXP _glmmPen_sample_mc_gibbs_adapt_rw(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP u0SEXP, SEXP proposal_SDSEXP, SEXP batchSEXP, SEXP batch_lengthSEXP, SEXP offsetSEXP, SEXP burnin_batchnumSEXP, SEXP traceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -176,9 +176,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type batch(batchSEXP);
     Rcpp::traits::input_parameter< double >::type batch_length(batch_lengthSEXP);
     Rcpp::traits::input_parameter< double >::type offset(offsetSEXP);
-    Rcpp::traits::input_parameter< double >::type burnin(burninSEXP);
+    Rcpp::traits::input_parameter< double >::type burnin_batchnum(burnin_batchnumSEXP);
     Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_mc_gibbs_adapt_rw(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin, trace));
+    rcpp_result_gen = Rcpp::wrap(sample_mc_gibbs_adapt_rw(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace));
     return rcpp_result_gen;
 END_RCPP
 }
