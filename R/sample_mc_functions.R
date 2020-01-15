@@ -151,7 +151,8 @@ sample.mc2 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
 
 #' @export
 sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-                      gibbs = F , uold, proposal_SD, batch){
+                      gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000,
+                      burnin_batchnum = 40){
   
   f = get(family, mode = "function", envir = parent.frame())
   
@@ -231,14 +232,15 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
         gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                           matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
+                                           matrix(proposal_SD[i,var_index], nrow = 1), batch, 
+                                           batch_length, offset, burnin_batchnum, trace)
         
         u0[,index] = gibbs_output[1:nMC,]
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
         
       }
-      batch = batch + nMC %/% 100
+      batch = gibbs_output[(nMC+3),1]
     }
     
   }else{ # Gibbs sampling
@@ -253,14 +255,15 @@ sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
       gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                         matrix(proposal_SD[i,var_index], nrow = 1), batch, trace)
+                                         matrix(proposal_SD[i,var_index], nrow = 1), batch, 
+                                         batch_length, offset, burnin_batchnum, trace)
       
       u0[,index] = gibbs_output[1:nMC,]
       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       
     }
-    batch = batch + nMC %/% 100
+    batch = gibbs_output[(nMC+3),1]
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   

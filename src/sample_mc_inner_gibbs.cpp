@@ -122,14 +122,17 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
 // Adaptive change in proposal variation
 // [[Rcpp::export]]
 NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
-                           arma::mat z, // matrix
-                           arma::vec y, // vector
-                           arma::vec t, // vector
-                           int NMC, // integer
-                           arma::vec u0, //matrix
-                           arma::rowvec proposal_SD, // row vector
-                           double batch,
-                           int trace){ // integer
+                                     arma::mat z, // matrix
+                                     arma::vec y, // vector
+                                     arma::vec t, // vector
+                                     int NMC, // integer
+                                     arma::vec u0, //matrix
+                                     arma::rowvec proposal_SD, // row vector
+                                     double batch,
+                                     double batch_length,
+                                     double offset,
+                                     double burnin_batchnum,
+                                     int trace){ // integer
   
   arma::mat fitted = f;
   arma::mat Z=z;
@@ -146,6 +149,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   int l = 0; 
   int naccept = 0;
   int index = 0;
+  int index2 = 0;
   double sum = 0;
   double sumn = 0;
   double w = 0;
@@ -153,8 +157,8 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   double e0 = 0;
   double delta = 0;
   double increment = 0;
-  double batch_length = 500.0; // Note: Total "retained" draws = total draws / 5
-  arma::mat out(nMC+2, q); // Last two lines = acceptance rates and updated proposal_SD, respectively
+  arma::mat out(nMC+3, q); 
+  // Last three lines of out = acceptance rates, updated proposal_SD, and updated batch index, respectively
   arma::vec e(q);
   arma::vec rate(q);
   arma::vec etae(n);
@@ -162,6 +166,8 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   arma::vec accept_index(q);
   arma::rowvec SD = proposal_SD; // At beginning of EM algorithm, proposal_SD = 1.0 for each variable
   arma::rowvec acc_rate(q);
+  arma::rowvec final_acc_rate(q);
+  arma::rowvec batch_vec(q);
   
   RNGScope scope;
   
@@ -222,9 +228,10 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
       naccept++;
     }
     index++;
+    index2++;
     
     // Update proposal variance
-    if(index % (int)batch_length == 0){ // if index = multiple of batch_length
+    if((index % (int)batch_length == 0) && (batch < burnin_batchnum)){ // if index = multiple of batch_length
       
       // Update batch information 
       batch = batch + 1.0;
@@ -236,7 +243,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
         
         // Update proposal SD (separate for each variable)
         // delta = min(0.01, (T_b)^(-1/2))
-        increment = 1 / sqrt(batch*batch_length + 8000.0);
+        increment = 1 / sqrt(batch*batch_length + offset);
         if(increment < 0.01){
           delta = increment;
         }else{
@@ -251,19 +258,17 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
           SD(j) = SD(j) * exp(-delta); 
         }
         
-        // if(batch < 2000.0){
-        //   Rprintf("Intermediate Proposal SD(%u): %f \n", j, SD(j));
-        // }
-        
         // Set min and max cap of log(standard deviation)
-        if(log(SD(j)) > 2.0){
+        if(log(SD(j)) > 1.0){
           SD(j) = exp(1.0);
-        }else if(log(SD(j)) < -2.0){
+        }else if(log(SD(j)) < -1.0){
           SD(j) = exp(-1.0);
         }
         
         // Re-set accept_index - new acceptance rate for next batch
         accept_index(j) = 0.0;
+        // Re-set index2 (only count index2 after burnin_batchnum limit reached)
+        index2 = 0.0;
         
       } // End j for loop (w/in if statement)
         
@@ -271,11 +276,16 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
       
   } // End while loop
   
-  Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
-  Rcout << "Final Updated Proposal SD" << std::endl << SD;
+  for(j = 0; j < q; j++){
+    batch_vec(j) = batch;
+  }
   
-  out.row(nMC) = acc_rate; // Second-to-last row
-  out.row(nMC+1) = SD; // Last row
+  // Rcout << "Final Acceptance Rate" << std::endl << acc_rate;
+  // Rcout << "Final Updated Proposal SD" << std::endl << SD;
+  
+  out.row(nMC) = acc_rate; // Third-to-last row
+  out.row(nMC+1) = SD; // Second-to-last row
+  out.row(nMC+2) = batch_vec;
     
   return(wrap(out)); 
   

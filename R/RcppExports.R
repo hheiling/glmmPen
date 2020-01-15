@@ -43,8 +43,8 @@ sample_mc_inner_gibbs <- function(f, z, y, t, NMC, u0, trace) {
     .Call('_glmmPen_sample_mc_inner_gibbs', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, trace)
 }
 
-sample_mc_inner_gibbs2 <- function(f, z, y, t, NMC, u0, proposal_SD, batch, trace) {
-    .Call('_glmmPen_sample_mc_inner_gibbs2', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, trace)
+sample_mc_inner_gibbs2 <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace) {
+    .Call('_glmmPen_sample_mc_inner_gibbs2', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace)
 }
 
 #' @export
