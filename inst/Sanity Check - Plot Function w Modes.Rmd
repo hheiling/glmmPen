@@ -226,7 +226,7 @@ AMCMC_test_sanity = function(fit_glmmPen, dat, M, batch_length, offset, burnin, 
   q = 1
   
   # Test acceptance rates for new Adaptive Metropolis-within-gibbs
-  post_list = sample.mc3(fit = fit_glmmPen$fit, cov = matrix(fit_glmmPen$sigma, ncol = 1), 
+  post_list = sample_mc_adapt(fit = fit_glmmPen$fit, cov = matrix(fit_glmmPen$sigma, ncol = 1), 
                               y = dat$y, X = dat$X,
                               Z = fit_glmmPen$extra$Znew2, nMC = M, family = "binomial",
                               group = dat$group, d = nlevels(dat$group), 
