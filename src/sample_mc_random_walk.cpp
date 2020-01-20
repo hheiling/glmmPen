@@ -423,9 +423,6 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   //iteratively update e 
   while(naccept < nMC){
     
-    // var_index = randperm(q); 
-    // j = var_index(1);
-    
     // Random scan: randomize order of updated random effect
     samp = RcppArmadillo::sample(var_index, q, 0);
     
@@ -535,7 +532,6 @@ NumericMatrix sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
   } // End while loop
   
   for(j = 0; j < q; j++){
-    // final_acc_rate(j) = accept_index(j) / (index - burnin_batchnum*batch_length);
     final_acc_rate(j) = accept_index(j) / index2;
     batch_vec(j) = batch;
   }

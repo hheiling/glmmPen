@@ -158,7 +158,7 @@ NumericMatrix sample_mc_inner_gibbs2(arma::mat f, // matrix
   double delta = 0;
   double increment = 0;
   arma::mat out(nMC+3, q); 
-  // Last three lines of out = acceptance rates, updated proposal_SD, and updated batch index, respectively
+  // Last three rows of out = acceptance rates, updated proposal_SD, and updated batch index, respectively
   arma::vec e(q);
   arma::vec rate(q);
   arma::vec etae(n);
