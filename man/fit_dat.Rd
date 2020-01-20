@@ -7,8 +7,8 @@ Minimization (MCECM)}
 \usage{
 fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   family = "binomial", trace = 0, penalty = "grMCP", alpha = 1,
-  nMC_max = 5000, returnMC = T, ufull = NULL, coeffull = NULL,
-  gibbs = T, maxitEM = 100, ufullinit = NULL,
+  nMC_max = 5000, t = 10, returnMC = T, ufull = NULL,
+  coeffull = NULL, gibbs = T, maxitEM = 100, ufullinit = NULL,
   adapt_RW_options = adaptControl())
 }
 \arguments{
