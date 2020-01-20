@@ -55,7 +55,7 @@
 #' @export
 fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
                    family = "binomial", trace = 0, penalty = "grMCP",
-                   alpha = 1, nMC_max = 5000, 
+                   alpha = 1, nMC_max = 5000, t = 10,
                    returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
                    ufullinit = NULL, adapt_RW_options = adaptControl()){
   
@@ -187,7 +187,10 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # ignored if use rejection sampling (gibbs = F), but use if gibbs = T or
   # use if initially rejection sampling but switch to gibbs = T
   ## initialize proposal standard deviation
-  proposal_SD = matrix(1.0, nrow = d, ncol = nrow(Z)/d)
+  proposal_SD = matrix(1.0, nrow = d, ncol = ncol(Z)/d)
+  print("Initialized proposal_SD")
+  print(proposal_SD)
+  
   ## initialize batch number to 0
   batch = 0.0
   ## initialize other paramters from adaptControl()
@@ -211,7 +214,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     u = u0 = samplemc_out$u0
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-    if(gibbs | samplemc_out$swith){
+    if(gibbs | samplemc_out$switch){
       # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
       if(samplemc_out$switch){ 
         rej_to_gibbs = rej_to_gibbs + 1
@@ -222,6 +225,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       batch = samplemc_out$updated_batch
       proposal_SD = samplemc_out$proposal_SD
     }
+    
+    print("Updated proposal_SD:")
+    print(proposal_SD)
     
   }else{
     
@@ -229,11 +235,11 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                                    d = d, okindex = okindex, trace = trace, gibbs = gibbs,
                                    uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)),
                                    proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                   offset = offset, burnin_batchnum = burning_batchnum)
+                                   offset = offset, burnin_batchnum = burnin_batchnum)
     u = u0 = samplemc_out$u0
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-    if(gibbs | samplemc_out$swith){
+    if(gibbs | samplemc_out$switch){
       # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
       if(samplemc_out$switch){ 
         rej_to_gibbs = rej_to_gibbs + 1
@@ -244,6 +250,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       batch = samplemc_out$updated_batch
       proposal_SD = samplemc_out$proposal_SD
     }
+    
+    print("Updated proposal_SD:")
+    print(proposal_SD)
     
   }
   #u = bmmat(u)
@@ -265,10 +274,10 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # initialize zero count vectors
   c0 = rep(0, length(coef))
   
-  # Record last 10 coef vectors (each row = coef vector for a past EM iteration)
+  # Record last t coef vectors (each row = coef vector for a past EM iteration)
   # Initialize with initial coef vector
   coef = c(coef, rep(0, length(covgroup)))
-  coef_record = matrix(coef, nrow = 10, ncol = length(coef), byrow = T)
+  coef_record = matrix(coef, nrow = t, ncol = length(coef), byrow = T)
   
   for(i in 1:maxitEM){
     
@@ -418,8 +427,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     #stopping rule
     # diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
-    # stopping rule: based on average Euclidean distance (comparing coef from t minus 10 iterations)
-    if(i <= 10){
+    # stopping rule: based on average Euclidean distance (comparing coef from minus t iterations)
+    if(i <= t){
       diff[i] = 10^2
     }else{
       diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / length(coef)
@@ -443,15 +452,17 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     print(c(i, nMC , diff[i], ll0, oldll,  ll0 - oldll, sum(coef!=0), coef[2], sqrt(diag(cov)[2])))
     lim = quantile(q, c(0.025, 0.975))
     
+    cat("cov: ", cov, "\n")
+    
     ### E stepf
     samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                    d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0,
-                                   batch = batch, batch_length = batch_length, offset = offset,
-                                   burnin_batchnum = burnin_batchnum)
+                                   proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                   offset = offset, burnin_batchnum = burnin_batchnum)
     u = u0 = samplemc_out$u0
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-    if(gibbs | samplemc_out$swith){
+    if(gibbs | samplemc_out$switch){
       # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
       if(samplemc_out$switch){ 
         rej_to_gibbs = rej_to_gibbs + 1
@@ -462,6 +473,11 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       batch = samplemc_out$updated_batch
       proposal_SD = samplemc_out$proposal_SD
     }
+    
+    print("Updated proposal_SD:")
+    print(proposal_SD)
+    print("Updated batch:")
+    print(batch)
     
     nMC2 = nrow(u)
     
@@ -569,6 +585,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   return(out)
 }
+
+
 
 #' @export
 adaptControl = function(batch_length = 50.0, offset = 0.0, burnin_batchnum = 200){
