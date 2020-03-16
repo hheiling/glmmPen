@@ -56,7 +56,9 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     n_k = sum(ids)
     
     # Identify columns corresponding to group k
-    cols = seq(from = k, by = d, length.out = num_var)
+    cols_all = seq(from = k, by = d, length.out = num_var)
+    # Restrict above colums to those belonging to variables with non-zero random effect variance
+    cols = cols_all[which(diag(sigma) != 0)]
     Z_k = Z[ids,cols]
     
     # Sample M samples from the importance function
@@ -78,7 +80,6 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     eta_fef_k = matrix(eta_fef[ids], nrow = 1) # 1 X n_k
     ## Random-effects component of eta (linear predictor)
     eta_ref = imp_samp %*% Gamma %*% t(Z_k) # M x n_k
-    ### Question: should Gamma here be t(chol(post_cov)) instead of t(chol(sigma))?
     ## Full eta - fixed + random effects component
     eta = eta_fef_k[rep(1, M),] + eta_ref
     
@@ -110,6 +111,8 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
   return(ll)
 } # End CAME_IS function
 
+
+
 # Pajor regular CAME Method for logLik calculations
 
 # Sample from prior, no importance sampling
@@ -136,7 +139,9 @@ CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
     n_k = sum(ids)
     
     # Identify columns corresponding to group k
-    cols = seq(from = k, by = d, length.out = num_var)
+    cols_all = seq(from = k, by = d, length.out = num_var)
+    # Restrict above colums to those belonging to variables with non-zero random effect variance
+    cols = cols_all[which(diag(sigma) != 0)]
     Z_k = Z[ids,cols]
     
     # Sample M samples from the prior function
