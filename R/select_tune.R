@@ -34,7 +34,9 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       }
       
       gc()
+      print("------------------------------------------------------------------")
       print(sprintf("lambda0 %f lambda1 %f", lambda0_range[i], lambda1_range[j]))
+      print("------------------------------------------------------------------")
       out = try(fit_dat(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
                         nMC = nMC, family = family, penalty = penalty,
                         trace = trace, conv = conv, nMC_max = nMC_max, 
