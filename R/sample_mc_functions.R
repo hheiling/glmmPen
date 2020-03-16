@@ -759,6 +759,7 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
   error_out = F
   q = ncol(Z) / d
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
+  gibbs_output = NULL
   
   if(gibbs == F){ # Rejection sampling
     
@@ -810,7 +811,9 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       }
-      batch = gibbs_output[(nMC+3),1]
+      if(!is.null(gibbs_output)){
+        batch = gibbs_output[(nMC+3),1]
+      }
     }
     
   }else{ # Gibbs sampling
@@ -833,7 +836,10 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       
     }
-    batch = gibbs_output[(nMC+3),1]
+    if(!is.null(gibbs_output)){
+      batch = gibbs_output[(nMC+3),1]
+    }
+    
   }
   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
   
