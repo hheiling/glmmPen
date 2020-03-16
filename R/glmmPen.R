@@ -205,10 +205,11 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 40){
 XZ_std = function(fD_out, group_num){
   # Standardize X - ncvreg::std method
   X = fD_out$X
-  X_std = cbind(1, std(X[,-1]))
-  X_center = attr(X_std, "center")
-  X_scale = attr(X_std, "scale")
-  # Note: X_std = (X - X_center) / X_scale
+  X_noInt_std = std(X[,-1])
+  X_std = cbind(1, X_noInt_std)
+  X_center = attr(X_noInt_std, "center")
+  X_scale = attr(X_noInt_std, "scale")
+  # Note: X_noInt_std = (X[,-1] - X_center) / X_scale
   
   var_subset = (colnames(X) %in% fD_out$cnms)
   Z_center = X_center[var_subset]
@@ -219,13 +220,13 @@ XZ_std = function(fD_out, group_num){
   d = nlevels(group_num)
   num_vars = ncol(Z_sparse) / d
   
-  Z_std = Matrix(data = NA, nrow = nrow(Z_sparse), ncol = ncol(Z_sparse), sparse = T)
+  Z_std = Matrix(data = 0, nrow = nrow(Z_sparse), ncol = ncol(Z_sparse), sparse = T)
   
   for(v in 1:num_vars){ 
     if("(Intercept)" %in% cnms) next # Don't need to scale intercept
     cols = seq(from = (v - 1)*d + 1, to = v*d, by = 1)
     for(k in 1:nlevels(group_num)){
-      ids = (group_num == k)
+      ids = which(group_num == k)
       Z_std[ids, cols[k]] = (Z_sparse[ids, cols[k]] - Z_center[v-1]) / Z_scale[v-1]
     }
   }
