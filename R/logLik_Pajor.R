@@ -122,7 +122,7 @@ CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
   # Define variables
   d = nlevels(group)
   num_var = ncol(Z) / d
-  Gamma = t(chol(sigma))
+  Gamma = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
   eta_fef = X %*% coef[1:ncol(X)]
   # post_mean = colMeans(posterior)
   # post_cov = sigma
