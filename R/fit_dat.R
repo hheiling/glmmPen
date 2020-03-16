@@ -57,7 +57,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                    family = "binomial", trace = 0, penalty = "grMCP",
                    alpha = 1, nMC_max = 5000, t = 10,
                    returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                   ufullinit = NULL, adapt_RW_options = adaptControl()){
+                   ufullinit = NULL, M = 10^4, MwG_sampler = c("random_walk","independence"),
+                   adapt_RW_options = adaptControl()){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -84,6 +85,11 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   }
   
   initial_gibbs = gibbs
+  
+  MwG_sampler = MwG_sampler[1] # Default of random walk
+  if(!(MwG_sampler %in% c("independence", "random_walk"))){
+    stop("MwG_sampler must be specified as either 'independence' or 'random_walk'")
+  }
   
   if(ncol(Z)/d <= 15){
     # create J, q2 x q*(q+1)/2
@@ -207,10 +213,16 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       ufullinit = ufull
     }
     
-    samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
-                                   d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit,
-                                   proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                   offset = offset, burnin_batchnum = burnin_batchnum)
+    if(MwG_sampler == "independence"){
+      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                                d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
+    }else{ # MwG_sampler == "random_walk"
+      samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                     d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit,
+                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                     offset = offset, burnin_batchnum = burnin_batchnum)
+    }
+    
     u = u0 = samplemc_out$u0
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
@@ -221,21 +233,33 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
         cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
       }
       
-      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-      batch = samplemc_out$updated_batch
-      proposal_SD = samplemc_out$proposal_SD
+      if(MwG_sampler == "random_walk"){
+        gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+        batch = samplemc_out$updated_batch
+        proposal_SD = samplemc_out$proposal_SD
+        
+        print("Updated proposal_SD:")
+        print(proposal_SD)
+      }
+      
     }
     
-    print("Updated proposal_SD:")
-    print(proposal_SD)
+    
     
   }else{
     
-    samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
-                                   d = d, okindex = okindex, trace = trace, gibbs = gibbs,
-                                   uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)),
-                                   proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                   offset = offset, burnin_batchnum = burnin_batchnum)
+    if(MwG_sampler == "independence"){
+      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                                d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
+                                uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
+    }else{ # MwG_sampler == "random_walk"
+      samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                     d = d, okindex = okindex, trace = trace, gibbs = gibbs,
+                                     uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)),
+                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                     offset = offset, burnin_batchnum = burnin_batchnum)
+    }
+    
     u = u0 = samplemc_out$u0
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
@@ -246,20 +270,29 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
         cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
       }
       
-      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-      batch = samplemc_out$updated_batch
-      proposal_SD = samplemc_out$proposal_SD
+      if(MwG_sampler == "random_walk"){
+        gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+        batch = samplemc_out$updated_batch
+        proposal_SD = samplemc_out$proposal_SD
+        
+        print("Updated proposal_SD:")
+        print(proposal_SD)
+      }
+      
     }
-    
-    print("Updated proposal_SD:")
-    print(proposal_SD)
     
   }
   #u = bmmat(u)
   nMC2 = nrow(u)  
   etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u) ) + Znew2%*%t(u)
   
+  if(nrow(cov) == 1){ # Single random intercept
+    cov_record = rep(NA, maxitEM)
+  }else{
+    cov_record = NULL
+  }
   
+  fit0_record = matrix(NA, nrow = maxitEM, ncol = (length(covgroup) + 1))
   diff = rep(NA, maxitEM)
   stopcount = 0
   
@@ -278,6 +311,9 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   # Initialize with initial coef vector
   coef = c(coef, rep(0, length(covgroup)))
   coef_record = matrix(coef, nrow = t, ncol = length(coef), byrow = T)
+  coef_record_all = matrix(NA, nrow = maxitEM, ncol = length(coef), byrow = T)
+  
+  # Start EM Algorithm (M step first)
   
   for(i in 1:maxitEM){
     
@@ -307,19 +343,32 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     # oldcoef = coef
     
+    # M Step
+    
     fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
                   penalty="grMCP", family="binomial",lambda = lambda1, 
-                  offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), alpha = alpha, active = active0, 
+                  offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), 
+                  alpha = alpha, active = active0, 
                   initbeta = c(0,coef[-c(1:ncol(X))]))
     gc()
     coef = rep(0,length(covgroup) + ncol(X))
     coef[-c(1:ncol(X))] = fit0$beta[-1]
     c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
     
+    cat("full fit0$beta output: ", fit0$beta, "\n")
+    fit0_record[i,] = fit0$beta
+    
     if(ncol(X) > 2){
-      fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
+      fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], 
+                    group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, 
+                    offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), 
+                    alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
     }else{
-      fit1 = grpreg(matrix(X[rep(1:nrow(X), each = nrow(u)),-1], nrow = nrow(X)*nrow(u)), y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
+      fit1 = grpreg(matrix(X[rep(1:nrow(X), each = nrow(u)),-1], nrow = nrow(X)*nrow(u)), 
+                    y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", 
+                    family="binomial",lambda = lambda0, 
+                    offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), 
+                    alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
     }
     gc()
     coef[c(1:ncol(X))] = fit1$beta
@@ -425,7 +474,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       if(!any(is.na(Znew2))) finish = 1
     }
     
-    #stopping rule
+    # stopping rule
     # diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
     # stopping rule: based on average Euclidean distance (comparing coef from minus t iterations)
     if(i <= t){
@@ -436,6 +485,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     # Update latest record of coef
     coef_record = rbind(coef_record[-1,], coef)
+    coef_record_all[i,] = coef
     
     if( sum(diff[i:max(i-2, 1)] < conv) >=3 ) break
     
@@ -452,13 +502,24 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     print(c(i, nMC , diff[i], ll0, oldll,  ll0 - oldll, sum(coef!=0), coef[2], sqrt(diag(cov)[2])))
     lim = quantile(q, c(0.025, 0.975))
     
-    cat("cov: ", cov, "\n")
+    print("cov:")
+    print(cov)
+    if(nrow(cov) == 1){
+      cov_record[i] = cov
+    }
     
-    ### E stepf
-    samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                                   d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0,
-                                   proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                   offset = offset, burnin_batchnum = burnin_batchnum)
+    # E Step 
+    
+    if(MwG_sampler == "independence"){
+      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
+    }else{ # MwG_sampler == "random_walk"
+      samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                     d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0,
+                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                     offset = offset, burnin_batchnum = burnin_batchnum)
+    }
+    
     u = u0 = samplemc_out$u0
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
@@ -469,15 +530,20 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
         cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
       }
       
-      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-      batch = samplemc_out$updated_batch
-      proposal_SD = samplemc_out$proposal_SD
+      if(MwG_sampler == "random_walk"){
+        gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+        batch = samplemc_out$updated_batch
+        proposal_SD = samplemc_out$proposal_SD
+        
+        print("Updated proposal_SD:")
+        print(proposal_SD)
+        print("Updated batch:")
+        print(batch)
+      }
+      
     }
     
-    print("Updated proposal_SD:")
-    print(proposal_SD)
-    print("Updated batch:")
-    print(batch)
+    
     
     nMC2 = nrow(u)
     
@@ -513,58 +579,84 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     gc()
   }
   
-  
-  
   ## calculate BIC 
-  if(is.null(ufull)){
-    BIC = -2*ll0 + log(length(y))*sum(coef != 0) # switched BIC and BIC0 11/28
-    BIC0 = -2*ll + log(length(y))*sum(coef != 0)
-    BIC20 = -2*ll20 + log(length(y))*sum(coef!=0)
-    llb = ll0b = 0
-  }else{
-    rm(Znew)
-    gc()
-    BIC20 = -2*ll20  + log(length(y))*sum(coef!=0)
-    Znew = big.matrix(nrow = nrow(X)*nrow(ufull), ncol = ncol(J))
-    Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
-    etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
-    llb = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dnorm(ufull, 0,1, log = T)))/nrow(ufull)
-    BIC = -2*llb + log(length(y))*sum(coef != 0)
-    ll0b = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(ufull)
-    BIC0 = -2*ll0b + log(length(y))*sum(coef != 0)
-    rm(Znew)
-    gc()
-  }
+  # if(is.null(ufull)){
+  #   BIC = -2*ll0 + log(length(y))*sum(coef != 0) # switched BIC and BIC0 11/28
+  #   BIC0 = -2*ll + log(length(y))*sum(coef != 0)
+  #   BIC20 = -2*ll20 + log(length(y))*sum(coef!=0)
+  #   llb = ll0b = 0
+  # }else{
+  #   rm(Znew)
+  #   gc()
+  #   BIC20 = -2*ll20  + log(length(y))*sum(coef!=0)
+  #   Znew = big.matrix(nrow = nrow(X)*nrow(ufull), ncol = ncol(J))
+  #   Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
+  #   etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
+  #   llb = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dnorm(ufull, 0,1, log = T)))/nrow(ufull)
+  #   BIC = -2*llb + log(length(y))*sum(coef != 0)
+  #   ll0b = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(ufull)
+  #   BIC0 = -2*ll0b + log(length(y))*sum(coef != 0)
+  #   rm(Znew)
+  #   gc()
+  # }
   
   
   print(sqrt(diag(cov)[1:3]))
   returnMC
-  # out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
-  #            ll = ll, ll0 = ll0, llb = llb, ll0b = ll0b, ll20 = ll20, 
-  #            lambda0 = lambda0, lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC = 
-  #              BIC20, covgroup = covgroup, J = J)
-  # if(returnMC == T) out$u = u
   
-  # Change ll to Pajor method
-  # ll = logLik_imp(y, X, Z, U = u, sigma = cov, group, coef, family, df = 10, c, M)
-  ll = NA
+  # Another E step for loglik calculation (number draws = M)
+  samplemc_out = sample_mc_adapt(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=M, trace = trace, family = family, group = group, 
+                                 d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0,
+                                 proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                 offset = offset, burnin_batchnum = burnin_batchnum)
+  u = u0 = samplemc_out$u0
+  
+  # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+  if(gibbs | samplemc_out$switch){
+    # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+    if(samplemc_out$switch){ 
+      rej_to_gibbs = rej_to_gibbs + 1
+      cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+    }
+    
+    gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+    batch = samplemc_out$updated_batch
+    proposal_SD = samplemc_out$proposal_SD
+  }
+  
+  print("Updated proposal_SD:")
+  print(proposal_SD)
+  print("Updated batch:")
+  print(batch)
+  
+  # Calculate loglik using Pajor method (see logLik_Pajor.R)
+  if(sum(diag(cov) == 0) == nrow(cov)){
+    if(family == "binomial"){
+      eta = X %*% coef[1:ncol(X)]
+      ll = sum(dbinom(x = y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T))
+    }
+  }else{
+    ll = CAME_IS(posterior = u, y = y, X = X, Z = Z, group = group,
+                 coef = coef, sigma = cov, family = family, M = M)
+  }
+  
   
   # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
   # d = nlevels(group) = number independent subjects/groups
   BICh = -2*ll + sum(diag(cov) != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
   # Usual BIC
-  # BIC = -2*ll + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
+  BIC = -2*ll + sum(coef != 0)*log(nrow(X))
   
   if(gibbs){
     out = list(fit = fit, coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
-               covgroup = covgroup, J = J, ll = ll, BICh = BICh,
+               covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
                extra = list(fit = fit, okindex = okindex, Znew2 = Znew2),
                gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
   }else{
     out = list(fit = fit, coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
-               covgroup = covgroup, J = J, ll = ll, BICh = BICh,
+               covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
                extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
   }
   
@@ -581,6 +673,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   if(initial_gibbs == F){
     out$rej_to_gibbs = rej_to_gibbs
+  }
+  
+  out$fit0_record = fit0_record
+  out$coef_record_all = coef_record_all
+  if(!is.null(cov_record)){
+    out$cov_record = cov_record
   }
   
   return(out)
