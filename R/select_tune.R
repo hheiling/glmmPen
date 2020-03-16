@@ -3,12 +3,14 @@
 select_tune = function(dat, nMC, lambda0_range,lambda1_range, family, 
                        penalty, returnMC = T,
                        conv, nMC_max, trace = 0, ufull = NULL, coeffull = NULL, 
-                       gibbs = T, maxitEM = 50, alpha = 1,
-                       c = 1, M = 10^5){
+                       gibbs = T, maxitEM = 100, alpha = 1, t = 10,
+                       M = 10^4, MwG_sampler = c("random_walk","independence"), 
+                       adapt_RW_options = adaptControl()){
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
   BICold = BIC = BIC2old2 = BIC2= Inf
+  BIChold = BICh = Inf
   res = matrix(0, n1*n2, 9)
   # res2 = matrix(0, n2, 4) 
   coef = NULL
@@ -38,8 +40,9 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
                         trace = trace, conv = conv, nMC_max = nMC_max, 
                         ufull = ufull, coeffull = coeffull0, 
                         gibbs = gibbs, maxitEM = maxitEM + maxitEM*(j==1), 
-                        returnMC = returnMC, ufullinit = ufullinit, alpha = alpha,
-                        c, M))
+                        returnMC = returnMC, ufullinit = ufullinit, alpha = alpha, t = t,
+                        M = M, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options))
+      
       
       if(is.character(out)) next
       
@@ -49,19 +52,31 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
         ui0 = out$u 
       }
       
-      BIC = out$BICh
-      #print(out)
+      fout = list()
+      
+      BICh = out$BICh
+      print(BICh)
+      if(!is.numeric(BICh)) BICh = Inf
+      if(length(BICh) != 1) BICh = Inf
+      
+      if(BICh < BIChold){
+        fout[["BICh"]] = out
+        BIChold = BICh
+      }
+      
+      BIC = out$BIC
       print(BIC)
       if(!is.numeric(BIC)) BIC = Inf
       if(length(BIC) != 1) BIC = Inf
       
       if(BIC < BICold){
-        fout = out
+        fout[["BIC"]] = out
         BICold = BIC
       }
+      
       res[(i-1)*(n2)+j,1] = lambda0_range[i]
       res[(i-1)*(n2)+j,2] = lambda1_range[j]
-      res[(i-1)*(n2)+j,3] = BIC
+      res[(i-1)*(n2)+j,3] = BICh
       # res[(i-1)*(n2)+j,4] = out$llb
       res[(i-1)*(n2)+j,4] = out$ll
       res[(i-1)*(n2)+j,5] = sum(out$coef[2:ncol(dat$X)] !=0)
@@ -69,12 +84,13 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       res[(i-1)*(n2)+j,7] = sum(out$coef !=0)
       # if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
       if(maxitEM > 1) res[(i-1)*(n2)+j,8] = out$ll
-      res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
-      outl[[(i-1)*(n2)+j]] = 1#out
+      # res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
+      res[(i-1)*(n2)+j,9] = BIC
+      outl[[(i-1)*(n2)+j]] = 1
       coef = rbind(coef, out$coef)
       print(res[(i-1)*(n2)+j,])
       colnames(res) = c("lambda0","lambda1","BICh","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef",
-                        "LogLik_2","BIC_regular")
+                        "ll_Pajor","BIC")
       
     }
   }
