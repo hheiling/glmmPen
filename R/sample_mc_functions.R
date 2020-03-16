@@ -808,7 +808,7 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
                                              batch_length, offset, burnin_batchnum, trace)
         
         u0[,index] = gibbs_output[1:nMC,]
-        gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
+        gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       }
       if(!is.null(gibbs_output)){
@@ -832,7 +832,7 @@ sample_mc_adapt = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, g
                                            batch_length, offset, burnin_batchnum, trace)
       
       u0[,index] = gibbs_output[1:nMC,]
-      gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
+      gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
       
     }
