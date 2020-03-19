@@ -50,7 +50,7 @@ Should be \code{NULL} or a numeric vector.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
 (details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-of the Monte Carlo draws computed in \code{\link{sample.mc2}})}
+of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
 
 \item{conv}{a non-negative numeric convergence criteria for the convergence of the 
 log likelihood in the EM algorithm}

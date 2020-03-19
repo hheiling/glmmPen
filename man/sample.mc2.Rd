@@ -22,7 +22,7 @@ sample.mc2(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
 (details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-of the Monte Carlo draws computed in \code{\link{sample.mc2}})}
+of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 For \code{fit_dat} this can be a character string naming a family function or a fmaily function. 

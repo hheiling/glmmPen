@@ -1,0 +1,457 @@
+---
+title: "Sanity Check - Plot Function w Modes"
+author: "Hillary Heiling"
+date: "January 8, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Version number of glmmPen (adaptive branch) used for this document: 1.4.6
+
+```{r, eval = FALSE, include=FALSE}
+# library(remotes)
+# install_github("hheiling/glmmPen", ref = "adaptive", force = TRUE)
+```
+
+## Simulate Data
+
+Data: random intercept, multiple fixed effects.
+
+Consider 10 groups, 100 members per group
+
+```{r}
+library(ncvreg)
+## set seed
+set.seed(1)
+
+## set variables
+# number of groups
+n = 10
+
+# number of individuals per group 
+ni = 100
+
+# total number of measurements
+N = n*ni
+
+# pick fixed effects coefficient vector
+beta = matrix(c(0.0, 1.0, 1.0, 1.0, 1.0), ncol = 1)
+
+# pick random intercept variance
+Sigma_gamma = 1.0
+
+# set dimensions of fixed effects and random effects
+p = length(beta) # includes intercept
+q = 1 
+
+# simulate data for p time varying covariates, measured per time point
+mat = matrix(rnorm(N*(p-1), mean = 0, sd = 0.5), nrow = N, ncol = p-1) 
+
+# Specify subject ID for each row in mat
+ID = rep(1:n, each = ni)
+  
+# add intercept
+X = cbind(rep(1, n), mat)
+colnames(X) = c("int", "x1","x2","x3","x4")
+  
+# create y vector to hold observation
+y = rep(0, N)
+
+# create Z matrix of random effects (random intercept): ncol = number groups (n)
+Z = matrix(0, nrow = nrow(X), ncol = n)
+
+# record random intercept values ("true modes")
+gamma_vec = numeric(n)
+
+# now simulate yi, i = 1,..,n
+
+for(i in 1:n){
+  
+  # get subject  i indices
+  subjecti = which(ID == i)
+  
+  # get covariates for subject i
+  Xi = X[subjecti,]
+  
+  # here we assume random intercept only 
+  Zi = matrix(rep(1, times = ni), ncol = 1)
+  Z[subjecti,i] = Zi
+  
+  # draw single q dimensional random effect vector for subject i, gammai
+  gammai = rnorm(n = 1, mean = 0, sd = sqrt(Sigma_gamma))
+  gammai = matrix(gammai, ncol = 1)
+  gamma_vec[i] = gammai
+  
+  # generate vector of ni observations for subject i
+  # Poisson:
+    # lambdai = exp(Xi%*%beta + Zi%*%gammai)
+    # y[subjecti] = rpois(ni, lambdai)
+  # Binomial:
+  probi = exp(Xi %*% beta + Zi %*% gammai) / (1 + exp(Xi %*% beta + Zi %*% gammai))
+  y[subjecti] = rbinom(ni, size = 1, prob = probi)
+  
+}
+
+dat = list(y = y, X = X, Z = Z, group = as.factor(ID), z1 = gamma_vec)
+
+```
+
+
+## Plot the Function
+
+```{r}
+inner = function(gammai, y, Xi, beta, s2gamma, log=F){
+  # y is of length n
+  
+  # calculate product over multiple potential values of gammai
+  val = rep(NA, length(gammai))
+  for(i in 1:length(val)){
+    # calculate lambda
+    # lambda =  exp(Xi%*%beta + matrix(1, nrow = nrow(Xi))%*%gammai[i])
+    # val0 = dpois(x = y, lambda = lambda) 
+    prob = exp(Xi%*%beta + matrix(1, nrow = nrow(Xi))%*%gammai[i]) / 
+      (1 + exp(Xi%*%beta + matrix(1, nrow = nrow(Xi))%*%gammai[i]))
+    val0 = dbinom(x = y, size = 1, prob = prob)
+    val[i] = prod(val0)*dnorm(x = gammai[i],mean = 0,sd = sqrt(s2gamma))
+  }
+  
+  if(log == F){
+    return(val)
+  }else{
+    return(log(val))
+  }
+}
+```
+
+```{r, include = FALSE}
+# range = c(-1.5, 1)
+# # beta given Simulate Data section
+# s2gamma = Sigma_gamma
+# 
+# # par(mfrow = c(10,1))
+# # i = 1
+# for(i in 1:10){
+#   yi = y[which(ID == i)]
+# 
+#   x = seq(range[1], range[2], length.out = 1000)
+#   
+#   plot(x, inner(x, y = yi, Xi = X[which(ID == i),], beta = beta, s2gamma = s2gamma),
+#        ylab = "inner(gamma)", xlab = "gammai",
+#        type = 'l', main = sprintf("Group %i",i))
+# }
+
+```
+
+
+
+## Run Random Walk and glmer; Overlay Modes onto Plot
+
+glmer fit:
+
+```{r}
+library(lme4)
+df = data.frame(y = dat$y, dat$X[,-1], group = dat$group)
+
+fit_glmer = glmer(data = df, formula = y ~ x1 + x2 + x3 + x4 + (1|group), family = "binomial")
+
+fit_glmer
+```
+
+glmmPen fit:
+
+Explanation of some parameters:
+
+t: how many iterations back to compare coefficients. Default is t = 10
+
+adapt_RW_options: Needed arguments for the adaptive random walk Metropolis-within-Gibbs algorithm, allows for experimentation to determine optimal parameter settings. Can adjust batch_length, burnin_batchnum, and offset (see below for descriptions)
+
+batch_length: default is 50
+
+burnin_batchnum: number of batches to allow adaptations to proceed before fixing the proposal variance. Default is 200
+
+offset: this variable determines at what point the adjustment to delta has diminishing adaptations; delta becomes min(0.01, (Tb+offset)^-1/2). Default is 0
+
+```{r}
+library(glmmPen)
+set.seed(1)
+
+fit_glmmPen = fit_dat(dat, lambda0 = 0, lambda1 = 0, conv = 10^-3, nMC = 200, 
+                      family = "binomial", trace = 0, penalty = "grMCP",
+                      alpha = 1, nMC_max = 5000, t = 10,
+                      returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 50, 
+                      ufullinit = NULL, 
+                      adapt_RW_options = adaptControl(batch_length = 100.0,
+                                                      burnin_batchnum = 500.0,
+                                                      offset = 9000))
+
+
+```
+
+Compare glmer and glmmPen output
+
+```{r}
+print("glmmPen fixed effect coefficients")
+fit_glmmPen$coef[1:ncol(X)]
+print("glmer fixed effect coefficients")
+fixef(fit_glmer)
+print("glmmPen random effect variance (Intercept)")
+fit_glmmPen$sigma
+print("glmmPen random effect SD (Intercept)")
+sqrt(fit_glmmPen$sigma)
+print("glmer summary output")
+fit_glmer
+
+# Euclidean distance between glmer and glmmPen fixed effects
+sqrt(sum((fit_glmmPen$coef[1:ncol(X)] - fixef(fit_glmer))^2))
+```
+
+Run random walk (with random scan and adaptation) using the converged/ending parameter results from fit_dat
+
+```{r, echo=FALSE}
+# Functions
+# Number of studies
+K = 10
+d = 10
+# Number of variables (Intercept, X1, X2)
+q = 1
+
+## Testing Adaptive Metropolis-within-Gibbs functions
+AMCMC_test_sanity = function(fit_glmmPen, dat, M, batch_length, offset, burnin, proposal_SD){
+  
+  # Set variables
+  K = 10
+  q = 1
+  
+  # Test acceptance rates for new Adaptive Metropolis-within-gibbs
+  post_list = sample_mc_adapt(fit = fit_glmmPen$fit, cov = matrix(fit_glmmPen$sigma, ncol = 1), 
+                              y = dat$y, X = dat$X,
+                              Z = fit_glmmPen$extra$Znew2, nMC = M, family = "binomial",
+                              group = dat$group, d = nlevels(dat$group), 
+                              okindex = fit_glmmPen$extra$ok_index,
+                              nZ = fit_glmmPen$extra$Znew2, gibbs = T, uold = fit_glmmPen$u, 
+                              trace = 2,
+                              # proposal_SD = matrix(1.0, nrow = K, ncol = q), batch = 0.0,
+                              proposal_SD = proposal_SD, batch = 0.0,
+                              batch_length = batch_length, offset = offset, burnin = burnin)
+  
+  
+  post_U = post_list$u0
+  
+  gibbs_accept_rate = post_list$gibbs_accept_rate
+  
+  proposal_SD = post_list$proposal_SD
+  
+  return(list(post_U = post_U, gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD))
+}
+
+
+# Test of random walk code
+
+fit_sim_burnin_sanity = function(output, M = 10^4, batch_length = 250, offset = 0, burnin = 40,
+                                 proposal_SD){
+  
+  K = 10
+  q = 1
+  
+  dat = output$dat
+  fit_glmmPen = output$fit_glmmPen
+  proposal_SD = fit_glmmPen$proposal_SD
+  
+  original = sample.mc2(fit = fit_glmmPen$fit, cov = fit_glmmPen$sigma, y = dat$y, X = dat$X,
+                        Z = fit_glmmPen$extra$Znew2, nMC = M, family = "binomial",
+                        group = dat$group, d = nlevels(dat$group), 
+                        okindex = fit_glmmPen$extra$ok_index,
+                        nZ = fit_glmmPen$extra$Znew2, gibbs = T, uold = fit_glmmPen$u, trace = 2)
+  
+  # Output: post_U, gibbs_accept_rate, proposal_SD
+  random_walk = AMCMC_test_sanity(fit_glmmPen, dat, M, batch_length, 
+                                  offset, burnin = burnin, proposal_SD = proposal_SD)
+  
+  keep = list(dat = dat, fit_glmmPen = fit_glmmPen, original = original, 
+              random_walk = random_walk)
+  
+  return(keep)
+}
+
+```
+
+Examine mcmc diagnostic plots (sample.path, histogram, cumsum, and autocorr)
+
+```{r}
+## Evaluate the performance of the chain
+mcmc_diagnostics_sanity = function(post_U, dat, fit_glmer){ # modified version of plot_mcmc.pglmmObj
+  
+  mode_df = ranef(fit_glmer)[[1]]
+  modes_glmer = c(as.matrix(mode_df))
+  
+  # "True" modes
+  true_modes = c(dat$z1)
+  
+  d = 10
+  q = 1 # Number of random effects (intercept only)
+  
+  type = c("sample.path","histogram","cumsum","autocorr")
+  
+  U_keep = post_U
+  var_names = c("Intercept")
+  grp_names = str_c("grp", 1:d)
+  var_str = rep(var_names, each = d)
+  grp_str = rep(grp_names, times = q)
+  U_cols = str_c(var_str, ":", grp_str)
+  
+  vars = "all"
+  grps = "all"
+  
+  U_t = data.frame(U_keep, t = 1:nrow(U_keep))
+  colnames(U_t) = c(U_cols, "t")
+  U_long = melt(U_t, id = "t")
+  U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
+                      grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = q))
+  
+  modes_data = data.frame(modes_glmer = modes_glmer, true_modes = true_modes, 
+                          modes_glmmPen = colMeans(post_U),
+                          var_names = var_str, grp_names = grp_str)
+   
+  plots_return = list()
+  
+  if("sample.path" %in% type){
+    plot_sp = ggplot(U_plot, mapping = aes(x = t, y = value)) + geom_path() +
+      facet_grid(var_names ~ grp_names) + xlab("iteration t") + ylab("draws") +
+      geom_hline(data = modes_data, aes(yintercept = modes_glmer, color = "glmer")) +
+      geom_hline(data = modes_data, aes(yintercept = true_modes, color = "truth")) +
+      geom_hline(data = modes_data, aes(yintercept = modes_glmmPen, color = "glmmPen")) +
+      scale_color_manual(values = c("glmer" = "red", "glmmPen" = "green3", "truth" = "blue")) +
+      labs(color = 'Modes')
+    
+    plots_return$sample_path = plot_sp
+  }
+  if("histogram" %in% type){
+    hist_U = ggplot(U_plot) + geom_histogram(mapping = aes(x = value)) + 
+      facet_grid(var_names ~ grp_names) + xlab("draws") +
+      geom_vline(data = modes_data, aes(xintercept = modes_glmer, color = "glmer")) +
+      geom_vline(data = modes_data, aes(xintercept = true_modes, color = "truth")) +
+      scale_color_manual(values = c("glmer" = "red", "truth" = "blue")) +
+      labs(color = 'Modes')
+    
+    plots_return$histogram = hist_U
+  }
+  if("cumsum" %in% type){
+    U_means = colMeans(U_keep)
+    U_means = data.frame(rbind(U_means))[rep.int(1L, nrow(U_keep)), , drop = FALSE]
+    U_tmeans = apply(U_keep, 2, cumsum) / 1:nrow(U_keep)
+    U_tdiff = U_tmeans - U_means
+    U_cumsum = apply(U_tdiff, 2, cumsum)
+    U_t = data.frame(U_cumsum, t = 1:nrow(U_cumsum))
+    colnames(U_t) = c(colnames(U_keep), "t")
+    U_long = melt(U_t, id = "t")
+    U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
+                        grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = q)) 
+    plot_cumsum = ggplot(U_plot) + geom_smooth(mapping = aes(x = t, y = value), color = "black") +
+      geom_hline(yintercept = 0, linetype = "dashed") +
+      facet_grid(var_names ~ grp_names) + xlab("iteration t") + ylab("Cumulative Sum")
+    
+    plots_return$cumsum = plot_cumsum
+  }
+  if("autocorr" %in% type){
+    grp_index = rep(grp_names, times = q)
+    var_index = rep(var_names, each = d)
+    for(j in 1:ncol(U_keep)){
+      ACF = acf(U_keep[,j], plot=F, lag.max = 40)
+      ACF_df = with(ACF, data.frame(lag,acf))
+      ACF_df$grp_names = grp_index[j]
+      ACF_df$var_names = var_index[j]
+      if(j == 1){
+        ACF_all = ACF_df
+      }else{
+        ACF_all = rbind(ACF_all, ACF_df)
+      }
+    }
+    
+    plot_acf = ggplot(data = ACF_all, mapping = aes(x = lag, y = acf)) +
+      geom_hline(mapping = aes(yintercept = 0)) + 
+      geom_segment(mapping = aes(xend = lag, yend = 0)) +
+      facet_grid(var_names ~ grp_names)
+    
+    plots_return$autocorr = plot_acf
+  }
+  
+  return(plots_return)
+  
+} ## Plots: sample_path, histogram, cumsum, autocorr
+```
+
+Running functions:
+
+```{r}
+sim_list = list(dat = dat, fit_glmmPen = fit_glmmPen)
+
+simple_example = fit_sim_burnin_sanity(sim_list, M = 5000,
+                                batch_length = 100, offset = 0, burnin = 0)
+```
+
+Diagnostic Graphs:
+
+```{r}
+library(stringr)
+library(reshape2)
+library(ggplot2)
+ # plots_mcmc = mcmc_diagnostics_sanity(post_U = simple_example$random_walk$post_U,
+ #                               dat = simple_example$dat, fit_glmer = fit_glmer)
+
+plots_mcmc = mcmc_diagnostics_sanity(post_U = fit_glmmPen$u,
+                               dat = simple_example$dat, fit_glmer = fit_glmer)
+```
+
+Sample Paths:
+
+```{r}
+plots_mcmc$sample_path
+```
+
+Autocorrelation Plots:
+
+```{r}
+plots_mcmc$autocorr
+```
+
+```{r}
+modes_rw = colMeans(simple_example$random_walk$post_U)
+modes_glmer = ranef(fit_glmer)[[1]]
+
+print(cbind(modes_rw, modes_glmer))
+```
+
+Plot of function overlayed with modes:
+
+```{r}
+range = c(-1.5, 1)
+# beta given Simulate Data section
+s2gamma = Sigma_gamma
+
+# par(mfrow = c(10,1))
+# i = 1
+for(i in 1:10){
+  yi = y[which(ID == i)]
+
+  x = seq(range[1], range[2], length.out = 1000)
+  
+  plot(x, inner(x, y = yi, Xi = X[which(ID == i),], beta = beta, s2gamma = s2gamma),
+       ylab = "inner(gamma)", xlab = "gammai",
+       type = 'l', main = sprintf("Group %i",i))
+  abline(v = c(modes_rw[i], modes_glmer[i,], dat$z1[i]), col = c("green3","red","blue"))
+  if(i != 0){
+    legend(x = "topleft",legend = c("true gamma","glmer mode","RW mode"),
+          lty = 1, col = c("blue","red","green3"))
+  }else{
+    legend(x = "topright",legend = c("true gamma","glmer mode","RW mode"),
+          lty = 1, col = c("blue","red","green3"))
+  }
+  
+}
+
+```
+
+The End
