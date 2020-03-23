@@ -58,7 +58,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                    alpha = 1, nMC_max = 5000, t = 10,
                    returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
                    ufullinit = NULL, M = 10^4, MwG_sampler = c("random_walk","independence"),
-                   adapt_RW_options = adaptControl()){
+                   adapt_RW_options = adaptControl(), covar = c("unstructured","independent")){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
@@ -77,6 +77,16 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   
   d = nlevels(factor(group))
   
+  covar = covar[1]
+  if(!(covar %in% c("unstructured","independent"))){
+    stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
+  }
+  if(covar == "unstructured" & ncol(Z)/d >= 10){
+    warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation \n",
+            immediate. = T)
+    covar == "independent"
+  }
+  
   #initial fit
   if(family == "binomial"){
     nTotal = rep(1, length(y))
@@ -91,7 +101,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     stop("MwG_sampler must be specified as either 'independence' or 'random_walk'")
   }
   
-  if(ncol(Z)/d <= 15){
+  if(covar == "unstructured"){ # Originally: ncol(Z)/d <= 15 
     # create J, q2 x q*(q+1)/2
     J = Matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2, sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2)
     index = 0
@@ -108,7 +118,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       covgroup = rbind(covgroup, rep(i, (ncol(Z)/d)))
     }
     covgroup = covgroup[lower.tri(covgroup, diag = T)]
-  }else{
+  }else{ # covar == "independent". Originally: ncol(Z)/d > 15
     J = Matrix(0,(ncol(Z)/d)^2, (ncol(Z)/d), sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d))
     index = 0
     indexc = 0
