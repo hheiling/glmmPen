@@ -5,7 +5,13 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
                        conv, nMC_max, trace = 0, ufull = NULL, coeffull = NULL, 
                        gibbs = T, maxitEM = 100, alpha = 1, t = 10,
                        M = 10^4, MwG_sampler = c("random_walk","independence"), 
-                       adapt_RW_options = adaptControl()){
+                       adapt_RW_options = adaptControl(),
+                       covar = c("unstructured","independent")){
+  
+  covar = covar[1]
+  if(!(covar %in% c("unstructured","independent"))){
+    stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
+  }
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
@@ -43,7 +49,8 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
                         ufull = ufull, coeffull = coeffull0, 
                         gibbs = gibbs, maxitEM = maxitEM + maxitEM*(j==1), 
                         returnMC = returnMC, ufullinit = ufullinit, alpha = alpha, t = t,
-                        M = M, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options))
+                        M = M, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
+                        covar = covar))
       
       
       if(is.character(out)) next
