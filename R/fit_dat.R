@@ -73,7 +73,17 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   Z = Matrix::as.matrix(dat$Z)
   group = dat$group
   
-  f = get(family, mode = "function", envir = parent.frame())
+  if(is.character(family)){
+    family = get(family, mode = "function", envir = parent.frame())
+  }
+  if(is.function(family)){
+    family = family()
+  }
+  if(class(family) == "family"){
+    f = family
+    link = family$link
+    family = family$family
+  }
   
   d = nlevels(factor(group))
   

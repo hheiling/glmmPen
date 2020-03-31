@@ -6,6 +6,103 @@
 
 using namespace Rcpp;
 
+// IRLS
+arma::vec IRLS(arma::vec y, arma::mat X, arma::vec mu, arma::vec weights, arma::vec z, arma::vec dims);
+RcppExport SEXP _glmmPen_IRLS(SEXP ySEXP, SEXP XSEXP, SEXP muSEXP, SEXP weightsSEXP, SEXP zSEXP, SEXP dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(IRLS(y, X, mu, weights, z, dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// soft_thresh
+double soft_thresh(double zeta, double lambda);
+RcppExport SEXP _glmmPen_soft_thresh(SEXP zetaSEXP, SEXP lambdaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type zeta(zetaSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    rcpp_result_gen = Rcpp::wrap(soft_thresh(zeta, lambda));
+    return rcpp_result_gen;
+END_RCPP
+}
+// MCP_soln
+double MCP_soln(double zeta, double nu, double lambda, double gamma);
+RcppExport SEXP _glmmPen_MCP_soln(SEXP zetaSEXP, SEXP nuSEXP, SEXP lambdaSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type zeta(zetaSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(MCP_soln(zeta, nu, lambda, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
+// SCAD_soln
+double SCAD_soln(double zeta, double nu, double lambda, double gamma);
+RcppExport SEXP _glmmPen_SCAD_soln(SEXP zetaSEXP, SEXP nuSEXP, SEXP lambdaSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type zeta(zetaSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(SCAD_soln(zeta, nu, lambda, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
+// coord_desc
+arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid, arma::vec dims, arma::vec beta, const char* penalty, double lambda, double gamma, const char* family, int link);
+RcppExport SEXP _glmmPen_coord_desc(SEXP ySEXP, SEXP XSEXP, SEXP weightsSEXP, SEXP residSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP penaltySEXP, SEXP lambdaSEXP, SEXP gammaSEXP, SEXP familySEXP, SEXP linkSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type resid(residSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    rcpp_result_gen = Rcpp::wrap(coord_desc(y, X, weights, resid, dims, beta, penalty, lambda, gamma, family, link));
+    return rcpp_result_gen;
+END_RCPP
+}
+// glm_fit
+arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims, arma::vec beta, const char* family, int link, int fit_type, const char* penalty, double lambda, arma::vec params);
+RcppExport SEXP _glmmPen_glm_fit(SEXP ySEXP, SEXP XSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP fit_typeSEXP, SEXP penaltySEXP, SEXP lambdaSEXP, SEXP paramsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< int >::type fit_type(fit_typeSEXP);
+    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
+    rcpp_result_gen = Rcpp::wrap(glm_fit(y, X, dims, beta, family, link, fit_type, penalty, lambda, params));
+    return rcpp_result_gen;
+END_RCPP
+}
 // logLik_cpp
 double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int M, const arma::vec& group, unsigned int n_levels, unsigned int df, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::mat& Gamma, const char* family);
 RcppExport SEXP _glmmPen_logLik_cpp(SEXP U_meansSEXP, SEXP sigmaSEXP, SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP dfSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP GammaSEXP, SEXP familySEXP) {
@@ -248,8 +345,63 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// initial_mu
+arma::vec initial_mu(const char* family, arma::vec y, int N);
+RcppExport SEXP _glmmPen_initial_mu(SEXP familySEXP, SEXP ySEXP, SEXP NSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< int >::type N(NSEXP);
+    rcpp_result_gen = Rcpp::wrap(initial_mu(family, y, N));
+    return rcpp_result_gen;
+END_RCPP
+}
+// dlink
+arma::vec dlink(int link, arma::vec mu);
+RcppExport SEXP _glmmPen_dlink(SEXP linkSEXP, SEXP muSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
+    rcpp_result_gen = Rcpp::wrap(dlink(link, mu));
+    return rcpp_result_gen;
+END_RCPP
+}
+// linkfun
+arma::vec linkfun(int link, arma::vec mu);
+RcppExport SEXP _glmmPen_linkfun(SEXP linkSEXP, SEXP muSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
+    rcpp_result_gen = Rcpp::wrap(linkfun(link, mu));
+    return rcpp_result_gen;
+END_RCPP
+}
+// invlink
+arma::vec invlink(int link, arma::vec eta);
+RcppExport SEXP _glmmPen_invlink(SEXP linkSEXP, SEXP etaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type eta(etaSEXP);
+    rcpp_result_gen = Rcpp::wrap(invlink(link, eta));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_glmmPen_IRLS", (DL_FUNC) &_glmmPen_IRLS, 6},
+    {"_glmmPen_soft_thresh", (DL_FUNC) &_glmmPen_soft_thresh, 2},
+    {"_glmmPen_MCP_soln", (DL_FUNC) &_glmmPen_MCP_soln, 4},
+    {"_glmmPen_SCAD_soln", (DL_FUNC) &_glmmPen_SCAD_soln, 4},
+    {"_glmmPen_coord_desc", (DL_FUNC) &_glmmPen_coord_desc, 11},
+    {"_glmmPen_glm_fit", (DL_FUNC) &_glmmPen_glm_fit, 10},
     {"_glmmPen_logLik_cpp", (DL_FUNC) &_glmmPen_logLik_cpp, 11},
     {"_glmmPen_logLik_modif", (DL_FUNC) &_glmmPen_logLik_modif, 11},
     {"_glmmPen_logLik_MCI", (DL_FUNC) &_glmmPen_logLik_MCI, 8},
@@ -264,6 +416,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_arma_test_const_ref", (DL_FUNC) &_glmmPen_arma_test_const_ref, 1},
     {"_glmmPen_Znew_gen2", (DL_FUNC) &_glmmPen_Znew_gen2, 9},
     {"_glmmPen_orthog_inner", (DL_FUNC) &_glmmPen_orthog_inner, 5},
+    {"_glmmPen_initial_mu", (DL_FUNC) &_glmmPen_initial_mu, 3},
+    {"_glmmPen_dlink", (DL_FUNC) &_glmmPen_dlink, 2},
+    {"_glmmPen_linkfun", (DL_FUNC) &_glmmPen_linkfun, 2},
+    {"_glmmPen_invlink", (DL_FUNC) &_glmmPen_invlink, 2},
     {NULL, NULL, 0}
 };
 
