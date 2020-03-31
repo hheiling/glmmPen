@@ -47,15 +47,15 @@ M_step = function(y, X, family, link, coef, offset = NULL,
   #   }
   # }
   
-  if(is.null(fitted)){
-    init = 0
-    fitted = rep(0, N)
-  }else{
-    init = 1
-    if((! is.numeric(fitted)) || length(fitted) != N){
-      stop("fitted must be a numeric vector of the same length as y\n")
-    }
-  }
+  # if(is.null(fitted)){
+  #   init = 0
+  #   fitted = rep(0, N)
+  # }else{
+  #   init = 1
+  #   if((! is.numeric(fitted)) || length(fitted) != N){
+  #     stop("fitted must be a numeric vector of the same length as y\n")
+  #   }
+  # }
   
   familyR = family$family
   linkR = family$link
@@ -103,6 +103,8 @@ M_step = function(y, X, family, link, coef, offset = NULL,
   }else if(linkR == "inverse"){
     link_int = 40
   }
+  
+  penalty = penalty[1]
   
   if(!(penalty %in% c("lasso","MCP","SCAD"))){
     stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
