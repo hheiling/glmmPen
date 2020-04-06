@@ -5,7 +5,7 @@
 # Eventually add alpha option (default = 1), for elastic net?
 
 #' @export
-M_step = function(y, X, family, link, coef, offset = NULL, 
+M_step = function(y, X, family, coef, offset = NULL, fitted,
                   maxit = 250, maxit_CD = 250, conv = 0.0001, fit_type,
                   penalty = c("MCP","SCAD","lasso"), lambda,
                   gamma = switch(penalty, SCAD = 3.7, 3.0), alpha = 1){
@@ -129,7 +129,7 @@ M_step = function(y, X, family, link, coef, offset = NULL,
   
   dims = c(p, N, conv, maxit, maxit_CD)
   
-  coef_new = glm_fit(y, X, dims, coef, family, link_int, fit_type, penalty, lambda, penalty_params)
+  coef_new = glm_fit(y, X, dims, coef, fitted, familyR, link_int, fit_type, penalty, lambda, penalty_params)
   
   # Calculate BIC for model (when no random effects)
   if(familyR == "binomial" & linkR == "logit"){

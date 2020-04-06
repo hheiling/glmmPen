@@ -15,16 +15,16 @@ using namespace Rcpp;
 
 //' @export
 // [[Rcpp::export]]
-arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims,
-                   arma::vec beta,
-                   const char* family, int link, int fit_type,
-                   const char* penalty, double lambda, arma::vec params) {
+arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
+                  arma::vec beta, arma::vec fitted,
+                  const char* family, int link, int fit_type,
+                  const char* penalty, double lambda, arma::vec params) {
   
   int p = dims(0); // number covariates (ncol(X))
   int N = dims(1); // total number observations (length(y))
   double conv = dims(2); // Convergence threshold
   int maxit = dims(3);
-  int maxit_CD = dims(4);
+  // int maxit_CD = dims(4); // Passed to coord_desc function if needed
   
   int i=0;
   int iter=0;
@@ -46,6 +46,7 @@ arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims,
   arma::vec resid(N); // IRLS residuals
   arma::vec z(N); // 'working response'
   arma::vec constant(N);
+  arma::vec mu_check(N);
   // arma::vec fitted(N); // Estimate of mu given initial beta input
   
   // Recall link coding (see "M_step.R" for logic):
@@ -54,13 +55,20 @@ arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims,
   
   // Initialize mu and eta
   mu = initial_mu(family, y, N);
-  eta = X*beta; // Will input initial beta. linkfun(link, fitted) instead?
+  mu_check = muvalid(family, mu);
+  eta = linkfun(link, fitted); // Will input initial beta. linkfun(link, fitted) instead?
   
   // Initialize residuals and weights
   deriv = dlink(link, mu);
   Vmu = varfun(family, mu);
   resid = deriv % (y - mu);
   weights = constant.ones() / (deriv % deriv % Vmu);
+  for(i=0; i<N; i++){
+    if(mu_check(i)==0){
+      weights(i) = 0.0;
+      resid(i) = 0.0;
+    }
+  }
   
   // Checks
   wsum = sum(weights);
@@ -96,7 +104,7 @@ arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims,
     iter = 0;
     converged = 0;
     
-    while(iter < maxit & converged == 0){
+    while((iter < maxit) && (converged == 0)){
       
       // Update beta given latest weights and working responses
       wX = sqrt(weights) % X.each_col();
@@ -106,24 +114,44 @@ arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims,
       // Update mu and eta
       eta = X * beta;
       mu = invlink(link, eta);
+      mu_check = muvalid(family, mu);
       
       // Update residuals and weights
       deriv = dlink(link, mu);
       Vmu = varfun(family, mu);
       resid = deriv % (y - mu);
       weights = constant.ones() / (deriv % deriv % Vmu);
+      for(i=0; i<N; i++){
+        if(mu_check(i) == 0){
+          weights(i) = 0.0;
+          resid(i) = 0.0;
+        }
+      }
       
       // Update z (working response)
       z = eta + resid;
       
       // Compare old vs new beta (test convergence criteria)
-      euclid_dist = as_scalar(sqrt((beta0-beta)%(beta0-beta)));
+      euclid_dist = sqrt(sum((beta0-beta)%(beta0-beta)));
       if(euclid_dist < conv){
         converged = 1;
       }
       
       // Store new beta
       beta0 = beta;
+      
+      // Update counter
+      iter = iter + 1;
+      
+      if((iter == maxit) && (converged == 0)){
+        warning("iteration limit reached for IRLS w/o convergence \n");
+      }
+      
+      if(beta.has_nan()){
+        Rprintf("iter %i", iter, "\n");
+        Rcout << "beta" << std::endl << beta;
+        stop("beta acquired NA values \n");
+      }
     }
     
   }else if(fit_type == 2){ // Coordinate descent (regular)
@@ -132,7 +160,7 @@ arma::vec glm_fit(const arma::vec& y, const arma::mat& X, const arma::vec& dims,
     // Coordinate Descent (ungrouped)
     //-------------------------------------------------------------------------------//
     
-    beta = coord_desc(y, X, weights, resid, dims, beta, penalty, lambda, gamma, family, link);
+    beta = coord_desc(y, X, weights, resid, eta, dims, beta, penalty, lambda, gamma, family, link);
     
   }else if(fit_type == 3){ // Grouped coordinate descent
     

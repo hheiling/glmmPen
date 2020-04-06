@@ -22,6 +22,8 @@
 /* GLM definition functions */
 
 arma::vec initial_mu(const char* family, arma::vec y, int N);
+arma::vec muvalid(const char* family, arma::vec mu);
+arma::vec mu_adjust(const char* family, arma::vec mu);
 arma::vec dlink(int link, arma::vec mu);
 arma::vec linkfun(int link, arma::vec mu);
 arma::vec invlink(int link, arma::vec eta);
