@@ -104,7 +104,7 @@ arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
     iter = 0;
     converged = 0;
     
-    while((iter < maxit) && (converged == 0)){
+    while((iter < maxit) & (converged == 0)){
       
       // Update beta given latest weights and working responses
       wX = sqrt(weights) % X.each_col();
@@ -143,7 +143,7 @@ arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
       // Update counter
       iter = iter + 1;
       
-      if((iter == maxit) && (converged == 0)){
+      if((iter == maxit) & (converged == 0)){
         warning("iteration limit reached for IRLS w/o convergence \n");
       }
       
