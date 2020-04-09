@@ -9,21 +9,21 @@ soft_thresh <- function(zeta, lambda) {
     .Call('_glmmPen_soft_thresh', PACKAGE = 'glmmPen', zeta, lambda)
 }
 
-MCP_soln <- function(zeta, nu, lambda, gamma) {
-    .Call('_glmmPen_MCP_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma)
+MCP_soln <- function(zeta, nu, lambda, gamma, alpha) {
+    .Call('_glmmPen_MCP_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma, alpha)
 }
 
-SCAD_soln <- function(zeta, nu, lambda, gamma) {
-    .Call('_glmmPen_SCAD_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma)
+SCAD_soln <- function(zeta, nu, lambda, gamma, alpha) {
+    .Call('_glmmPen_SCAD_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma, alpha)
 }
 
-coord_desc <- function(y, X, weights, resid, eta, dims, beta, penalty, lambda, gamma, family, link) {
-    .Call('_glmmPen_coord_desc', PACKAGE = 'glmmPen', y, X, weights, resid, eta, dims, beta, penalty, lambda, gamma, family, link)
+coord_desc <- function(y, X, weights, resid, eta, offset, dims, beta, penalty, lambda, gamma, alpha, family, link) {
+    .Call('_glmmPen_coord_desc', PACKAGE = 'glmmPen', y, X, weights, resid, eta, offset, dims, beta, penalty, lambda, gamma, alpha, family, link)
 }
 
 #' @export
-glm_fit <- function(y, X, dims, beta, fitted, family, link, fit_type, penalty, lambda, params) {
-    .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, fitted, family, link, fit_type, penalty, lambda, params)
+glm_fit <- function(y, X, dims, beta, offset, family, link, fit_type, penalty, lambda, params) {
+    .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, fit_type, penalty, lambda, params)
 }
 
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {

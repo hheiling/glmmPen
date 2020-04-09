@@ -5,10 +5,10 @@
 # Eventually add alpha option (default = 1), for elastic net?
 
 #' @export
-M_step = function(y, X, family, coef, offset = NULL, fitted,
+M_step = function(y, X, family, coef, offset = NULL,
                   maxit = 250, maxit_CD = 250, conv = 0.0001, fit_type,
                   penalty = c("MCP","SCAD","lasso"), lambda,
-                  gamma = switch(penalty, SCAD = 3.7, 3.0), alpha = 1){
+                  gamma = switch(penalty, SCAD = 3.7, 3.0), alpha = 1.0){
   
   if (!is.double(y)) {
     tmp <- try(y <- as.double(y), silent=TRUE)
@@ -31,12 +31,12 @@ M_step = function(y, X, family, coef, offset = NULL, fitted,
   }
   
   if(!is.null(offset)){
-    useOffset = 1
+    # useOffset = 1
     if((! is.numeric(offset)) || length(offset) != N){
       stop("offset must be a numeric vector of the same length as y\n")
     }
   }else{
-    useOffset = 0
+    # useOffset = 0
     offset    = rep(0.0, times = N)
   }
   
@@ -44,16 +44,6 @@ M_step = function(y, X, family, coef, offset = NULL, fitted,
   #   if((! is.numeric(nTotal)) || length(nTotal) != N){
   #     strWarn = "For binomial family, nTotal must be a numeric vector"
   #     stop(strWarn, "of the same length as y\n")
-  #   }
-  # }
-  
-  # if(is.null(fitted)){
-  #   init = 0
-  #   fitted = rep(0, N)
-  # }else{
-  #   init = 1
-  #   if((! is.numeric(fitted)) || length(fitted) != N){
-  #     stop("fitted must be a numeric vector of the same length as y\n")
   #   }
   # }
   
@@ -67,6 +57,7 @@ M_step = function(y, X, family, coef, offset = NULL, fitted,
     stop("invalid link \n")
   }
   
+  # Optional:
   # Re-code family as integer
   # Binomial 1
   # Poisson  2
@@ -117,19 +108,20 @@ M_step = function(y, X, family, coef, offset = NULL, fitted,
   }else if(!is.double(gamma)){
     tmp <- try(gamma <- as.double(gamma), silent=TRUE)
     if (inherits(tmp, "try-error")) stop("gamma must be numeric or able to be coerced to numeric", call.=FALSE)
-    
   }
   
   if (!is.double(alpha)) {
     tmp <- try(alpha <- as.double(alpha), silent=TRUE)
     if (inherits(tmp, "try-error")) stop("alpha must be numeric or able to be coerced to numeric", call.=FALSE)
+  }else if(alpha == 0.0){
+    stop("alpha cannot equal 0. Pick a small value > 0 instead (e.g. 0.001) \n");
   }
   
   penalty_params = c(gamma, alpha)
   
   dims = c(p, N, conv, maxit, maxit_CD)
   
-  coef_new = glm_fit(y, X, dims, coef, fitted, familyR, link_int, fit_type, penalty, lambda, penalty_params)
+  coef_new = glm_fit(y, X, dims, coef, offset, familyR, link_int, fit_type, penalty, lambda, penalty_params)
   
   # Calculate BIC for model (when no random effects)
   if(familyR == "binomial" & linkR == "logit"){
