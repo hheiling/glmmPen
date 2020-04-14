@@ -6,25 +6,18 @@
 
 using namespace Rcpp;
 
-// // declare internal functions
-// arma::vec initial_mu(const char* family, arma::vec y, int N);
-// arma::vec dlink(int link, arma::vec mu);
-// arma::vec linkfun(int link, arma::vec mu);
-// arma::vec invlink(int link, arma::vec eta);
-// arma::vec varfun(const char* family, arma::vec mu);
-
 //' @export
 // [[Rcpp::export]]
 arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
                   arma::vec beta, arma::vec offset,
                   const char* family, int link, int fit_type,
+                  arma::vec group_X, arma::vec K_X, // K_X = vector of size of groups in X
                   const char* penalty, double lambda, arma::vec params) {
   
   int p = dims(0); // number covariates (ncol(X))
   int N = dims(1); // total number observations (length(y))
   double conv = dims(2); // Convergence threshold
   int maxit = dims(3);
-  // int maxit_CD = dims(4); // Passed to coord_desc function if needed
   
   int i=0;
   int iter=0;
@@ -184,11 +177,9 @@ arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
     // Grouped Coordinate Descent
     //-------------------------------------------------------------------------------//
     
-    stop("grouped coordinate descent not yet available \n");
+    beta = grp_CD(y, X, weights, resid, eta, dims, beta, group_X, K_X, penalty, lambda, gamma, alpha, family, link);
     
   }
-  
-
   
   return beta;
 }

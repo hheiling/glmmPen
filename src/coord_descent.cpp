@@ -5,14 +5,7 @@
 
 using namespace Rcpp;
 
-// // declare internal functions
-// arma::vec initial_mu(const char* family, arma::vec y, int N);
-// arma::vec dlink(int link, arma::vec mu);
-// arma::vec linkfun(int link, arma::vec mu);
-// arma::vec invlink(int link, arma::vec eta);
-// arma::vec varfun(const char* family, arma::vec mu);
-
-// zeta, nu, gamma, and lambda defined in coord_desc function
+// zeta, nu, gamma, and lambda defined in coord_desc and grp_CD functions
 
 // Soft-thresholding function (used in Lasso, MCP, and SCAD penalties)
 // [[Rcpp::export]]
@@ -41,12 +34,15 @@ double MCP_soln(double zeta, double nu, double lambda, double gamma, double alph
   double val = 0;
   double abs_z = fabs(zeta);
   
-  if(abs_z <= lambda*alpha){
+  double lam1 = lambda*alpha;
+  double lam2 = lambda*(1.0-alpha);
+  
+  if(abs_z <= lam1){
     val = 0;
-  }else if(abs_z <= gamma*(lambda*alpha)*(1.0+lambda*(1.0-alpha))){
-    val = soft_thresh(zeta, lambda*alpha) / (nu*(1.0 - (1.0/gamma) + lambda*(1-alpha)));
+  }else if(abs_z <= gamma*lam1*(1.0+lam2)){
+    val = soft_thresh(zeta, lam1) / (nu*(1.0 - (1.0/gamma) + lam2));
   }else{
-    val = zeta / (nu*(1.0+lambda*(1.0-alpha)));
+    val = zeta / (nu*(1.0+lam2));
   }
   
   return val;
@@ -60,14 +56,17 @@ double SCAD_soln(double zeta, double nu, double lambda, double gamma, double alp
   double val = 0;
   double abs_z = fabs(zeta);
   
-  if(abs_z <= lambda*alpha){
+  double lam1 = lambda*alpha;
+  double lam2 = lambda*(1.0-alpha);
+  
+  if(abs_z <= lam1){
     val = 0.0;
-  }else if(abs_z <= (lambda*alpha)*(2.0+lambda*(1.0-alpha))){
-    val = soft_thresh(zeta, lambda*alpha) / (nu*(1.0 +lambda*(1.0-alpha)));
-  }else if(abs_z <= gamma*(lambda*alpha)*(1.0+lambda*(1.0-alpha))){
-    val = soft_thresh(zeta, gamma*lambda*alpha/(gamma-1.0)) / (nu * (1.0 - (1.0/(gamma-1.0)) + lambda*(1.0-alpha)));
+  }else if(abs_z <= lam1*(2.0+lam2)){
+    val = soft_thresh(zeta, lam1) / (nu*(1.0 +lam2));
+  }else if(abs_z <= gamma*lam1*(1.0+lam2)){
+    val = soft_thresh(zeta, gamma*lam1/(gamma-1.0)) / (nu * (1.0 - (1.0/(gamma-1.0)) + lam2));
   }else{
-    val = zeta / (nu*(1.0+lambda*(1.0-alpha)));
+    val = zeta / (nu*(1.0+lam2));
   }
   
   return val;
@@ -98,7 +97,6 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
   // Notation: W = diag(weights), beta0 = beta from past iteration
   double nuj=0.0; // 1/N * t(X_j) %*% W %*% X_j
   double zetaj=0.0; // 1/N * t(X_j) %*% W %*% resid + nuj * beta0_j
-  double euclid_dist=0.0;
   double v0=0.0; // sum(residuals^2) / N
   double v0_last=0.0; // value of v0 from past iteration
   
@@ -107,10 +105,8 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
   arma::vec mu(N); // expected mean for observations (g(eta) where g = link function)
   arma::vec deriv(N); // (d_eta / d_mu) = g'(mu) where g = link function
   arma::vec Vmu(N); // variance = b''(theta) where b(theta) from exponential family
-  arma::vec constant(N);
+  arma::vec constant(N); // Arbitrary vector used to create vector of ones
   arma::vec mu_check(N); // 1 if mu a valid number for given family, 0 otherwise
-  arma::vec change_metric(p);
-  
   
   v0 = sum(resid % resid) / N;
   
@@ -198,8 +194,169 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     
   } // End while loop
   
-  // Rprintf("Number of iterations needed: %i \n", iter);
-  
   return(beta);
   
+}
+
+// Group Coordinate Descent
+//' @export
+// [[Rcpp::export]]
+arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
+                 arma::vec eta, arma::vec dims, arma::vec beta,
+                 arma::vec group_X, arma::vec K_X, // group designation (group_X) and size (K_X)
+                 const char* penalty, double lambda, double gamma, double alpha, // penalty type and parameters
+                 const char* family, int link){
+
+  // Define available penalties
+  const char* lasso = "lasso";
+  const char* mcp = "MCP";
+  const char* scad = "SCAD";
+
+  // Families with specific majorization-minimization nu values (theoretically determined)
+      // definition of nu provided below
+  const char* bin = "binomial";
+  const char* gaus = "gaussian";
+
+  int p = dims(0); // number covariates (ncol(X))
+  int N = dims(1); // total number observations (length(y))
+  double conv = dims(2); // convergence criteria
+  int maxit_CD = dims(4); // max number iterations for coordinate descent
+  int J_X = dims(5);
+  // int i=0;
+  int j=0;
+  int iter=0;
+  int converged=0; // 0 if not converged, 1 if converged
+
+  double nu=0.0; // max second deriv of loss function (max possible weight)
+  double zetaj=0.0; // 1/N * t(X_j) %*% resid + beta0_j
+  double zj_L2=0.0; // L2 norm of zetaj vector
+  double v0 = sum(resid % resid) / N; // sum(residuals^2) / N
+  double v0_last=0.0; // value of v0 from past iteration
+
+  arma::vec beta0(p); // Input initial beta / beta from last round of updates
+  double bj=0.0; // place-holder for value of element of beta
+
+  arma::vec mu(N); // expected mean for observations (g(eta) where g = link function)
+  arma::vec deriv(N); // (d_eta / d_mu) = g'(mu) where g = link function
+  arma::vec Vmu(N); // variance = b''(theta) where b(theta) from exponential family
+  arma::vec constant(N); // arbitrary vector used to create vector of ones
+  arma::vec mu_check(N); // 1 if mu a valid number for given family, 0 otherwise
+
+  arma::vec lam = lambda * sqrt(K_X); // lambda_j = lambda * sqrt(Kj) where Kj = size of jth group
+
+  if(std::strcmp(family, bin) == 0){
+    nu = 0.25;
+  }else if(std::strcmp(family, gaus) == 0){
+    nu = 1.0;
+  }else{
+    nu = max(weights);
+  }
+
+  while((iter<maxit_CD) & (converged==0)){
+
+    // Add to iter
+    iter = iter + 1;
+    // Save latest value of beta
+    beta0 = beta;
+    // Save latest v0
+    v0_last = v0;
+
+    // Element-wise update of beta
+    for(j=0; j<J_X; j++){
+
+      // Identify columns of X and elements of beta belonging to group j
+      arma::uvec ids = find(group_X == j);
+
+      if((iter>=5) & (sum(beta.elem(ids)) == 0)){
+        // If beta penalized to zero in past round, will stay zero in further rounds
+        // Therefore, skip to next covariate grouping
+        continue;
+      }
+
+      // Update zeta
+      arma::mat Xj = X.cols(ids); // Select cols of X belonging to group j
+      arma::vec zj_vec = (Xj.t() * resid) / N + beta.elem(ids);
+
+      // Clarify: when and when not to cary though nu value
+
+      if(ids.n_elem == 1){ // Equivalent to if K_X(j) == 1
+
+        zetaj = as_scalar(zj_vec);
+
+        // Update beta
+        if(j==0){
+          // No penalization for the intercept and other covariates given group_X values of 0
+          bj = zetaj;
+        }else{
+          if(std::strcmp(penalty, lasso) == 0){
+            bj = soft_thresh(zetaj*nu, lam(j)*alpha) / (nu * (1.0 + lam(j)*(1.0 - alpha)));
+          }else if(std::strcmp(penalty, mcp) == 0){
+            bj = MCP_soln(zetaj*nu, nu, lam(j), gamma, alpha);
+          }else if(std::strcmp(penalty, scad) == 0){
+            bj = SCAD_soln(zetaj*nu, nu, lam(j), gamma, alpha);
+          }
+        }
+
+        arma::vec b(ids.n_elem);
+        beta.elem(ids) = bj * b.ones();
+
+      }else{ // ids.n_elem > 1
+
+        // zj_L2 = norm(zj_vec); // unit vector = zj_vec / norm(zj_vec)
+        zj_L2 = sqrt(sum(zj_vec % zj_vec));
+
+        // Update beta
+        if(j==0){
+          // No penalization for the intercept and other covariates given group_X values of 0
+          beta.elem(ids) = zj_vec;
+        }else{
+          if(std::strcmp(penalty, lasso) == 0){
+            beta.elem(ids) = soft_thresh(zj_L2*nu, lam(j)*alpha) / (nu * (1.0 + lam(j)*(1.0 - alpha))) * (zj_vec / zj_L2);
+          }else if(std::strcmp(penalty, mcp) == 0){
+            beta.elem(ids) = MCP_soln(zj_L2*nu, nu, lam(j), gamma, alpha) * (zj_vec / zj_L2);
+          }else if(std::strcmp(penalty, scad) == 0){
+            beta.elem(ids) = SCAD_soln(zj_L2*nu, nu, lam(j), gamma, alpha) * (zj_vec / zj_L2);
+          }
+        }
+
+      }
+
+        // Update eta  and mu
+        // eta = X * beta + offset; // simplify eta update (Breheny and Huang 2015)
+        eta = eta + Xj*(beta.elem(ids) - beta0.elem(ids));
+        mu = invlink(link,eta);
+
+        // If not binomial or gaussian family, update nu by recalculating weights
+          // Binomial: nu stays at 0.25 always
+          // Gaussian: nu stays at 1.0 always
+        if((std::strcmp(family, bin) != 0) & (std::strcmp(family, gaus) != 0)){
+
+          // Update weights
+          deriv = dlink(link, mu);
+          Vmu = varfun(family, mu);
+          weights = constant.ones() / (deriv % deriv % Vmu);
+
+          // Update nu
+          nu = max(weights);
+        }
+
+        // Update residuals
+        resid = (y - mu) / nu;
+
+    } // End j for loop
+
+    // Check convergence criteria
+    v0 = sum(resid % resid) / N;
+    if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
+      converged = 1;
+    }
+
+    if((iter == maxit_CD) & (converged == 0)){
+      warning("grouped coordinate descent algorithm did not converge \n");
+    }
+
+  } // End while loop
+
+  return(beta);
+
 }

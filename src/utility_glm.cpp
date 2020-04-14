@@ -128,6 +128,9 @@ arma::vec mu_adjust(const char* family, arma::vec mu) {
         mu_new(i) = gammaMin;
       }
     }
+  }else if(std::strcmp(family, gaus) == 0){ 
+    // No invalid mu
+    mu_new = mu;
   }else{
     stop("invalid family \n");
   }

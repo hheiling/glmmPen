@@ -22,8 +22,13 @@ coord_desc <- function(y, X, weights, resid, eta, offset, dims, beta, penalty, l
 }
 
 #' @export
-glm_fit <- function(y, X, dims, beta, offset, family, link, fit_type, penalty, lambda, params) {
-    .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, fit_type, penalty, lambda, params)
+grp_CD <- function(y, X, weights, resid, eta, dims, beta, group_X, K_X, penalty, lambda, gamma, alpha, family, link) {
+    .Call('_glmmPen_grp_CD', PACKAGE = 'glmmPen', y, X, weights, resid, eta, dims, beta, group_X, K_X, penalty, lambda, gamma, alpha, family, link)
+}
+
+#' @export
+glm_fit <- function(y, X, dims, beta, offset, family, link, fit_type, group_X, K_X, penalty, lambda, params) {
+    .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, fit_type, group_X, K_X, penalty, lambda, params)
 }
 
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
