@@ -75,7 +75,6 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   double v0 = 0.0; // sum(residuals^2) / N
   double v0_last = 0.0; // v0 from last iteration
   
-  arma::vec mu(M); // expected means 
   arma::mat eta(M,N); // linear predictors
   arma::vec tmp_out(M+2);
   
@@ -85,6 +84,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   
   arma::vec beta0 = beta; // Input initial beta / beta from last round of updates
   double bj=0.0; // place-holder for value of element of beta
+  arma::vec vec_ones(1); vec_ones.ones();
   arma::uvec fef_cols = seq(0,p-1);
   arma::uvec ref_cols = seq(p, p + J.n_cols - 1);
   
@@ -93,6 +93,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   arma::uvec m0(1);
   int H = J.n_cols; // From paper, J_q
   
+  arma::uvec K_sub = K.subvec(p,p+H-1) - K(p); // Size of random effects groups
   // lambda_j = lambda * sqrt(Kj) where Kj = size of jth group
   arma::vec K_vec = arma::conv_to<arma::vec>::from(K); // Size of groups
   arma::vec lam(p+H); // lambda to use
@@ -143,8 +144,6 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   
   if(H > q){
     
-    arma::uvec K_sub = K.subvec(p,p+H-1) - K(p); // Includes integers from 0 to (q-1)
-    
     // Initialize list for t(A_j) * A_j matrices
     List L;
     
@@ -174,7 +173,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
         arma::mat A_std = (A.each_col() - center) / scale;
         
         // Calculate t(A_j) * A_j for groups
-        for(f=0;f<q;f++){
+        for(f=1;f<q;f++){
           arma::mat xTx = L[f];
           arma::uvec Kidx = find(K_sub == f);
           xTx = xTx + trans(A_std.cols(Kidx)) * A_std.cols(Kidx);
@@ -250,7 +249,6 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
       }else{ // H = q(q+1)/2, unstructured sigma
         // Orthonormalize A_std matrix
         arma::mat A_ortho(ids.n_elem,H);
-        arma::uvec K_sub = K.subvec(p,p+H-1) - K(p); // Includes integers from 0 to (q-1)
         for(f=0;f<q;f++){
           arma::uvec Aidx = find(K_sub == f);
           if(f==0){
@@ -358,7 +356,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
               arma::vec tmp_out = resid_nu_v0_k(y, eta.submat(m0,ids), family, link, nu);
               arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
               nu = tmp_out(ids.n_elem);
-              v0 = tmp_out(ids.n_elem+1);
+              v0 += tmp_out(ids.n_elem+1);
               zetaj = zetaj + Xj.t() * resid;
               
             } // End m for loop
@@ -398,7 +396,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
                   arma::vec tmp_out = resid_nu_v0_k(y, eta.submat(m0,ids), family, link, nu);
                   arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
                   nu = tmp_out(ids.n_elem);
-                  v0 = tmp_out(ids.n_elem+1);
+                  v0 += tmp_out(ids.n_elem+1);
                   zetaj = zetaj + Xj.t() * resid;
                 }
               }
@@ -411,7 +409,6 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
                 arma::mat A_std = (A.each_col() - center) / scale;
                 // Orthonormalize A_std matrix
                 arma::mat A_ortho(ids.n_elem, H);
-                arma::uvec K_sub = K.subvec(p,p+H-1) - K(p); // Includes integers from 0 to (q-1)
                 for(f=0;f<q;f++){
                   arma::uvec Aidx = find(K_sub == f);
                   if(f==0){
@@ -428,7 +425,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
                   arma::vec tmp_out = resid_nu_v0_k(y, eta.submat(m0,ids), family, link, nu);
                   arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
                   nu = tmp_out(ids.n_elem);
-                  v0 = tmp_out(ids.n_elem+1);
+                  v0 += tmp_out(ids.n_elem+1);
                   zetaj = zetaj + Xj.t() * resid;
                 }
               } // End m for loop
@@ -477,8 +474,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
         }
         
         if(idxj.n_elem == 1){
-          arma::vec vec(1); vec.ones();
-          beta.elem(idxj) = bj * vec;
+          beta.elem(idxj) = bj * vec_ones;
         }else{
           beta.elem(idxj) = bj * (zetaj / zetaj_L2);
         }
@@ -514,7 +510,6 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
     beta.subvec(p,p+H-1) = beta_ranef / scale;
   }else{ // sigma matrix unstructured
     // Need to (a) unorthogonalize and (b) undo standardization (centering and scaling)
-    arma::uvec K_sub = K.subvec(p,p+H-1) - K(p);
     arma::vec beta_ranef = beta.subvec(p,p+H-1);
     for(f=1;f<q;f++){
       arma::mat ortho_mat = ortho_factor[f];
