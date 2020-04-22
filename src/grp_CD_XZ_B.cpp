@@ -232,7 +232,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   }
   
   //-------------------------------------------------------------------------------//
-  // Initialize eta matrix and zetaj for j = 0
+  // Initialize eta matrix
   //-------------------------------------------------------------------------------//
   
   for(i=0;i<N;i++){
@@ -273,20 +273,6 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
     
   }
   
-  // Find covariates in group j = 0
-  arma::uvec idxj = find(XZ_group == 0);
-  
-  // Calculate zetaj for j = 0 and update v0 and nu
-  arma::vec zetaj(idxj.n_elem); zetaj.zeros();
-  arma::vec out = zeta_fixef(y, X, eta, idxj, family, link, nu);
-  
-  zetaj = out.subvec(0, idxj.n_elem-1);
-  nu = out(idxj.n_elem);
-  v0 = out(idxj.n_elem+1);
-  
-  zetaj = zetaj / (N*M) + beta.elem(idxj);
-  arma::vec zetar = zetaj;
-  
   //-------------------------------------------------------------------------------//
   // Grouped Coordinate Descent
   //-------------------------------------------------------------------------------//
@@ -312,34 +298,44 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
       if((init == 1) & (iter>=4) & (sum(beta.elem(idxj)) == 0)){
         // If beta penalized to zero in past round, will stay zero in further rounds
         // Therefore, skip to next covariate grouping
+        continue;
+      }else if((init == 0) & (sum(beta.elem(idxj)) == 0)){
+        continue;
+      }
+      
+      //----------------------------------------------------------------------------------//
+      // Update eta from last updated beta (group r)
+      // Calculate zetaj for current group j
+      //----------------------------------------------------------------------------------//
+      
+      // Find covariates corresponding to previous j in sequence (r)
+      arma::uvec idxr = find(XZ_group == r);
+      
+      // Calculate zetaj vector (initialize as zero, then sum components of interest)
+      arma::vec zetaj(idxj.n_elem); zetaj.zeros(); 
+      
+      v0 = 0.0;
+      
+      if(max(idxr) < p){ // Just need to update fixed effects portion of eta
         
-        // Without updating eta, calculate zetaj for next j (zeta r, r = next j)
+        arma::mat Xr = X.cols(idxr);
         
-        if(j+1 <= max(XZ_group)){
-          r = j+1;
-        }else{
-          r = 0;
-        }
+        // Update fixed effects component of eta
+        eta = eta.each_row() + trans(Xr * (beta.elem(idxr) - beta0.elem(idxr))) / M;
         
-        // Find covariates corresponding to next j in sequence (r)
-        arma::uvec idxr = find(XZ_group == r);
-        
-        // Calculate zetar vector (initialize as zero, then sum components of interest)
-        // k = next j in sequence
-        arma::vec zetar(idxr.n_elem); zetar.zeros(); 
-        
-        if(max(idxr) < p){ // Calculate zetar for fixed effect covariate(s)
+        if(max(idxj) < p){ // Calculate zetaj for fixed effect covariate(s)
           
           // Create list of fixef zetar and updated nu and v0
-          arma::vec out = zeta_fixef(y, X, eta, idxj, family, link, nu);
+          arma::vec out = zeta_fixef(y, X, eta, idxj, family, link, nu); 
+          zetaj = out.subvec(0,idxj.n_elem-1);
+          nu = out(idxj.n_elem);
+          v0 = out(idxj.n_elem+1);
           
-          zetar = out.subvec(0, idxr.n_elem-1);
-          nu = out(idxr.n_elem);
-          v0 = out(idxr.n_elem+1);
+        }else{ // Calculate zetaj for random effect
           
-        }else{ // Calculate zetar for random intercept (transition from fixed to random effects)
+          // Need to add orthogonalization option (???)
           
-          arma::mat Xr(M, idxr.n_elem); Xr.zeros();
+          arma::mat Xj(M, idxj.n_elem); Xj.zeros();
           
           for(i=0;i<N;i++){
             
@@ -357,29 +353,98 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
             for(m=0;m<M;m++){
               A = kron(u.row(m),Zki) * J;
               A_std = (A - center) / scale;
-              Xr.row(m) = A_std.elem(idxr - p);
+              Xj.row(m) = A_std.elem(idxj - p);
             }
             
-            // Update resid, nu, and v0
             tmp_out = resid_nu_v0(y(i), eta.col(i), family, link, nu);
             resid = tmp_out.subvec(0,M-1);
             nu = tmp_out(M);
             v0 = tmp_out(M+1);
             
             // Calculate zetaj
-            zetar = zetar + Xr.t() * resid;
+            zetaj = zetaj + Xj.t() * resid;
             
           } // End i for loop
           
         }
         
-        continue;
-      }else if((init == 0) & (sum(beta.elem(idxj)) == 0)){
-        continue;
-      }
+      }else{ // Need to update random effects portion of eta
+        
+        // Improvements in efficiency?
+        
+        // Note: if max(idxj) >= p, then calculate zetaj for a random effects group j
+        //    else calculate zetaj for a fixed effects group j
+        
+        arma::mat Xj(M,idxj.n_elem); Xj.zeros(); // Max dimension M x q
+        
+        for(i=0;i<N;i++){
+          
+          // Rows of Z to use
+          id = i;
+          // Identify observation group, find appropriate columns of Z and u
+          grp = group(i);
+          for(f=0;f<q;f++){
+            col_idx(f) = grp + f*d;
+          }
+          
+          Zki = Z.submat(id,col_idx);
+          
+          if(H == q){ // sigma specified with independence structure (diagonal)
+            
+            for(m=0;m<M;m++){
+              A = kron(u.row(m),Zki) * J;
+              A_std = (A - center) / scale;
+              // Update random effects component of eta for each individual, weight by 1/M
+              eta(m,i) += as_scalar(A_std.elem(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr))) / M;
+              if(max(idxj) >= p){
+                Xj.row(m) = A_std.elem(idxj - p);
+              }
+            }
+            
+          }else{ // H = q(q+1)/2, unstructured sigma
+            
+            for(m=0;m<M;m++){
+              A = kron(u.row(m),Zki) * J;
+              A_std = (A - center) / scale;
+              // Orthonormalize A_std matrix
+              arma::uvec K_sub = K.subvec(p,p+H-1) - K(p); // Includes integers from 0 to (q-1)
+              for(f=0;f<q;f++){
+                arma::uvec Aidx = find(K_sub == f);
+                if(f==0){
+                  A_ortho.cols(Aidx) = A_std.cols(Aidx);
+                }else{
+                  arma::mat ortho_mat = ortho_factor[f];
+                  A_ortho.cols(Aidx) = A_std.cols(Aidx) * ortho_mat;
+                }
+              }
+              // Update random effects componenet of eta for each individual, weight by 1/M
+              eta(m,i) = as_scalar(A_ortho.elem(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr))) / M;
+              if(max(idxj) >= p){
+                Xj.row(m) = A_ortho.elem(idxj - p);
+              }
+            }
+            
+          }
+          
+          tmp_out = resid_nu_v0(y(i), eta.col(i), family, link, nu);
+          resid = tmp_out.subvec(0,M-1);
+          nu = tmp_out(M);
+          v0 = tmp_out(M+1);
+          
+          // Calculate zetaj
+          if(max(idxj) >= p){
+            zetaj = zetaj + Xj.t() * resid;
+          }else{
+            arma::vec Xji = X.submat(id,idxj);
+            zetaj = zetaj + Xji * sum(resid);
+          }
+          
+        } // End i for loop
+        
+      } // End if-else for fixed or random effects update to eta
       
-      // Set zetaj = zeta(j+1) from last
-      arma::vec zetaj = zetar;
+      // Finish calc of zetaj
+      zetaj = zetaj / (N*M) + beta.elem(idxj);
       
       // L2 norm of zetaj
       if(idxj.n_elem == 1){
@@ -388,12 +453,10 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
         zetaj_L2 = sqrt(sum(zetaj % zetaj));
       }
       
-      // Save latest value of beta
-      beta0 = beta;
-      
-      // Update beta
+      // Update betaj
       if(j==0){
         // No penalization for the intercept and other covariates given XZ_group values of 0
+        // Option: if(fixed effect intercept | random intercept) then do not penalize
         beta.elem(idxj) = zetaj;
       }else{
         if(std::strcmp(penalty, lasso) == 0){
@@ -418,151 +481,8 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
         nu = 0.0;
       }
       
-      // ---------------------------------------------------------------------------------- //
-      // Update eta and calculate zetaj for next j in sequence, (r = next j in sequence)
-      // ---------------------------------------------------------------------------------- //
-      
-      if(j+1 <= max(XZ_group)){
-        r = j+1;
-      }else{
-        r = 0;
-      }
-      
-      // Find covariates corresponding to next j in sequence (r)
-      arma::uvec idxr = find(XZ_group == r);
-      
-      // Calculate zetar vector (initialize as zero, then sum components of interest)
-      // k = next j in sequence
-      arma::vec zetar(idxr.n_elem); zetar.zeros(); 
-      
-      v0 = 0.0;
-      
-      if(max(idxj) < p){ // Just need to update fixed effects portion of eta
-        
-        arma::mat Xj = X.cols(idxj);
-        
-        // Update fixed effects component of eta
-        eta = eta.each_row() + trans(Xj * (beta.elem(idxj) - beta0.elem(idxj))) / M;
-        
-        if(max(idxr) < p){ // Calculate zetar for fixed effect covariate(s)
-          
-          // Create list of fixef zetar and updated nu and v0
-          out = zeta_fixef(y, X, eta, idxr, family, link, nu); 
-          zetar = out.subvec(0,idxr.n_elem-1);
-          nu = out(idxr.n_elem);
-          v0 = out(idxr.n_elem+1);
-          
-        }else{ // Calculate zetar for random intercept (transition from fixed to random effects)
-          
-          arma::mat Xr(M, idxr.n_elem); Xr.zeros();
-          
-          for(i=0;i<N;i++){
-            
-            // Rows of Z to use
-            id = i;
-            // Identify observation group, find appropriate columns of Z and u
-            grp = group(i);
-            for(f=0;f<q;f++){
-              col_idx(f) = grp + f*d;
-            }
-            
-            Zki = Z.submat(id,col_idx);
-            
-            // Since calculating zetar for random intercept, only standardize (no orthogonalization)
-            for(m=0;m<M;m++){
-              A = kron(u.row(m),Zki) * J;
-              A_std = (A - center) / scale;
-              Xr.row(m) = A_std.elem(idxr - p);
-            }
-            
-            tmp_out = resid_nu_v0(y(i), eta.col(i), family, link, nu);
-            resid = tmp_out.subvec(0,M-1);
-            nu = tmp_out(M);
-            v0 = tmp_out(M+1);
-            
-            // Calculate zetaj
-            zetar = zetar + Xr.t() * resid;
-            
-          } // End i for loop
-          
-        }
-        
-      }else{ // Need to update random effects portion of eta
-        
-        // Improvements in efficiency?
-        
-        if(r > 0){ // next j is next random effects group
-          
-          arma::mat Xr(M,idxr.n_elem); Xr.zeros(); // Max dimension M x q
-          
-          for(i=0;i<N;i++){
-            
-            // Rows of Z to use
-            id = i;
-            // Identify observation group, find appropriate columns of Z and u
-            grp = group(i);
-            for(f=0;f<q;f++){
-              col_idx(f) = grp + f*d;
-            }
-            
-            Zki = Z.submat(id,col_idx);
-            
-            if(H == q){ // sigma specified with independence structure (diagonal)
-              
-              for(m=0;m<M;m++){
-                A = kron(u.row(m),Zki) * J;
-                A_std = (A - center) / scale;
-                // Update random effects component of eta for each individual, weight by 1/M
-                eta(m,i) += as_scalar(A_std.elem(idxj - p) * (beta.elem(idxj) - beta0.elem(idxj))) / M;
-                Xr.row(m) = A_std.elem(idxr - p);
-              }
-              
-            }else{ // H = q(q+1)/2, unstructured sigma
-              
-              for(m=0;m<M;m++){
-                A = kron(u.row(m),Zki) * J;
-                A_std = (A - center) / scale;
-                // Orthonormalize A_std matrix
-                arma::uvec K_sub = K.subvec(p,p+H-1) - K(p); // Includes integers from 0 to (q-1)
-                for(f=0;f<q;f++){
-                  arma::uvec Aidx = find(K_sub == f);
-                  if(f==0){
-                    A_ortho.cols(Aidx) = A_std.cols(Aidx);
-                  }else{
-                    arma::mat ortho_mat = ortho_factor[f];
-                    A_ortho.cols(Aidx) = A_std.cols(Aidx) * ortho_mat;
-                  }
-                }
-                // Update random effects componenet of eta for each individual, weight by 1/M
-                eta(m,i) = as_scalar(A_ortho.elem(idxj - p) * (beta.elem(idxj) - beta0.elem(idxj))) / M;
-                Xr.row(m) = A_ortho.elem(idxr - p);
-              }
-              
-            }
-            
-            tmp_out = resid_nu_v0(y(i), eta.col(i), family, link, nu);
-            resid = tmp_out.subvec(0,M-1);
-            nu = tmp_out(M);
-            v0 = tmp_out(M+1);
-            
-            // Calculate zetaj
-            zetar = zetar + Xr.t() * resid;
-            
-          } // End i for loop
-          
-        }else{ // Calculate zetar for group r = 0
-          
-          out = zeta_fixef(y, X, eta, idxr, family, link, nu); 
-          zetar = out.subvec(0,idxr.n_elem-1);
-          nu = out(idxr.n_elem);
-          v0 = out(idxr.n_elem+1);
-          
-        } // End if-else for r > 0
-        
-      } // End if-else for fixed or random effects
-      
-      // This zetar will be used as zetaj for next update to betaj
-      zetar = zetar / (N*M) + beta.elem(idxr);
+      // Save r as the most recent updated j
+      r = j;
       
     } // End j for loop
     
