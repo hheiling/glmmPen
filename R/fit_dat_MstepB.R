@@ -53,15 +53,26 @@
 #' 
 #' 
 #' @export
-fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000, 
-                   family = "binomial", trace = 0, penalty = "grMCP",
-                   alpha = 1, nMC_max = 5000, t = 10,
-                   returnMC = T, ufull = NULL, coeffull = NULL, gibbs = T, maxitEM = 100, 
-                   ufullinit = NULL, M = 10^4, MwG_sampler = c("random_walk","independence"),
-                   adapt_RW_options = adaptControl(), covar = c("unstructured","independent")){
+fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, 
+                   family = "binomial", offset_fit = NULL,
+                   trace = 0, penalty = c("MCP","SCAD","lasso"),
+                   alpha = 1, gamma_penalty = switch(penalty, SCAD = 4.0, 3.0), 
+                   group_X = 0:(ncol(dat$X)-1),
+                   nMC = 1000, nMC_max = 5000, t = 10,
+                   returnMC = T, ufull = NULL, coeffull = NULL, ufullinit = NULL, 
+                   maxitEM = 100, maxit_CD = 500,
+                   M = 10^4, gibbs = T, MwG_sampler = c("random_walk","independence"),
+                   adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
+                   fit_type = 1){
   
   # Things to address:
   ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
+  
+  
+  penalty = penalty[1]
+  if(!(penalty %in% c("lasso","MCP","SCAD"))){
+    stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
+  }
   
   # Set small penalties to zero
   if(lambda0 <=10^-6) lambda0 = 0
@@ -80,9 +91,32 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     family = family()
   }
   if(class(family) == "family"){
-    f = family
+    fam_fun = family
     link = family$link
     family = family$family
+    
+    # Re-code link as integer
+    ## All link_int will have two digits
+    ## First digit corresponds to family that link is canonical for
+    ## 1 = binomial, 2 = poisson, 3 = gaussian, 4 = gamma
+    ## Second digit is arbitrary enumeration of links
+    if(link == "logit"){
+      link_int = 10
+    }else if(link == "probit"){
+      link_int = 11
+    }else if(link == "cloglog"){
+      link_int = 12
+    }else if(link == "log"){
+      link_int = 20
+    }else if(link == "identity"){
+      link_int = 30
+    }else if(link == "inverse"){
+      link_int = 40
+    }
+  }
+  
+  if(is.null(offset_fit)){
+    offset_fit = rep(0.0, length(y))
   }
   
   d = nlevels(factor(group))
@@ -111,6 +145,8 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     stop("MwG_sampler must be specified as either 'independence' or 'random_walk'")
   }
   
+  # Create J matrix (from t(alpha_k kronecker z_ki) * J from paper) and 
+  # covgroup = indexing of random effect covariate group
   if(covar == "unstructured"){ # Originally: ncol(Z)/d <= 15 
     # create J, q2 x q*(q+1)/2
     J = Matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2, sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2)
@@ -145,13 +181,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     covgroup = rep(1:(ncol(Z)/d))
   }
   
+  # Initialize cov and coef for start of EM algorithm
   if(!is.null(ufull) & !is.null(coeffull)){
-    fit = list()
+    
     print("using coef from full model to intialize")
-    coef = coeffull
-    gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
+    gamma = matrix(J%*%matrix(coeffull[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
-    fit$coef = coef[c(1:ncol(X))]
+    
     ok = which(diag(var) > 0)# & coef[1:ncol(X)] != 0)
     if(length(ok) == 0) ok = 1 # at least include the random intercept
     okindex = NULL
@@ -160,18 +196,17 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
         okindex = c(okindex, (i-1)*d + 1:d)
       }
     }
-    fit00 = fit
+    
+    coef = coeffull[1:ncol(X)]
+    
   }else{
-    if(ncol(X) > 2){
-      fit = grpreg(X[,-1], y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
-    }else{
-      fit = grpreg(matrix(X[,-1], nrow = nrow(X)), y, group=1:(ncol(X)-1), penalty = penalty, family=family,lambda = lambda1, alpha = alpha)###
-    }
     
-    fit00 = fit # naive fit
-    
-    coef = as.numeric(fit$beta)
-    fit$coef = as.numeric(fit$beta)
+    # Coordinate descent ignoring random effects: naive fit
+    naive_fit = glm(y ~ 1, family = fam_fun, offset = offset_fit)
+    coef_init = c(naive_fit$coefficients, rep(0, times = ncol(X)-1))
+    coef = M_step(y, X, fam_fun, coef_init, offset_fit, group_X = group_X,
+                  maxit = 250, maxit_CD = 250, conv = 0.0001, fit_type = 2, 
+                  penalty = penalty, lambda = lambda0, gamma = gamma_penalty, alpha = alpha)
     
     if(trace == 1) print(coef)
     
@@ -221,7 +256,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   batch = 0.0
   ## initialize other paramters from adaptControl()
   batch_length = adapt_RW_options$batch_length
-  offset = adapt_RW_options$offset
+  offset_increment = adapt_RW_options$offset
   burnin_batchnum = adapt_RW_options$burnin_batchnum
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Z)/d)
   
@@ -234,13 +269,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                                 d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
     }else{ # MwG_sampler == "random_walk"
       samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
                                      d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit,
                                      proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                     offset = offset, burnin_batchnum = burnin_batchnum)
+                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
     
     u = u0 = samplemc_out$u0
@@ -269,7 +304,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   }else{
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                                 d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
                                 uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
     }else{ # MwG_sampler == "random_walk"
@@ -277,7 +312,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                                      d = d, okindex = okindex, trace = trace, gibbs = gibbs,
                                      uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)),
                                      proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                     offset = offset, burnin_batchnum = burnin_batchnum)
+                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
     
     u = u0 = samplemc_out$u0
@@ -302,9 +337,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     
   }
-  #u = bmmat(u)
+  
   nMC2 = nrow(u)  
-  etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u) ) + Znew2%*%t(u)
+  etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u)) + Znew2%*%t(u)
+  mu = matrix(0, nrow = length(y), ncol = ncol(etae))
+  for(i in 1:nrow(etae)){
+    mu[i,] = invlink(link_int, matrix(etae[i,], ncol=1))
+  }
   
   if(nrow(cov) == 1){ # Single random intercept
     cov_record = rep(NA, maxitEM)
@@ -312,26 +351,20 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     cov_record = NULL
   }
   
-  fit0_record = matrix(NA, nrow = maxitEM, ncol = (length(covgroup) + 1))
   diff = rep(NA, maxitEM)
   stopcount = 0
   
-  ## this needs to get updated to reflect whatever is chosen to evaluate likelihood
   if(family == "poisson"){
-    ll = ll0 = ll20 = sum(rowMeans(dpois(matrix(y, nrow = length(y), ncol = ncol(etae)), lambda =  exp(etae), log = T)))
+    ll0 = sum(rowMeans(dpois(matrix(y, nrow = length(y), ncol = ncol(etae)), lambda = mu, log = T)))
   }else if(family == "binomial"){
-    ll = ll0 = ll20  = sum(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae)), size = 1, prob = exp(etae)/(1+exp(etae)), log = T)))
-  }  
-  Znew = NULL
-  
-  # initialize zero count vectors
-  c0 = rep(0, length(coef))
+    ll0 = sum(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae)), size = 1, prob = mu, log = T)))
+  } 
   
   # Record last t coef vectors (each row = coef vector for a past EM iteration)
   # Initialize with initial coef vector
   coef = c(coef, rep(0, length(covgroup)))
   coef_record = matrix(coef, nrow = t, ncol = length(coef), byrow = T)
-  coef_record_all = matrix(NA, nrow = maxitEM, ncol = length(coef), byrow = T)
+  # coef_record_all = matrix(NA, nrow = maxitEM, ncol = length(coef), byrow = T)
   
   # Start EM Algorithm (M step first)
   
@@ -351,67 +384,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       nTotal = NULL
     }
     
-    print("Znewgen done")
-    rm(Znew)
-    gc()
-    Znew = big.matrix(nrow = nrow(X)*nrow(u), ncol = ncol(J))
-    Znew_gen2(u, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
-    gc()
-    
-    active0 = rep(1, max(covgroup))
-    active1 = rep(1, ncol(X)-1)
-    
-    # oldcoef = coef
-    
     # M Step
     
-    fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup, 
-                  penalty="grMCP", family="binomial",lambda = lambda1, 
-                  offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1), 
-                  alpha = alpha, active = active0, 
-                  initbeta = c(0,coef[-c(1:ncol(X))]))
-    gc()
-    coef = rep(0,length(covgroup) + ncol(X))
-    coef[-c(1:ncol(X))] = fit0$beta[-1]
-    c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
-    
-    cat("full fit0$beta output: ", fit0$beta, "\n")
-    fit0_record[i,] = fit0$beta
-    
-    if(ncol(X) > 2){
-      fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))], 
-                    group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0, 
-                    offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), 
-                    alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-    }else{
-      fit1 = grpreg(matrix(X[rep(1:nrow(X), each = nrow(u)),-1], nrow = nrow(X)*nrow(u)), 
-                    y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP", 
-                    family="binomial",lambda = lambda0, 
-                    offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)), 
-                    alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-    }
-    gc()
-    coef[c(1:ncol(X))] = fit1$beta
-    c0[c(1:ncol(X))] = c0[c(1:ncol(X))] + (fit1$beta == 0)^2
-    fit = fit1
-    fit$coef = coef
-    
-    # need to compile code first before running.  Actives will default to 1 to test, then uncomment the below to skip groups
-    # update active set every 5 iterations
-    if(floor(i/5) == ceiling(i/5)){
-      active1[which(c0[c(2:ncol(X))] == 5)] = 0
-      active1[which(c0[c(2:ncol(X))] < 5)] = 1
-      
-      for(kk in 1:max(covgroup)){
-        active0[kk] = (all(c0[-c(1:ncol(X))][covgroup == kk]<5))^2
-      }
-      print(length(covgroup))
-      print(length(c0[-c(1:ncol(X))]))
-      print(active1)
-      print(active0)
-      # reset c0
-      c0 = rep(0, length(coef))
-    }
+    coef = M_stepB(y, X, Z, u, J, group, family=fam_fun, coef, offset=offset_fit,
+                   maxit=maxit_CD, conv=0.0001, init=(i == 1), group_X, covgroup,
+                   penalty, lambda0, lambda1, gamma=gamma_penalty, alpha,
+                   fit_type=fit_type)
     
     problem = F
     if(any(is.na(coef))){
@@ -423,55 +401,25 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     for(ii in 1:d){
       u2[,seq(ii, ncol(Z), by = d)] = rmvnorm(n = nMC2,sigma=var)
     }
-    etae = as.numeric(X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
-    etae2 = X %*% matrix(coef[1:ncol(X)],nrow = ncol(X), ncol = nrow(u2)) + Z %*% t(u2)
-    if(length(etae) != length(y)*nMC2){
-      print(head(etae))
-      print(dim(etae))
-    }
     
-    if(family == "poisson"){
-      q = apply(etae, 2, FUN = function(etaei) sum(dpois(y, lambda =  exp(etaei), log = T)))
-      ll = sum(rowMeans(dpois(matrix(y, nrow = length(y), ncol = ncol(etae)), lambda =  exp(etae), log = T)))
-    }else if(family == "binomial"){
-      q = apply(matrix(dbinom( y[rep(1:nrow(X), each = nrow(u))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T), ncol = nrow(u), byrow = T), 2, FUN = function(etaei) sum(dbinom(y, size = 1, prob = exp(etaei)/(1+exp(etaei)), log = T)))     
-      
-      ll = (sum((dbinom(y[rep(1:nrow(X), each = nrow(u))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dmvnorm(u, log = T)))/nrow(u) # calc of norm is fine since cov = I
-      ll0 = (sum((dbinom(y[rep(1:nrow(X), each = nrow(u))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(u)
-      ll20 =  sum(log(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae2)), size = 1, prob = exp(etae2)/(1+exp(etae2)), log = F))))
-      
-    }  
+    # Q-function version of log-likelihoood
+    ll0 = Qfun(y, X, Z, u, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
     
-    if(!is.finite(ll)){
+    if(!is.finite(ll0)){
       problem = T
-      ll = Inf
+      ll0 = Inf
       print(coef)
     }
     
     if(problem == T){
       stop("Error in M step")
-      if(is.null(ufull)){
-        BIC = -2*ll+ log(length(y))*sum(d) 
-      }else{
-        rm(Znew)
-        gc()
-        Znew = big.matrix(nrow = nrow(X)*nrow(ufull), ncol = ncol(J))
-        Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
-        etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
-        if(!is.finite(ll)){
-          ll2 = ll
-        }else{
-          BIC = -2*ll + log(d)*sum(coef != 0)  
-        }
-      }
-      out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC,  
-                 ll = ll, ll0 = ll0,lambda0 = lambda0, lambda1 = lambda1, 
-                 fit00 = fit00, covgroup = covgroup, J = J)
+      out = list(coef = coef, sigma = cov, lambda0 = lambda0, lambda1 = lambda1, 
+                 covgroup = covgroup, J = J)
       if(returnMC == T) out$u = u0
       return(out)
     }
-    if(trace == 1) print(coef)
     
+    if(trace == 1) print(coef)
     
     gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
@@ -489,13 +437,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     finish = 0
     while(finish == 0){
       for(j in 1:d){
-        Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*% gamma
+        Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
       }
       if(!any(is.na(Znew2))) finish = 1
     }
     
-    # stopping rule
-    # diff[i] = abs(ll0 - oldll)/abs(ll0) ## if need to change back later update all ll0's for convergence in script to ll
+    
+    
     # stopping rule: based on average Euclidean distance (comparing coef from minus t iterations)
     if(i <= t){
       diff[i] = 10^2
@@ -504,13 +452,12 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     
     # Update latest record of coef
-    coef_record = rbind(coef_record[-1,], coef)
-    coef_record_all[i,] = coef
+    coef_record = rbind(coef_record[-1,], t(coef))
+    # coef_record_all[i,] = coef
     
     if( sum(diff[i:max(i-2, 1)] < conv) >=3 ) break
     
     # if current q is within 95% emp CI of old q, increase nMC
-    #if(mean(q) > lim[1] & mean(q) < lim[2]) nMC = min(round(nMC + nMC/3), 10000)
     if(diff[i] > 10^-10){
       nMC = max(round(nMC + min(.15*0.001*nMC/(abs(ll0 - oldll)/abs(ll0)), 250)), 2)+1
     }else{
@@ -519,8 +466,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     if(nMC > nMC_max) nMC = nMC_max
     # now update limits  
-    print(c(i, nMC , diff[i], ll0, oldll,  ll0 - oldll, sum(coef!=0), coef[2], sqrt(diag(cov)[2])))
-    lim = quantile(q, c(0.025, 0.975))
+    print(c(i, nMC , diff[i], sum(coef!=0)))
     
     print("cov:")
     print(cov)
@@ -531,13 +477,13 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     # E Step 
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                 d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
     }else{ # MwG_sampler == "random_walk"
       samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                      d = d, okindex = okindex, gibbs = gibbs, uold = u0,
                                      proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                     offset = offset, burnin_batchnum = burnin_batchnum)
+                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
     
     u = u0 = samplemc_out$u0
@@ -567,68 +513,18 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     
     nMC2 = nrow(u)
     
-    if(any(is.na(u)) | any(colSums(u) == 0)){
-      print("E step: hit iteration limit of 10^10 samples, fit likely inadequate")
-      if(is.null(ufull)){
-        BIC = -2*ll + log(d)*sum(coef != 0) # switched BIC and BIC0 11/28
-        BIC0 = -2*ll0 + log(d)*sum(coef != 0)
-        BIC20 = -2*ll20 + log(d)*sum(coef!=0)
-      }else{
-        rm(Znew)
-        gc()
-        Znew = big.matrix(nrow = nrow(X)*nrow(ufull), ncol = ncol(J))
-        Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
-        etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
-        ll2 = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dmvnorm(ufull,log = T)))/nrow(ufull)
-        BIC = -2*ll2 + log(d)*sum(coef != 0)
-        ll20b = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(ufull)
-        BIC0 = -2*ll20b + log(d)*sum(coef != 0)
-        
-        BIC20 = -2*ll20 + log(d)*sum(coef != 0)
-        #BIC20 is already computed
-      }
-      out = list(fit = fit, coef = coef, sigma = cov, BIC = BIC, 
-                 ll = ll, ll0 = ll0, ll2=ll2, ll20b=ll20b,lambda0 = lambda0, 
-                 lambda1 = lambda1, fit00 = fit00, BIC0 = BIC0, BIC20 = BIC20, covgroup 
-                 = covgroup, J = J)
-      if(returnMC == T) out$u = u0
-      return(out)
-    }
-    
     if(trace == 1) print(diag(cov))
     gc()
   }
   
-  ## calculate BIC 
-  # if(is.null(ufull)){
-  #   BIC = -2*ll0 + log(length(y))*sum(coef != 0) # switched BIC and BIC0 11/28
-  #   BIC0 = -2*ll + log(length(y))*sum(coef != 0)
-  #   BIC20 = -2*ll20 + log(length(y))*sum(coef!=0)
-  #   llb = ll0b = 0
-  # }else{
-  #   rm(Znew)
-  #   gc()
-  #   BIC20 = -2*ll20  + log(length(y))*sum(coef!=0)
-  #   Znew = big.matrix(nrow = nrow(X)*nrow(ufull), ncol = ncol(J))
-  #   Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
-  #   etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
-  #   llb = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dnorm(ufull, 0,1, log = T)))/nrow(ufull)
-  #   BIC = -2*llb + log(length(y))*sum(coef != 0)
-  #   ll0b = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(ufull)
-  #   BIC0 = -2*ll0b + log(length(y))*sum(coef != 0)
-  #   rm(Znew)
-  #   gc()
-  # }
-  
-  
-  print(sqrt(diag(cov)[1:3]))
+  print(sqrt(diag(cov)))
   returnMC
   
   # Another E step for loglik calculation (number draws = M)
   samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=M, trace = trace, family = family, group = group, 
                                  d = d, okindex = okindex, gibbs = gibbs, uold = u0,
                                  proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                 offset = offset, burnin_batchnum = burnin_batchnum)
+                                 offset = offset_increment, burnin_batchnum = burnin_batchnum)
   u = u0 = samplemc_out$u0
   
   # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
@@ -668,16 +564,16 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   BIC = -2*ll + sum(coef != 0)*log(nrow(X))
   
   if(gibbs){
-    out = list(fit = fit, coef = coef, sigma = cov,  
+    out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
-               extra = list(fit = fit, okindex = okindex, Znew2 = Znew2),
+               extra = list(okindex = okindex, Znew2 = Znew2),
                gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
   }else{
-    out = list(fit = fit, coef = coef, sigma = cov,  
+    out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
-               extra = list(fit = fit, okindex = okindex, Znew2 = Znew2))
+               extra = list(okindex = okindex, Znew2 = Znew2))
   }
   
   if(returnMC == T) out$u = u
@@ -695,8 +591,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     out$rej_to_gibbs = rej_to_gibbs
   }
   
-  out$fit0_record = fit0_record
-  out$coef_record_all = coef_record_all
+ # out$coef_record_all = coef_record_all
   if(!is.null(cov_record)){
     out$cov_record = cov_record
   }
@@ -712,45 +607,3 @@ adaptControl = function(batch_length = 50.0, offset = 0.0, burnin_batchnum = 200
             class = c("adaptControl"))
 }
 
-# Log-likelihood approximation using importance sampling
-# @export
-# logLik_imp = function(y, X, Z, U, sigma, group, coef, family, df, c = 1, M){
-#   
-#   # Set-up calculations
-#   d = nlevels(group)
-#   cols = seq(from = as.numeric(group[1]), to = ncol(Z), by = d)
-#   
-#   # Ignore columns of U (and Z) corresponding to random effects penalized to 0 variance 
-#   U_means_all = colMeans(U)
-#   non_zero = (diag(sigma) != 0)
-#   
-#   if(sum(non_zero) > 0){
-#     
-#     non_zero_ext = rep(non_zero, each = d)
-#     U_means = U_means_all[non_zero_ext]
-#     
-#     # Reduced sigma: remove rows and columns with diag = 0
-#     sigma_red = sigma[non_zero,non_zero]
-#     
-#     # Gamma = cholesky decomposition of sigma (lower-triangular)
-#     Gamma = t(chol(sigma_red))
-#     
-#     # Calculated fixed effects contribution to eta (linear predictor)
-#     eta_fef = X %*% coef[1:ncol(X)]
-#     
-#     ll = logLik_cpp(U_means, c*sigma_red, M, group, d, df, y, eta_fef, Z[,non_zero_ext], 
-#                     Gamma, family)
-#   }else{
-#     
-#     eta_fef = X %*% coef[1:ncol(X)]
-#     
-#     if(family == "binomial"){
-#       ll = sum(dbinom(y, size = 1, prob = exp(eta_fef) / (1+exp(eta_fef)), log = T))
-#     }else if(family == "poisson"){
-#       ll = sum(dpois(y, lambda = exp(eta_fef), log = T))
-#     }
-#   }
-#   
-#   return(ll)
-#   
-# }

@@ -7,13 +7,18 @@
 using namespace Rcpp;
 using namespace arma;
 
+// Change from original version B: 
+// No centering and scaling of the random effect covariates
+// No orthogonalization
+// Instead, use (t(X) * X).i() approach
+
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
 // Comparied to grp_CD_XZ_A: store eta in MxN matrix
 
 // Note: implement a check that if U matrix cols = 0 for a variable, skip that ranef coef update (?)
 
 // [[Rcpp::export]]
-arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
+arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
                       const arma::vec& group,
                       const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims,
                       arma::vec beta, const arma::vec& offset,
@@ -47,7 +52,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   int J_X = XZ_group(p); // Covariate group corresponding to random intercept
 
   int Kj = 0; // Size of covariate group j
-  
+
   arma::uvec n(1); // other observation counter
   int j=0; // covariate group counter
   int m=0; // MCMC draw counter
@@ -78,7 +83,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
   arma::mat eta(M,N); // linear predictors
   arma::vec tmp_out(M+2);
-  
+
   double nu=0.0; // max second deriv of loss function (max possible weight)
   double zetaj_L2=0.0; // L2 norm of zetaj vector
 
@@ -91,7 +96,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   arma::uvec col_idx(q); // columns of Z and u to choose at a time
   arma::uvec m0(1);
   int H = J_q.n_cols; // From paper, J_q
-  
+
   arma::uvec covgroup = XZ_group.subvec(p,p+H-1) - XZ_group(p); // Group index for random effects
   arma::vec K_vec = arma::conv_to<arma::vec>::from(K); // Size of groups
   arma::vec lam(J_XZ); // lambda to use; lambda_j = lambda * sqrt(Kj) where Kj = size of jth group
@@ -104,54 +109,47 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
   // 20: log, 30: identity, 40: inverse
 
   //-------------------------------------------------------------------------------//
-  // Standardization and Orthogonalization
+  // Calculating (t(X)*X) for random effect covariates
   //-------------------------------------------------------------------------------//
 
-  // Standardize A matrix (from paper, matrix of (alpha_k kronecker Zki)T J_q)
-    // Note: only scale, don't center
-  // Find eigenvectors and eigenvalues of t(A_j) * (A_j) for jth group
-  // Note: Standardization sufficient if specified sigma matrix as diagonal
-
-  // arma::rowvec center(H); center.zeros();
+  // A matrix: from paper, matrix of (alpha_k kronecker Zki)T J_q
+  // Initialize list for t(A_j) * A_j matrices when random effect covariate groups of size 1 only
   arma::rowvec scale(H); scale.zeros();
-
-  for(k=0;k<d;k++){ // For each of d groups of individuals
-
-    // Rows of Z to use
-    arma::uvec ids = find(group == (k+1));
-
-    for(f=0;f<q;f++){
-      col_idx(f) = k + f*d;
-    }
-    arma::mat Zk = Z.submat(ids, col_idx);
-
-    for(m=0;m<M;m++){
-      m0 = m;
-      arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
-      scale = scale + sum(A%A,0);
-    }
-
-  }
+  // Initialize list for t(A_j) * A_j matrices for general grouped case of random effect covariates
+  List L(q);
   
-  // If ncols(J) > q then orthogonalize. Not necessary otherwise.
-    // If sigma matrix diagonal, then coefficients relating to random effects not grouped
-    // and orthogonalization not necessary. If sigma matrix diagonal, ncol(J) == q.
-    // Otherwise, ncol(J) == q(q+1)/2
+  // If sigma matrix diagonal, then coefficients relating to random effects not grouped
+  // If sigma matrix diagonal, ncol(J_q) == q.
+  // Otherwise, ncol(J) == q(q+1)/2
 
-  List ortho_factor(q);
+  if(H == q){ 
+    // random effects not grouped (one random effects covariate for each random effects beta)
 
-  if(H > q){
+    for(k=0;k<d;k++){ // For each of d groups of individuals
 
-    // Initialize list for t(A_j) * A_j matrices
-    List L(q);
+      // Rows of Z to use
+      arma::uvec ids = find(group == (k+1));
 
+      for(f=0;f<q;f++){
+        col_idx(f) = k + f*d;
+      }
+      arma::mat Zk = Z.submat(ids, col_idx);
+
+      for(m=0;m<M;m++){
+        m0 = m;
+        arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
+        scale = scale + sum(A%A,0); // Add columns of A%A
+      }
+
+    }
+  }else{ 
+    // random effects are grouped
+    // Only used when size of q is relatively small
+
+    // Initialize xTx to be 0 (will add up componenets)
     for(f=0;f<q;f++){
       arma::mat xTx(f+1,f+1);
-      if(f == 0){
-        xTx.ones(); // Standardization sufficient for group of size 1, no additional orthogonalization necessary
-      }else{
-        xTx.zeros();
-      }
+      xTx.zeros();
       L[f] = xTx;
     }
 
@@ -169,13 +167,12 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
       for(m=0;m<M;m++){
         m0 = m;
         arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
-        arma::mat A_std = A.each_row() / scale;
 
         // Calculate t(A_j) * A_j for groups
         for(f=1;f<q;f++){
           arma::mat xTx = L[f];
           arma::uvec gr_idx = find(covgroup == f);
-          xTx = xTx + trans(A_std.cols(gr_idx)) * A_std.cols(gr_idx);
+          xTx = xTx + trans(A.cols(gr_idx)) * A.cols(gr_idx);
           L[f] = xTx;
         }
       }
@@ -188,23 +185,9 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
       L[f] = xTx;
     }
 
-    // Find eigenvectors and eigenvalues of the xTx matrices, create matrix used to orthonormalize
-    // Note: Incorporate checks to make sure eigen values (evec) not equal to 0
-
-    for(f=0;f<q;f++){
-      if(f == 0){
-        ortho_factor[f] = 1.0;
-      }else{
-        arma::mat xTx = L[f];
-        arma::mat emat;
-        arma::vec evec;
-        arma::eig_sym(evec, emat, xTx);
-        ortho_factor[f] = emat.each_col() % (1/sqrt(evec));
-      }
-    }
 
   }
-  
+
   //-------------------------------------------------------------------------------//
   // Initialize nu = max possible weight
   //-------------------------------------------------------------------------------//
@@ -236,38 +219,21 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
     }
 
     arma::mat Zk = Z.submat(ids, col_idx);
-    
+
     for(m=0;m<M;m++){
       m0 = m;
       arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
-      arma::mat A_std = A.each_row() / scale;
+      eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A * beta.elem(ref_cols) + offset(ids));
 
-      if(H == q){ // sigma specified with independence structure (diagonal)
-        // Caculate eta for each individual using initial beta
-        eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A_std * beta.elem(ref_cols) + offset(ids));
-      }else{ // H = q(q+1)/2, unstructured sigma
-        // Orthonormalize A_std matrix
-        arma::mat A_ortho(ids.n_elem,H);
-        for(f=0;f<q;f++){
-          arma::uvec Aidx = find(covgroup == f);
-          if(f==0){
-            A_ortho.cols(Aidx) = A_std.cols(Aidx);
-          }else{
-            arma::mat ortho_mat = ortho_factor[f];
-            A_ortho.cols(Aidx) = A_std.cols(Aidx) * ortho_mat;
-          }
-        }
-        eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A_ortho * beta.elem(ref_cols) + offset(ids));
-      }
     }
   }
-  
+
   v0 = R_PosInf;
 
   //-------------------------------------------------------------------------------//
   // Grouped Coordinate Descent
   //-------------------------------------------------------------------------------//
-  
+
   while((iter<maxit) & (converged==0)){
 
     // Add to iter
@@ -364,11 +330,11 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
 
     } // End j for loop for fixed effects
-    
-    // ----------------------------------------------------------------------------------//
+
+    //----------------------------------------------------------------------------------//
     // Calculate zetaj for random intercept
     // Will not penalize random intercept
-    // ----------------------------------------------------------------------------------//
+    //----------------------------------------------------------------------------------//
 
     // Identify covariates belonging to random intercept (group j = J_X)
     arma::uvec idxj = find(XZ_group == J_X);
@@ -379,7 +345,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
     // Initialize mean(resid^2) as 0, then sum components of interest
     v0 = 0.0;
-    
+
     for(k=0;k<d;k++){
       // Rows of Z to use
       arma::uvec ids = find(group == (k+1));
@@ -390,12 +356,11 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
       arma::mat Zk = Z.submat(ids, col_idx);
       arma::mat Xj(ids.n_elem, Kj); Xj.zeros();
-      
+
       for(m=0;m<M;m++){
         m0 = m;
         arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q;
-        arma::mat A_std = A.each_row() / scale;
-        Xj = A_std.cols(idxj - p);
+        Xj = A.cols(idxj - p);
         arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
         arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
         nu = tmp_out(ids.n_elem);
@@ -405,11 +370,12 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
       } // End m for loop
 
     } // End k for loop
-    
+
     // resid in above = (y-mu), need resid = (y-mu)/nu
     // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
     // Finish calc of zetaj
-    zetaj = zetaj / (N*M*nu) + beta.elem(idxj);
+
+    zetaj = zetaj / (N*M*nu) + scale(0) * beta.elem(idxj);
     v0 = v0 / (nu*nu*N*M);
 
     // L2 norm of zetaj
@@ -428,7 +394,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
     }
 
     r = J_X;
-    
+
     // ----------------------------------------------------------------------------------//
     // Element-wise update of random effects effects betaj
     // ----------------------------------------------------------------------------------//
@@ -458,7 +424,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
       // Find index of covariates corresponding to previous j in sequence (r)
       arma::uvec idxr = find(XZ_group == r);
-      
+
       // Calculate zetaj vector (initialize as zero, then sum components of interest)
       arma::vec zetaj(Kj); zetaj.zeros();
 
@@ -475,63 +441,35 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
         arma::mat Zk = Z.submat(ids, col_idx);
         arma::mat Xj(ids.n_elem, Kj); Xj.zeros();
-
-          if(H == q){ // sigma specified with independence structure (diagonal)
-
-            for(m=0;m<M;m++){
-              m0 = m;
-              arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-              arma::mat A_std = A.each_row() / scale;
-              // Update random effects component of eta for each individual
-              eta.submat(m0,ids) += A_std.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr));
-              // Calculate zetaj
-              Xj = A_std.cols(idxj - p);
-              arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-              arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
-              nu = tmp_out(ids.n_elem);
-              v0 += tmp_out(ids.n_elem+1);
-              zetaj = zetaj + Xj.t() * resid;
-              
-            }
-
-          }else{ // H = q(q+1)/2, unstructured sigma
-            
-            for(m=0;m<M;m++){
-              m0 = m;
-              arma::mat A = kron(u.submat(m0, col_idx), Zk) * J_q;
-              arma::mat A_std = A.each_row() / scale;
-              // Orthonormalize A_std matrix
-              arma::mat A_ortho(ids.n_elem, H);
-              for(f=0;f<q;f++){
-                arma::uvec Aidx = find(covgroup == f);
-                if(f==0){
-                  A_ortho.cols(Aidx) = A_std.cols(Aidx);
-                }else{
-                  arma::mat ortho_mat = ortho_factor[f];
-                  A_ortho.cols(Aidx) = A_std.cols(Aidx) * ortho_mat;
-                }
-              }
-              
-              // Update random effects component of eta for each individual
-              eta.submat(m0,ids) += trans(A_ortho.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-              // Calculate zetaj
-              Xj = A_ortho.cols(idxj - p);
-              arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-              arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
-              nu = tmp_out(ids.n_elem);
-              v0 += tmp_out(ids.n_elem+1);
-              zetaj = zetaj + Xj.t() * resid;
-              
-            } // End m for loop
-
-          } // End if-else H == q
+        
+        for(m=0;m<M;m++){
+          m0 = m;
+          arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+          // Update random effects component of eta for each individual
+          eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+          // Calculate zetaj
+          Xj = A.cols(idxj - p);
+          arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
+          arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
+          nu = tmp_out(ids.n_elem);
+          v0 += tmp_out(ids.n_elem+1);
+          zetaj = zetaj + Xj.t() * resid;
+          
+        }
 
       } // End k for loop
 
       // resid in above = (y-mu), need resid = (y-mu)/nu
       // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
       // Finish calc of zetaj
-      zetaj = zetaj / (N*M*nu) + beta.elem(idxj);
+      
+      if(H == q){ // sigma specified with independence structure (diagonal)
+        zetaj = zetaj / (N*M*nu) + scale(j - J_X) * beta.elem(idxj);
+      }else{ // H = q(q+1)/2, unstructured sigma
+        arma::mat xTx = L[j - J_X];
+        zetaj = zetaj / (N*M*nu) + xTx * beta.elem(idxj);
+      } // End if-else H == q
+      
       v0 = v0 / (nu*nu*N*M);
 
       // L2 norm of zetaj
@@ -550,11 +488,16 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
         bj = SCAD_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
       }
 
-      if(idxj.n_elem == 1){
-        beta.elem(idxj) = bj * vec_ones;
-      }else{
-        beta.elem(idxj) = bj * (zetaj / zetaj_L2);
-      }
+      if(H == q){ 
+        // sigma specified with independence structure (diagonal)
+        // group size = 1
+        beta.elem(idxj) = bj * vec_ones / scale(j - J_X);
+      }else{ 
+        // H = q(q+1)/2, unstructured sigma
+        // group size > 1 for random effect that is not random intercept
+        arma::mat xTx = L[j - J_X];
+        beta.elem(idxj) = xTx.i() * bj * (zetaj / zetaj_L2);
+      } // End if-else H == q
 
       // Reset nu to 0 if not binomial or gaussian with canonical link
       if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
@@ -572,7 +515,7 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
 
     // Find index of covariates corresponding to previous j in sequence (r)
     arma::uvec idxr = find(XZ_group == r);
-    
+
     // Initialize mean(resid^2) as 0, then sum components of interest
     v0 = 0.0;
 
@@ -585,49 +528,18 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
       }
 
       arma::mat Zk = Z.submat(ids, col_idx);
-
-      if(H == q){ // sigma specified with independence structure (diagonal)
-
-        for(m=0;m<M;m++){
-          m0 = m;
-          arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-          arma::mat A_std = A.each_row() / scale;
-          // Update random effects component of eta for each individual
-          eta.submat(m0,ids) += trans(A_std.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-          // Update nu and v0
-          arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-          nu = tmp_out(ids.n_elem);
-          v0 += tmp_out(ids.n_elem+1);
-
-        }
-
-      }else{ // H = q(q+1)/2, unstructured sigma
-
-        for(m=0;m<M;m++){
-          m0 = m;
-          arma::mat A = kron(u.submat(m0, col_idx), Zk) * J_q;
-          arma::mat A_std = A.each_row() / scale;
-          // Orthonormalize A_std matrix
-          arma::mat A_ortho(ids.n_elem, H);
-          for(f=0;f<q;f++){
-            arma::uvec Aidx = find(covgroup == f);
-            if(f==0){
-              A_ortho.cols(Aidx) = A_std.cols(Aidx);
-            }else{
-              arma::mat ortho_mat = ortho_factor[f];
-              A_ortho.cols(Aidx) = A_std.cols(Aidx) * ortho_mat;
-            }
-          }
-          // Update random effects component of eta for each individual
-          eta.submat(m0,ids) += trans(A_ortho.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-          // Update nu and v0
-          arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-          nu = tmp_out(ids.n_elem);
-          v0 += tmp_out(ids.n_elem+1);
-
-        } // End m for loop
-
-      } // End if-else H == q
+      
+      for(m=0;m<M;m++){
+        m0 = m;
+        arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+        // Update random effects component of eta for each individual
+        eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+        // Update nu and v0
+        arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
+        nu = tmp_out(ids.n_elem);
+        v0 += tmp_out(ids.n_elem+1);
+        
+      }
 
     } // End k for loop
 
@@ -649,28 +561,12 @@ arma::vec grp_CD_XZ_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z
     }
 
   } // End while loop
-  
+
   Rprintf("Number iterations in grouped coord descent: %i \n", iter);
 
   if(converged == 0){
     // warning("grouped coordinate descent algorithm did not converge \n");
     Rcout << "grouped coordinate descent algorithm did not converge" << std::endl;
-  }
-
-  // Need to change scale of random effects componenet of beta back to original scale
-  if(H == q){ // sigma matrix diagonal (independent)
-    // Only need to undo standardization (scaling only)
-    arma::vec beta_ranef = beta.subvec(p,p+H-1);
-    beta.subvec(p,p+H-1) = beta_ranef / scale.t();
-  }else{ // sigma matrix unstructured
-    // Need to (a) unorthogonalize and (b) undo standardization (centering and scaling)
-    arma::vec beta_ranef = beta.subvec(p,p+H-1);
-    for(f=1;f<q;f++){
-      arma::mat ortho_mat = ortho_factor[f];
-      arma::uvec beta_idx = find(covgroup == f);
-      beta_ranef.elem(beta_idx) = ortho_mat * beta_ranef.elem(beta_idx);
-    }
-    beta.subvec(p,p+H-1) = beta_ranef / scale.t();
   }
 
   return beta;

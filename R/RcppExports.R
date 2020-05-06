@@ -31,6 +31,18 @@ glm_fit <- function(y, X, dims, beta, offset, family, link, fit_type, group_X, K
     .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, fit_type, group_X, K_X, penalty, lambda, params)
 }
 
+grp_CD_XZ_B <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
+grp_CD_XZ_B2 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B2', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
+grp_CD_XZ_B3 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B3', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
     .Call('_glmmPen_logLik_cpp', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
 }
@@ -78,18 +90,12 @@ sample_mc_inner_gibbs2 <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batc
 }
 
 #' @export
-sample_mc_gibbs_rw <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, trace) {
-    .Call('_glmmPen_sample_mc_gibbs_rw', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, trace)
+sample_mc_gibbs_adapt_rw <- function(f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace) {
+    .Call('_glmmPen_sample_mc_gibbs_adapt_rw', PACKAGE = 'glmmPen', f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace)
 }
 
-#' @export
-sample_mc_gibbs_rw_rs <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, trace) {
-    .Call('_glmmPen_sample_mc_gibbs_rw_rs', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, trace)
-}
-
-#' @export
-sample_mc_gibbs_adapt_rw <- function(f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace) {
-    .Call('_glmmPen_sample_mc_gibbs_adapt_rw', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace)
+posterior <- function(yk, Xk, Zk, beta_fef, q, M, sigma, uold, proposal_SD_k, batch, batch_length, offset, burnin_batchnum, trace) {
+    .Call('_glmmPen_posterior', PACKAGE = 'glmmPen', yk, Xk, Zk, beta_fef, q, M, sigma, uold, proposal_SD_k, batch, batch_length, offset, burnin_batchnum, trace)
 }
 
 arma_test_value <- function(x) {
@@ -113,27 +119,23 @@ orthog_inner <- function(X, g, gmax, gmin, n) {
     .Call('_glmmPen_orthog_inner', PACKAGE = 'glmmPen', X, g, gmax, gmin, n)
 }
 
-initial_mu <- function(family, y, N) {
-    .Call('_glmmPen_initial_mu', PACKAGE = 'glmmPen', family, y, N)
-}
-
-muvalid <- function(family, mu) {
-    .Call('_glmmPen_muvalid', PACKAGE = 'glmmPen', family, mu)
-}
-
-mu_adjust <- function(family, mu) {
-    .Call('_glmmPen_mu_adjust', PACKAGE = 'glmmPen', family, mu)
-}
-
-dlink <- function(link, mu) {
-    .Call('_glmmPen_dlink', PACKAGE = 'glmmPen', link, mu)
-}
-
-linkfun <- function(link, mu) {
-    .Call('_glmmPen_linkfun', PACKAGE = 'glmmPen', link, mu)
-}
-
 invlink <- function(link, eta) {
     .Call('_glmmPen_invlink', PACKAGE = 'glmmPen', link, eta)
+}
+
+Qfun <- function(y, X, Z, u, group, J_q, beta, offset, dims, family, link) {
+    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, u, group, J_q, beta, offset, dims, family, link)
+}
+
+resid_nu_v0_i <- function(yi, eta, family, link, nu) {
+    .Call('_glmmPen_resid_nu_v0_i', PACKAGE = 'glmmPen', yi, eta, family, link, nu)
+}
+
+zeta_fixef <- function(y, X, eta, idxr, family, link, nu) {
+    .Call('_glmmPen_zeta_fixef', PACKAGE = 'glmmPen', y, X, eta, idxr, family, link, nu)
+}
+
+resid_nu_v0_k <- function(y, eta, family, link, nu) {
+    .Call('_glmmPen_resid_nu_v0_k', PACKAGE = 'glmmPen', y, eta, family, link, nu)
 }
 

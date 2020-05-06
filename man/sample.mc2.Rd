@@ -4,12 +4,10 @@
 \alias{sample.mc2}
 \title{Calculate Monte Carlo draws}
 \usage{
-sample.mc2(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
+sample.mc2(coef, cov, y, X, Z, nMC, trace = 0, family = family, group,
   d, nZ, okindex, gibbs = F, uold)
 }
 \arguments{
-\item{fit}{a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
-
 \item{cov}{the random effects covariance matrix estimated from the last M step of the EM algorithm}
 
 \item{y}{a numeric vector of the response variable}
@@ -39,6 +37,8 @@ consecutive numeric integers}
 (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?}
 
 \item{uold}{a matrix of the Monte Carlo draws from the last E step of the EM algorithm}
+
+\item{fit}{a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
 }
 \value{
 a list made of the following components:

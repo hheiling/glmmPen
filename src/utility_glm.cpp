@@ -5,7 +5,7 @@ using namespace Rcpp;
 
 // Helper functions for IRLS
 
-// [[Rcpp::export]]
+
 arma::vec initial_mu(const char* family, arma::vec y, int N) {
   
   const char* bin = "binomial";
@@ -50,7 +50,7 @@ arma::vec initial_mu(const char* family, arma::vec y, int N) {
   return mu;
 }
 
-// [[Rcpp::export]]
+
 arma::vec muvalid(const char* family, arma::vec mu) {
   
   const char* bin = "binomial";
@@ -91,7 +91,7 @@ arma::vec muvalid(const char* family, arma::vec mu) {
   
 }
 
-// [[Rcpp::export]]
+
 arma::vec mu_adjust(const char* family, arma::vec mu) {
   
   const char* bin = "binomial";
@@ -141,7 +141,7 @@ arma::vec mu_adjust(const char* family, arma::vec mu) {
   
 }
 
-// [[Rcpp::export]]
+
 arma::vec dlink(int link, arma::vec mu){
   
   int N = mu.n_elem;
@@ -161,7 +161,7 @@ arma::vec dlink(int link, arma::vec mu){
   
 }
 
-// [[Rcpp::export]]
+
 arma::vec linkfun(int link, arma::vec mu){
   
   int N = mu.n_elem;
@@ -233,5 +233,136 @@ arma::vec varfun(const char* family, arma::vec mu){ // double phi
   
 }
 
+// Q-function calculation
+// [[Rcpp::export]]
+double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const arma::mat& u, 
+            const arma::vec& group, const arma::sp_mat& J_q,
+            const arma::vec& beta, const arma::vec offset, arma::vec dims,
+            const char* family, int link){
+  
+  const char* bin = "binomial";
+  const char* pois = "poisson";
+  const char* gaus = "gaussian";
+  const char* Gamma = "Gamma";
+  
+  int M = u.n_rows;
+  int N = y.n_elem;
+  int p = X.n_cols; // Number fixed effects covariates
+  int p2 = beta.n_elem; // Total number of coefficients 
+  
+  int m=0;
+  arma::uvec m0(1);
+  int i=0;
+  int k=0;
+  int f=0;
+  
+  int d = dims(0); // Number groups
+  int q = dims(1); // Number random effect variables
+  
+  arma::uvec col_idx(q);
+  
+  arma::mat eta(M,N);
+  arma::vec mu(M);
+  double yi=0;
+  
+  double likQ = 1.0;
+  double llQ = 0.0;
+  
+  // Calculate MxN eta matrix
+  for(k=0;k<d;k++){
+    
+    // Rows of X and Z to use
+    arma::uvec ids = find(group == (k+1));
+    arma::mat Xk = X.rows(ids);
+    // Index of appropriate columns of Z and u
+    for(f=0;f<q;f++){
+      col_idx(f) = k + f*d;
+    }
+    
+    arma::mat Zk = Z.submat(ids, col_idx);
+    
+    for(m=0;m<M;m++){
+      m0 = m;
+      arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
+      eta.submat(m0,ids) = trans(Xk * beta.subvec(0,p-1) + A * beta.subvec(p,p2-1) + offset(ids));
+      
+    }
+    
+  } // End k for loop
+  
+  // Calculate llQ
+  
+  
+  llQ = 0.0;
+  
+  for(i=0;i<N;i++){
+    
+    mu = invlink(link, eta.col(i));
+    mu = mu_adjust(family, mu);
+    
+    if(std::strcmp(family, bin) == 0){
+      for(m=0;m<M;m++){
+        llQ = llQ + R::dbinom(y(i), 1.0, mu(m), 1); // log value
+      }
+    }else if(std::strcmp(family, pois) == 0){
+      for(m=0;m<M;m++){
+        llQ = llQ + R::dpois(y(i), mu(m), 1); // log value
+      }
+    }else if(std::strcmp(family, gaus) == 0){
+      stop("gaussian not yet available");
+      for(m=0;m<M;m++){
+        // Need to calculate and include sigma
+        llQ = llQ + R::dnorm4(y(i), mu(m), 1.0, 1); // log value
+      }
+    }else if(std::strcmp(family, Gamma) == 0){
+      stop("Gamma not yet available");
+    }else{
+      stop("invalid family \n");
+    }
+    
+  }
+  
+  llQ = llQ / M;
+  
+  return(llQ);
 
+}
+
+// double QfunB(const char*family, double yi, arma::vec mu){
+//   
+//   const char* bin = "binomial";
+//   const char* pois = "poisson";
+//   const char* gaus = "gaussian";
+//   const char* Gamma = "Gamma";
+//   
+//   int m=0;
+//   int M = mu.n_elem;
+//   
+//   double llQ=0.0;
+//   
+//   if(std::strcmp(family, bin) == 0){
+//     for(m=0;m<M;m++){
+//       llQ = llQ + R::dbinom(yi, 1.0, mu(m), 1); // log value
+//     }
+//   }else if(std::strcmp(family, pois) == 0){
+//     for(m=0;m<M;m++){
+//       llQ = llQ + R::dpois(yi, mu(m), 1); // log value
+//     }
+//   }else if(std::strcmp(family, gaus) == 0){
+//     stop("gaussian not yet available");
+//     for(m=0;m<M;m++){
+//       // Need to calculate and include sigma
+//       llQ = llQ + R::dnorm4(yi, mu(m), 1.0, 1); // log value
+//     }
+//   }else if(std::strcmp(family, Gamma) == 0){
+//     stop("Gamma not yet available");
+//   }else{
+//     stop("invalid family \n");
+//   }
+//   
+//   llQ = llQ / M;
+//   
+//   return(llQ);
+//   
+// }
 ////////////////////////////////////////////////////////////////////////////////////////////////

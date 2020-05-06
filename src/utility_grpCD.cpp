@@ -57,7 +57,7 @@ arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, 
     }
   }
   
-  v0 = mean(resid % resid); // Will divide v0 by nu^2 later
+  v0 = sum(resid % resid); // Will divide v0 by nu^2 and M*N later
   
   output.subvec(0,M-1) = resid;
   output(M) = nu;
@@ -169,7 +169,7 @@ arma::vec resid_nu_v0_k(arma::vec y, arma::vec eta, const char* family, int link
     }
   }
   
-  v0 = mean(resid % resid); // Will divide by nu^2 later (to make sure nu = max(all weights))
+  v0 = sum(resid % resid); // Will divide by nu^2 and (N*M) later (to make sure nu = max(all weights))
   
   output.subvec(0,Nk-1) = resid;
   output(Nk) = nu;

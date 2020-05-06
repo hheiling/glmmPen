@@ -29,6 +29,9 @@ arma::vec linkfun(int link, arma::vec mu);
 arma::vec invlink(int link, arma::vec eta);
 arma::vec varfun(const char* family, arma::vec mu);
 
+// Q-function calculation
+double Qfun(const char* family, double yi, arma::vec mu);
+
 
 /* Fit a base model */
 
