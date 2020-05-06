@@ -1,5 +1,8 @@
+#' @importFrom stringr str_c
+#' @importFrom ncvreg std
 #' @export
-sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
+sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, 
+                     slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
   set.seed(seed = seed)
   library(mvtnorm)
   # set variables
@@ -22,8 +25,9 @@ sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binom
   }
   
   # add intercept
-  mat = scale(mat)
+  mat = std(mat)
   X = cbind(rep(1, n), mat)
+  colnames(X) = c("(Intercept)",str_c("X", 1:(ncol(X)-1)))
   
   # create raneff matrix (assuming only 1 random effect with nstudies levels for now)
   drep = factor(rep(1:d, each = n/d))

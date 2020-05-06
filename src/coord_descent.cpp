@@ -297,7 +297,7 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
           }
         }
 
-        arma::vec b(ids.n_elem);
+        arma::vec b(1);
         beta.elem(ids) = bj * b.ones();
 
       }else{ // ids.n_elem > 1
