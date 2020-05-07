@@ -285,7 +285,6 @@ arma::vec grp_CD_XZ_B3(const arma::vec& y, const arma::mat& X, const arma::mat& 
         arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
         arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
         nu = tmp_out(ids.n_elem);
-        v0 += tmp_out(ids.n_elem+1);
         zetaj = zetaj + Xj.t() * resid;
 
       } // End m for loop
@@ -296,8 +295,7 @@ arma::vec grp_CD_XZ_B3(const arma::vec& y, const arma::mat& X, const arma::mat& 
     // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
     // Finish calc of zetaj
     zetaj = zetaj / (N*M*nu) + beta.elem(idxj);
-    v0 = v0 / (nu*nu*N*M);
-
+    
     // L2 norm of zetaj
     if(idxj.n_elem == 1){
       zetaj_L2 = as_scalar(zetaj);
@@ -361,43 +359,20 @@ arma::vec grp_CD_XZ_B3(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
         arma::mat Zk = Z.submat(ids, col_idx);
         arma::mat Xj(ids.n_elem, Kj); Xj.zeros();
-
-          if(H == q){ // sigma specified with independence structure (diagonal)
-
-            for(m=0;m<M;m++){
-              m0 = m;
-              arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-              // Update random effects component of eta for each individual
-              eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-              // Calculate zetaj
-              Xj = A.cols(idxj - p);
-              arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-              arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
-              nu = tmp_out(ids.n_elem);
-              v0 += tmp_out(ids.n_elem+1);
-              zetaj = zetaj + Xj.t() * resid;
-              
-            }
-
-          }else{ // H = q(q+1)/2, unstructured sigma
-            
-            for(m=0;m<M;m++){
-              m0 = m;
-              arma::mat A = kron(u.submat(m0, col_idx), Zk) * J_q;
-              
-              // Update random effects component of eta for each individual
-              eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-              // Calculate zetaj
-              Xj = A.cols(idxj - p);
-              arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-              arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
-              nu = tmp_out(ids.n_elem);
-              v0 += tmp_out(ids.n_elem+1);
-              zetaj = zetaj + Xj.t() * resid;
-              
-            } // End m for loop
-
-          } // End if-else H == q
+        
+        for(m=0;m<M;m++){
+          m0 = m;
+          arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+          // Update random effects component of eta for each individual
+          eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+          // Calculate zetaj
+          Xj = A.cols(idxj - p);
+          arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
+          arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
+          nu = tmp_out(ids.n_elem);
+          zetaj = zetaj + Xj.t() * resid;
+          
+        } // End m for loop
 
       } // End k for loop
 
@@ -405,8 +380,7 @@ arma::vec grp_CD_XZ_B3(const arma::vec& y, const arma::mat& X, const arma::mat& 
       // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
       // Finish calc of zetaj
       zetaj = zetaj / (N*M*nu) + beta.elem(idxj);
-      v0 = v0 / (nu*nu*N*M);
-
+      
       // L2 norm of zetaj
       if(idxj.n_elem == 1){
         zetaj_L2 = as_scalar(zetaj);
@@ -458,37 +432,18 @@ arma::vec grp_CD_XZ_B3(const arma::vec& y, const arma::mat& X, const arma::mat& 
       }
 
       arma::mat Zk = Z.submat(ids, col_idx);
-
-      if(H == q){ // sigma specified with independence structure (diagonal)
-
-        for(m=0;m<M;m++){
-          m0 = m;
-          arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-          // Update random effects component of eta for each individual
-          eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-          // Update nu and v0
-          arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-          nu = tmp_out(ids.n_elem);
-          v0 += tmp_out(ids.n_elem+1);
-
-        }
-
-      }else{ // H = q(q+1)/2, unstructured sigma
-
-        for(m=0;m<M;m++){
-          m0 = m;
-          arma::mat A = kron(u.submat(m0, col_idx), Zk) * J_q;
-          
-          // Update random effects component of eta for each individual
-          eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
-          // Update nu and v0
-          arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
-          nu = tmp_out(ids.n_elem);
-          v0 += tmp_out(ids.n_elem+1);
-
-        } // End m for loop
-
-      } // End if-else H == q
+      
+      for(m=0;m<M;m++){
+        m0 = m;
+        arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+        // Update random effects component of eta for each individual
+        eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+        // Update nu and v0
+        arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
+        nu = tmp_out(ids.n_elem);
+        v0 += tmp_out(ids.n_elem+1);
+        
+      } // End m for loop
 
     } // End k for loop
 
