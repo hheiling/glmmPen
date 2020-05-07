@@ -114,6 +114,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
   // A matrix: from paper, matrix of (alpha_k kronecker Zki)T J_q
   // Initialize list for t(A_j) * A_j matrices when random effect covariate groups of size 1 only
+  // Note: will standardize these values to get t(A_j) * A_j / (N*M)
   arma::rowvec scale(H); scale.zeros();
   // Initialize list for t(A_j) * A_j matrices for general grouped case of random effect covariates
   List L(q);
@@ -140,7 +141,9 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
         arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
         scale = scale + sum(A%A,0); // Add columns of A%A
       }
-
+      
+      // Standardize to get t(A_j)*A_j / (N*M)
+      scale = scale / (N*M);
     }
   }else{ 
     // random effects are grouped
@@ -169,7 +172,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
         arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
 
         // Calculate t(A_j) * A_j for groups
-        for(f=1;f<q;f++){
+        for(f=0;f<q;f++){
           arma::mat xTx = L[f];
           arma::uvec gr_idx = find(covgroup == f);
           xTx = xTx + trans(A.cols(gr_idx)) * A.cols(gr_idx);
@@ -179,14 +182,14 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     }
 
     // Divide t(Xj) * Xj by (N*M)
-    for(f=1;f<q;f++){
+    for(f=0;f<q;f++){
       arma::mat xTx = L[f];
       xTx = xTx / (N*M);
       L[f] = xTx;
     }
 
 
-  }
+  } // End if-else H == q
 
   //-------------------------------------------------------------------------------//
   // Initialize nu = max possible weight
@@ -272,21 +275,16 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       // Calculate zetaj vector (initialize as zero, then sum components of interest)
       arma::vec zetaj(Kj); zetaj.zeros();
 
-      // Initialize mean(resid^2) as 0, then sum components of interest
-      v0 = 0.0;
-
       // Calculate zetaj for fixed effects covariates in group j
         // zeta_fixef() function in 'utility_grpCD.cpp'
       arma::vec out = zeta_fixef(y, X, eta, idxj, family, link, nu);
       zetaj = out.subvec(0,Kj-1);
       nu = out(Kj);
-      v0 = out(Kj+1);
 
       // resid used in above = (y-mu), need resid = (y-mu)/nu
       // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
       // Finish calc of zetaj
       zetaj = zetaj / (N*M*nu) + beta.elem(idxj);
-      v0 = v0 / (nu*nu*N*M);
 
       // L2 norm of zetaj
       if(idxj.n_elem == 1){
@@ -364,7 +362,6 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
         arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
         arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
         nu = tmp_out(ids.n_elem);
-        v0 += tmp_out(ids.n_elem+1);
         zetaj = zetaj + Xj.t() * resid;
 
       } // End m for loop
@@ -374,20 +371,26 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     // resid in above = (y-mu), need resid = (y-mu)/nu
     // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
     // Finish calc of zetaj
-
-    zetaj = zetaj / (N*M*nu) + scale(0) * beta.elem(idxj);
-    v0 = v0 / (nu*nu*N*M);
-
-    // L2 norm of zetaj
-    if(idxj.n_elem == 1){
-      zetaj_L2 = as_scalar(zetaj);
-    }else{
-      zetaj_L2 = sqrt(sum(zetaj % zetaj));
-    }
-
+    
+    if(H == q){ // sigma specified with independence structure (diagonal)
+      // Calculated xTx/(N*M) within scale vector
+      zetaj = zetaj / (N*M*nu) + scale(0) * beta.elem(idxj);
+    }else{ // H = q(q+1)/2, unstructured sigma
+      // Calculated xTx/(N*M) within list L
+      arma::mat xTx = L[0];
+      zetaj = zetaj / (N*M*nu) + xTx * beta.elem(idxj);
+    } // End if-else H == q
+    
     // Update beta (no penalization)
-    beta.elem(idxj) = zetaj;
-
+    if(H == q){ 
+      // Calculated xTx/(N*M) within scale vector
+      beta.elem(idxj) = zetaj / scale(0);
+    }else{ 
+      // Calculated xTx/(N*M) within list L
+      arma::mat xTx = L[0];
+      beta.elem(idxj) = xTx.i() * zetaj;
+    } // End if-else H == q
+    
     // Reset nu to 0 if not binomial or gaussian with canonical link
     if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
       nu = 0.0;
@@ -452,7 +455,6 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
           arma::vec tmp_out = resid_nu_v0_k(y(ids), trans(eta.submat(m0,ids)), family, link, nu);
           arma::vec resid = tmp_out.subvec(0,ids.n_elem-1);
           nu = tmp_out(ids.n_elem);
-          v0 += tmp_out(ids.n_elem+1);
           zetaj = zetaj + Xj.t() * resid;
           
         }
@@ -464,14 +466,14 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       // Finish calc of zetaj
       
       if(H == q){ // sigma specified with independence structure (diagonal)
+        // Calculated xTx/(N*M) within scale vector
         zetaj = zetaj / (N*M*nu) + scale(j - J_X) * beta.elem(idxj);
       }else{ // H = q(q+1)/2, unstructured sigma
+        // Calculated xTx/(N*M) within list L
         arma::mat xTx = L[j - J_X];
         zetaj = zetaj / (N*M*nu) + xTx * beta.elem(idxj);
       } // End if-else H == q
       
-      v0 = v0 / (nu*nu*N*M);
-
       // L2 norm of zetaj
       if(idxj.n_elem == 1){
         zetaj_L2 = as_scalar(zetaj);
