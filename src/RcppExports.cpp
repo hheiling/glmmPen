@@ -214,6 +214,58 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// grp_CD_XZ_B4
+arma::vec grp_CD_XZ_B4(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const arma::vec& group, const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims, arma::vec beta, const arma::vec& offset, const char* family, int link, int init, const arma::uvec& XZ_group, arma::uvec K, const char* penalty, arma::vec params);
+RcppExport SEXP _glmmPen_grp_CD_XZ_B4(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP groupSEXP, SEXP uSEXP, SEXP J_qSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP initSEXP, SEXP XZ_groupSEXP, SEXP KSEXP, SEXP penaltySEXP, SEXP paramsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type u(uSEXP);
+    Rcpp::traits::input_parameter< const arma::sp_mat& >::type J_q(J_qSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< int >::type init(initSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type XZ_group(XZ_groupSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type K(KSEXP);
+    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
+    rcpp_result_gen = Rcpp::wrap(grp_CD_XZ_B4(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params));
+    return rcpp_result_gen;
+END_RCPP
+}
+// grp_CD_XZ_B5
+arma::vec grp_CD_XZ_B5(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const arma::vec& group, const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims, arma::vec beta, const arma::vec& offset, const char* family, int link, int init, const arma::uvec& XZ_group, arma::uvec K, const char* penalty, arma::vec params);
+RcppExport SEXP _glmmPen_grp_CD_XZ_B5(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP groupSEXP, SEXP uSEXP, SEXP J_qSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP initSEXP, SEXP XZ_groupSEXP, SEXP KSEXP, SEXP penaltySEXP, SEXP paramsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type u(uSEXP);
+    Rcpp::traits::input_parameter< const arma::sp_mat& >::type J_q(J_qSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< int >::type init(initSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type XZ_group(XZ_groupSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type K(KSEXP);
+    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
+    rcpp_result_gen = Rcpp::wrap(grp_CD_XZ_B5(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params));
+    return rcpp_result_gen;
+END_RCPP
+}
 // logLik_cpp
 double logLik_cpp(const arma::vec& U_means, const arma::mat& sigma, unsigned int M, const arma::vec& group, unsigned int n_levels, unsigned int df, const arma::vec& y, const arma::vec& eta_fef, const arma::mat& Z, const arma::mat& Gamma, const char* family);
 RcppExport SEXP _glmmPen_logLik_cpp(SEXP U_meansSEXP, SEXP sigmaSEXP, SEXP MSEXP, SEXP groupSEXP, SEXP n_levelsSEXP, SEXP dfSEXP, SEXP ySEXP, SEXP eta_fefSEXP, SEXP ZSEXP, SEXP GammaSEXP, SEXP familySEXP) {
@@ -470,53 +522,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// resid_nu_v0_i
-arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, double nu);
-RcppExport SEXP _glmmPen_resid_nu_v0_i(SEXP yiSEXP, SEXP etaSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP nuSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type yi(yiSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type eta(etaSEXP);
-    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
-    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
-    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
-    rcpp_result_gen = Rcpp::wrap(resid_nu_v0_i(yi, eta, family, link, nu));
-    return rcpp_result_gen;
-END_RCPP
-}
-// zeta_fixef
-arma::vec zeta_fixef(arma::vec y, arma::mat X, arma::mat eta, arma::uvec idxr, const char* family, int link, double nu);
-RcppExport SEXP _glmmPen_zeta_fixef(SEXP ySEXP, SEXP XSEXP, SEXP etaSEXP, SEXP idxrSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP nuSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type eta(etaSEXP);
-    Rcpp::traits::input_parameter< arma::uvec >::type idxr(idxrSEXP);
-    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
-    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
-    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
-    rcpp_result_gen = Rcpp::wrap(zeta_fixef(y, X, eta, idxr, family, link, nu));
-    return rcpp_result_gen;
-END_RCPP
-}
-// resid_nu_v0_k
-arma::vec resid_nu_v0_k(arma::vec y, arma::vec eta, const char* family, int link, double nu);
-RcppExport SEXP _glmmPen_resid_nu_v0_k(SEXP ySEXP, SEXP etaSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP nuSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type eta(etaSEXP);
-    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
-    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
-    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
-    rcpp_result_gen = Rcpp::wrap(resid_nu_v0_k(y, eta, family, link, nu));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_IRLS", (DL_FUNC) &_glmmPen_IRLS, 6},
@@ -529,6 +534,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_grp_CD_XZ_B", (DL_FUNC) &_glmmPen_grp_CD_XZ_B, 16},
     {"_glmmPen_grp_CD_XZ_B2", (DL_FUNC) &_glmmPen_grp_CD_XZ_B2, 16},
     {"_glmmPen_grp_CD_XZ_B3", (DL_FUNC) &_glmmPen_grp_CD_XZ_B3, 16},
+    {"_glmmPen_grp_CD_XZ_B4", (DL_FUNC) &_glmmPen_grp_CD_XZ_B4, 16},
+    {"_glmmPen_grp_CD_XZ_B5", (DL_FUNC) &_glmmPen_grp_CD_XZ_B5, 16},
     {"_glmmPen_logLik_cpp", (DL_FUNC) &_glmmPen_logLik_cpp, 11},
     {"_glmmPen_logLik_modif", (DL_FUNC) &_glmmPen_logLik_modif, 11},
     {"_glmmPen_logLik_MCI", (DL_FUNC) &_glmmPen_logLik_MCI, 8},
@@ -544,9 +551,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_orthog_inner", (DL_FUNC) &_glmmPen_orthog_inner, 5},
     {"_glmmPen_invlink", (DL_FUNC) &_glmmPen_invlink, 2},
     {"_glmmPen_Qfun", (DL_FUNC) &_glmmPen_Qfun, 11},
-    {"_glmmPen_resid_nu_v0_i", (DL_FUNC) &_glmmPen_resid_nu_v0_i, 5},
-    {"_glmmPen_zeta_fixef", (DL_FUNC) &_glmmPen_zeta_fixef, 7},
-    {"_glmmPen_resid_nu_v0_k", (DL_FUNC) &_glmmPen_resid_nu_v0_k, 5},
     {NULL, NULL, 0}
 };
 

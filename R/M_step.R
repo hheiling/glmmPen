@@ -246,6 +246,10 @@ M_stepB = function(y, X, Z, u, J, group, family, coef, offset = NULL,
     coef_new = grp_CD_XZ_B2(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else if(fit_type == 3){
     coef_new = grp_CD_XZ_B3(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+  }else if(fit_type == 4){
+    coef_new = grp_CD_XZ_B4(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+  }else if(fit_type == 5){
+    coef_new = grp_CD_XZ_B5(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }
   
   return(as.numeric(coef_new))

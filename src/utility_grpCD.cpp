@@ -6,7 +6,7 @@
 
 using namespace Rcpp;
 
-// [[Rcpp::export]]
+// Calculates the M residuals for an individual given eta, updates nu and v0
 arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, double nu){
   
   int M = eta.n_elem;
@@ -48,7 +48,7 @@ arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, 
     if(nu_tmp > nu){
       nu = nu_tmp;
     }
-  }
+  } // End family if-else
   
   resid = ((yi*const_ones) - mu); // Will divide zetaj by nu later
   for(m=0;m<M;m++){
@@ -66,7 +66,7 @@ arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, 
   return(output);
 }
 
-// [[Rcpp::export]]
+// Calculates zetaj for fixed effects starting with eta
 arma::vec zeta_fixef(arma::vec y, arma::mat X, arma::mat eta, 
                      arma::uvec idxr, const char* family, int link, double nu){
   
@@ -119,7 +119,8 @@ arma::vec zeta_fixef(arma::vec y, arma::mat X, arma::mat eta,
   return(output);
 }
 
-// [[Rcpp::export]]
+// Calculates residuals by group (used in calculation of zetaj for random effects covariate(s))
+// Also updates nu and v0
 arma::vec resid_nu_v0_k(arma::vec y, arma::vec eta, const char* family, int link, double nu){
   
   int Nk = eta.n_elem;
@@ -176,5 +177,25 @@ arma::vec resid_nu_v0_k(arma::vec y, arma::vec eta, const char* family, int link
   output(Nk+1) = v0;
   
   return(output);
+}
+
+// Calculates fixed effects zetaj using residuals matrix
+arma::vec zeta_fixef_calc(arma::mat X, arma::mat resid, arma::uvec idxj){
+  
+  arma::vec zetaj(idxj.n_elem); zetaj.zeros();
+  int N = resid.n_cols;
+  
+  int i = 0;
+  
+  arma::mat Xj = X.cols(idxj);
+  
+  for(i=0;i<N;i++){
+    // Update zetaj sum
+    arma::vec Xji = Xj.row(i);
+    zetaj = zetaj + Xji * sum(resid.col(i));
+    
+  } // End i for loop
+  
+  return(zetaj);
 }
 

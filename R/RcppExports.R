@@ -43,6 +43,14 @@ grp_CD_XZ_B3 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, lin
     .Call('_glmmPen_grp_CD_XZ_B3', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
+grp_CD_XZ_B4 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B4', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
+grp_CD_XZ_B5 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B5', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
     .Call('_glmmPen_logLik_cpp', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
 }
@@ -125,17 +133,5 @@ invlink <- function(link, eta) {
 
 Qfun <- function(y, X, Z, u, group, J_q, beta, offset, dims, family, link) {
     .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, u, group, J_q, beta, offset, dims, family, link)
-}
-
-resid_nu_v0_i <- function(yi, eta, family, link, nu) {
-    .Call('_glmmPen_resid_nu_v0_i', PACKAGE = 'glmmPen', yi, eta, family, link, nu)
-}
-
-zeta_fixef <- function(y, X, eta, idxr, family, link, nu) {
-    .Call('_glmmPen_zeta_fixef', PACKAGE = 'glmmPen', y, X, eta, idxr, family, link, nu)
-}
-
-resid_nu_v0_k <- function(y, eta, family, link, nu) {
-    .Call('_glmmPen_resid_nu_v0_k', PACKAGE = 'glmmPen', y, eta, family, link, nu)
 }
 
