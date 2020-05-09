@@ -234,7 +234,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                                 d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
     }else{ # MwG_sampler == "random_walk"
       samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
@@ -269,7 +269,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   }else{
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                                 d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
                                 uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
     }else{ # MwG_sampler == "random_walk"
@@ -531,7 +531,7 @@ fit_dat = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     # E Step 
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(fit=fit, cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                 d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
     }else{ # MwG_sampler == "random_walk"
       samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
