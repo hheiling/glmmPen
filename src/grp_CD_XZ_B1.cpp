@@ -7,14 +7,13 @@
 using namespace Rcpp;
 using namespace arma;
 
-// Change from version B2: 
-// More efficient update to residuals after beta_j update (like grpreg and ncvreg)
-// Still use (t(X) * X).i() approach
+// Update the residuals as specified in the grpreg and ncvreg paper (to speed things up)
+// Use (t(X) * X).i() approach
 
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
 
 // [[Rcpp::export]]
-arma::vec grp_CD_XZ_B5(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
+arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
                       const arma::vec& group,
                       const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims,
                       arma::vec beta, const arma::vec& offset,
@@ -288,10 +287,8 @@ arma::vec grp_CD_XZ_B5(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
       // Calculate zetaj for fixed effects covariates in group j
         // zeta_fixef_calc() function in 'utility_grpCD.cpp'
-      arma::vec out = zeta_fixef_calc(X, resid, idxj);
-      zetaj = out.subvec(0,Kj-1);
-      nu = out(Kj);
-
+      zetaj = zeta_fixef_calc(X, resid, idxj);
+      
       // Finish calc of zetaj
       zetaj = zetaj / (N*M) + beta.elem(idxj);
 
