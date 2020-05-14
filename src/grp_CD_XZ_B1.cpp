@@ -117,7 +117,7 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
   List L(q);
   
   // If sigma matrix diagonal, then coefficients relating to random effects not grouped
-  // If sigma matrix diagonal, ncol(J_q) == q.
+  // Therefore, if sigma matrix diagonal, ncol(J_q) == q.
   // Otherwise, ncol(J) == q(q+1)/2
 
   if(H == q){ 
@@ -575,12 +575,12 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
     // ----------------------------------------------------------------------------------//
     
     // Convergence criteria after every full beta update
-    // if((arma::max(abs(beta0 - beta))*sqrt(nu)) < conv){
-    //   converged = 1;
-    // }
-    if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
+    if(arma::max(abs(beta0 - beta)) < conv){
       converged = 1;
     }
+    // if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
+    //   converged = 1;
+    // }
 
   } // End while loop
 

@@ -14,13 +14,13 @@ using namespace arma;
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
 
 // [[Rcpp::export]]
-arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
-                      const arma::vec& group,
-                      const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims,
-                      arma::vec beta, const arma::vec& offset,
-                      const char* family, int link, int init,
-                      const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
-                      const char* penalty, arma::vec params) {
+arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
+                          const arma::vec& group,
+                          const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims,
+                          arma::vec beta, const arma::vec& offset,
+                          const char* family, int link, int init,
+                          const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
+                          const char* penalty, arma::vec params) {
 
   // y = response vector
   // X = fixed effecs covariate matrix
@@ -121,6 +121,39 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     // Initialize to 0
     nu = 0.0;
   }
+  
+  //-------------------------------------------------------------------------------//
+  // Standardization
+  //-------------------------------------------------------------------------------//
+  
+  // Standardize A matrix (from paper, matrix of (alpha_k kronecker Zki)T J_q)
+  // in order to make selection of random effects less dependent on size of random effects
+  
+  arma::rowvec center(H); center.zeros();
+  arma::rowvec scale(H); scale.zeros();
+  
+  for(k=0;k<d;k++){ // For each of d groups of individuals
+    
+    // Rows of Z to use
+    arma::uvec ids = find(group == (k+1));
+    
+    for(f=0;f<q;f++){
+      col_idx(f) = k + f*d;
+    }
+    arma::mat Zk = Z.submat(ids, col_idx);
+    
+    for(m=0;m<M;m++){
+      m0 = m;
+      arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
+      center = center + sum(A,0); // Add up column sums
+      scale = scale + sum(A%A,0); // Add up column sums
+    }
+    
+  }
+  
+  // Random intercept coefficient will not be centered or scaled
+  center(0) = 0.0;
+  scale(0) = 1.0;
 
   //-------------------------------------------------------------------------------//
   // Initialize eta and residual matrices
@@ -142,7 +175,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     for(m=0;m<M;m++){
       m0 = m;
       arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
-      eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A * beta.elem(ref_cols) + offset(ids));
+      arma::mat A_std = (A.each_col() - center).each_col() / scale;
+      eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A_std * beta.elem(ref_cols) + offset(ids));
       
     }
   }
@@ -364,7 +398,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
         for(m=0;m<M;m++){
           m0 = m;
           arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-          arma::rowvec shift = trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+          arma::mat A_std = (A.each_col() - center).each_col() / scale;
+          arma::rowvec shift = trans(A_std.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
           // Update random effects component of eta for each individual
           eta.submat(m0,ids) += shift;
           // Update residuals
@@ -436,8 +471,9 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       for(m=0;m<M;m++){
         m0 = m;
         arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+        arma::mat A_std = (A.each_col() - center).each_col() / scale;
         // Update random effects component of eta for each individual
-        eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+        eta.submat(m0,ids) += trans(A_std.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
         
       } // End m for loop
 
@@ -491,6 +527,14 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     // warning("grouped coordinate descent algorithm did not converge \n");
     Rcout << "grouped coordinate descent algorithm did not converge" << std::endl;
   }
+  
+  // Unstandardize the random effects portion
+  arma::vec beta_ranef = beta.subvec(p,p+H-1);
+  // Random intercept
+  arma::vec ratio = trans(center / scale); // value = 0 for random intercept
+  beta(p) = beta(p) - sum(ratio % beta_ranef);
+  // Coefficients corresponding to random slopes
+  beta.subvec(p,p+H-1) = beta_ranef / scale.t(); // divide by 1.0 for random intercept
 
   return beta;
 }

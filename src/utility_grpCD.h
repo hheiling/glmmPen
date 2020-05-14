@@ -21,13 +21,6 @@ double SCAD_soln(double zeta, double nu, double lambda, double gamma, double alp
 // See "utility_grpCD.cpp" file for function details
 //----------------------------------------------------------------------------------------//
 
-// Calculates zetaj for fixed effects starting with eta
-arma::vec zeta_fixef(arma::vec y, arma::mat X, arma::mat eta, 
-                     arma::uvec idxr, const char* family, int link, double nu);
-
-// Calculating residuals by group (used for zetaj calc for random effects covariates)
-arma::vec resid_nu_v0_k(arma::vec y, arma::vec eta, const char* family, int link, double nu);
-
 // Calculating residuals by individual using eta as input
 arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, double nu);
 

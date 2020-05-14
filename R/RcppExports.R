@@ -31,24 +31,20 @@ glm_fit <- function(y, X, dims, beta, offset, family, link, fit_type, group_X, K
     .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, fit_type, group_X, K_X, penalty, lambda, params)
 }
 
-grp_CD_XZ_B <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+grp_CD_XZ_B1 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B1', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
+grp_CD_XZ_B1_std <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B1_std', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
 grp_CD_XZ_B2 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
     .Call('_glmmPen_grp_CD_XZ_B2', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
-grp_CD_XZ_B3 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B3', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
-}
-
-grp_CD_XZ_B4 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B4', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
-}
-
-grp_CD_XZ_B5 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B5', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+grp_CD_XZ_B2_std <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B2_std', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
