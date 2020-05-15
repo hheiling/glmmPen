@@ -27,7 +27,7 @@
 #' Metropolis-within-Gibbs sampling?}
 #'
 #' @export
-sample.mc2 = function(coef, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
+sample.mc2 = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, nZ, okindex,
                       gibbs = F , uold){
   
   # find tau for rejection sampler (Booth 1999) by first maximizing u
@@ -149,7 +149,7 @@ sample.mc2 = function(coef, cov, y, X, Z, nMC, trace = 0, family = family, group
 ############################################################################
 
 #' @export
-sample_mc_adapt = function(coef, cov, y, X, Z, nMC, trace = 0, family = family, group, d, okindex,
+sample_mc_adapt = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, okindex,
                            gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000,
                            burnin_batchnum = 40){
   
