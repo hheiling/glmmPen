@@ -47,6 +47,10 @@ grp_CD_XZ_B2_std <- function(y, X, Z, group, u, J_q, dims, beta, offset, family,
     .Call('_glmmPen_grp_CD_XZ_B2_std', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
+grp_CD_XZ_B_ortho <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B_ortho', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
     .Call('_glmmPen_logLik_cpp', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
 }
