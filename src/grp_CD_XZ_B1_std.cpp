@@ -113,8 +113,13 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
   // in order to make selection of random effects less dependent on size of random effects
   // Center and scale to be used for calc of A_std and reverse of standardization of 
   // beta coefficients that are related to random effects
-  // A_std = (A.each_col() - center).each_col() / scale
+  // A_std = (A.each_row() - center).each_row() / scale
   // Note: will not center or scale portion of A relating to random intercept variance
+  // Goal of standardization:
+    // sum(A_std.col(j)) = 0
+    // mean(A_std.col(j)) = 1
+  // center(j) = sum(A.col(j)) / (N*M)
+  // scale(j) = sqrt(sum(A.col(j) - center(j)) / (N*M))
   
   arma::rowvec center(H); center.zeros();
   arma::rowvec scale(H); scale.zeros();
@@ -133,13 +138,35 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
       m0 = m;
       arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
       center = center + sum(A,0); // Add up column sums
-      scale = scale + sum(A%A,0); // Add up column sums
     }
     
   }
   
+  center = center / (N*M);
+  
+  for(k=0;k<d;k++){ // For each of d groups of individuals
+    
+    // Rows of Z to use
+    arma::uvec ids = find(group == (k+1));
+    
+    for(f=0;f<q;f++){
+      col_idx(f) = k + f*d;
+    }
+    arma::mat Zk = Z.submat(ids, col_idx);
+    
+    for(m=0;m<M;m++){
+      m0 = m;
+      arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
+      arma::mat A_c = A.each_row() - center;
+      scale = scale + sum(A_c%A_c,0); // Add up column sums
+    }
+    
+  }
+  
+  scale = sqrt(scale / (N*M));
+  
   // t(A_j) * A_j for random intercept
-  double xTx_randInt = scale(0) / (N*M);
+  double xTx_randInt = scale(0);
   
   // Random intercept covariate will not be centered or scaled
   center(0) = 0.0;
@@ -191,7 +218,7 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
       for(m=0;m<M;m++){
         m0 = m;
         arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
-        arma::mat A_std = (A.each_col() - center).each_col() / scale;
+        arma::mat A_std = (A.each_row() - center).each_row() / scale;
 
         // Calculate t(A_j) * A_j for groups
         for(f=1;f<q;f++){
@@ -248,7 +275,7 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
     for(m=0;m<M;m++){
       m0 = m;
       arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
-      arma::mat A_std = (A.each_col() - center).each_col() / scale;
+      arma::mat A_std = (A.each_row() - center).each_row() / scale;
       eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A_std * beta.elem(ref_cols) + offset(ids));
 
     }
@@ -463,7 +490,7 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
         for(m=0;m<M;m++){
           m0 = m;
           arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-          arma::mat A_std = (A.each_col() - center).each_col() / scale;
+          arma::mat A_std = (A.each_row() - center).each_row() / scale;
           arma::rowvec shift = trans(A_std.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
           // Update random effects component of eta for each individual
           eta.submat(m0,ids) += shift;
@@ -551,7 +578,7 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
       for(m=0;m<M;m++){
         m0 = m;
         arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
-        arma::mat A_std = (A.each_col() - center).each_col() / scale;
+        arma::mat A_std = (A.each_row() - center).each_row() / scale;
         // Update random effects component of eta for each individual
         eta.submat(m0,ids) += trans(A_std.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
         
