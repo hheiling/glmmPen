@@ -4,8 +4,8 @@
 \alias{sample.mc2}
 \title{Calculate Monte Carlo draws}
 \usage{
-sample.mc2(coef, cov, y, X, Z, nMC, trace = 0, family = family, group,
-  d, nZ, okindex, gibbs = F, uold)
+sample.mc2(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, nZ,
+  okindex, gibbs = F, uold)
 }
 \arguments{
 \item{cov}{the random effects covariance matrix estimated from the last M step of the EM algorithm}
