@@ -401,9 +401,6 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
     // Calculate zetaj vector (initialize as zero, then sum components of interest)
     arma::vec zetaj(Kj); zetaj.zeros();
 
-    // Initialize mean(resid^2) as 0, then sum components of interest
-    v0 = 0.0;
-
     for(k=0;k<d;k++){
       // Rows of Z to use
       arma::uvec ids = find(group == (k+1));
@@ -473,9 +470,6 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
       // Calculate zetaj vector (initialize as zero, then sum components of interest)
       arma::vec zetaj(Kj); zetaj.zeros();
 
-      // Initialize mean(resid^2) as 0, then sum components of interest
-      v0 = 0.0;
-
       for(k=0;k<d;k++){
         // Rows of Z to use
         arma::uvec ids = find(group == (k+1));
@@ -504,8 +498,6 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
 
       } // End k for loop
 
-      // resid in above = (y-mu), need resid = (y-mu)/nu
-      // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
       // Finish calc of zetaj
       
       if(H == q){ // sigma specified with independence structure (diagonal)
@@ -561,9 +553,6 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
 
     // Find index of covariates corresponding to previous j in sequence (r)
     arma::uvec idxr = find(XZ_group == r);
-
-    // Initialize mean(resid^2) as 0, then sum components of interest
-    v0 = 0.0;
 
     for(k=0;k<d;k++){
       // Rows of Z to use

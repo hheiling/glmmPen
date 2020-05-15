@@ -265,9 +265,6 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
       // Calculate zetaj vector (initialize as zero, then sum components of interest)
       arma::vec zetaj(Kj); zetaj.zeros();
 
-      // Initialize mean(resid^2) as 0, then sum components of interest
-      v0 = 0.0;
-
       // Calculate zetaj for fixed effects covariates in group j
         // zeta_fixef_calc() function in 'utility_grpCD.cpp'
       zetaj = zeta_fixef_calc(X, resid, idxj);
@@ -331,9 +328,6 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
     // Calculate zetaj vector (initialize as zero, then sum components of interest)
     arma::vec zetaj(Kj); zetaj.zeros();
 
-    // Initialize mean(resid^2) as 0, then sum components of interest
-    v0 = 0.0;
-    
     for(k=0;k<d;k++){
       // Rows of Z to use
       arma::uvec ids = find(group == (k+1));
@@ -408,9 +402,6 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
       // Calculate zetaj vector (initialize as zero, then sum components of interest)
       arma::vec zetaj(Kj); zetaj.zeros();
 
-      // Initialize mean(resid^2) as 0, then sum components of interest
-      v0 = 0.0;
-
       for(k=0;k<d;k++){
         // Rows of Z to use
         arma::uvec ids = find(group == (k+1));
@@ -482,9 +473,6 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
     // Find index of covariates corresponding to previous j in sequence (r)
     arma::uvec idxr = find(XZ_group == r);
     
-    // Initialize mean(resid^2) as 0, then sum components of interest
-    v0 = 0.0;
-
     for(k=0;k<d;k++){
       // Rows of Z to use
       arma::uvec ids = find(group == (k+1));
