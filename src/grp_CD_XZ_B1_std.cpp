@@ -626,9 +626,9 @@ arma::vec grp_CD_XZ_B1_std(const arma::vec& y, const arma::mat& X, const arma::m
   
   // Unstandardize the random effects portion
   arma::vec beta_ranef = beta.subvec(p,p+H-1);
-  // Unstandardize  the random intercept
+  // Adjust intercept (fixed effects intercept)
   arma::vec ratio = trans(center / scale); // value = 0 for random intercept
-  beta(p) = beta(p) - sum(ratio % beta_ranef);
+  beta(0) = beta(0) - sum(ratio % beta_ranef);
   // Unstandardize the coefficients corresponding to random slopes
   beta.subvec(p,p+H-1) = beta_ranef / scale.t(); // divide by 1.0 for random intercept
 
