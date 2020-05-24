@@ -4,6 +4,7 @@
 #' 
 #' Description
 #' 
+#' @inheritParams optimControl
 #' @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
 #' Z (model matrix for the random effects), and group (vector whose value indicates 
 #' the study, batch, or other group identity to which on observation belongs), with each row an 
@@ -12,27 +13,38 @@
 #' @param lambda1 a non-negative numeric penalty parameter for the grouped random effects
 #' covariance parameters
 #' @param conv a non-negative numeric convergence criteria for the convergence of the 
-#' log likelihood in the EM algorithm
+#' log likelihood in the EM algorithm. Default is 0.001.
 #' @param nMC a positive integer for the initial number of Monte Carlo draws
 #' @param family a description of the error distribution and link function to be used in the model. 
-#' For \code{fit_dat} this can be a character string naming a family function or a fmaily function. 
+#' For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 #' See \code{family} options in the Details section.
+#' @param offset_fit This can be used to specify an a priori known component to be included in the 
+#' linear predictor during fitting. This should be NULL or a numeric vector of length equal to the 
+#' number of cases. 
 #' @param trace an integer specifying print output to include as function runs. Default value is 0 
-#' (details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-#' of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})
-#' @param penalty character descripting the type of penalty to use in the variable selection procedure
-#' @param alpha ?
+#' (details ...)
+#' @param penalty character descripting the type of penalty to use in the variable selection procedure.
+#' Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.
+#' @param alpha Tuning parameter for the Mnet estimator which controls the relative contributions 
+#' from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+#' the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+#' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
+#' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
+#' Default is 4.0 for SCAD and 3.0 for MCP.
 #' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws
 #' @param returnMC logical, should the final Monte Carlo draws be returned? Default \code{TRUE}.
 #' @param gibbs logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
 #' (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?
 #' @param maxitEM a positive integer for the maximum number of allowed EM iterations
+#' @param maxit_CD a positive integer for the maximum number of allowed interations for the
+#' coordinate descent algorithms used within each EM iteration.
 #' 
 #' @section Details: 
-#' Accepted families: binomial, poisson
+#' Accepted families: binomial, poisson, gaussian. Currently, the algorithm is only equipted to handle
+#' the canonical links associated with these families (logit link for binomial, log link for poisson,
+#' identity link for gaussian).
 #' 
 #' @return a list with the following elements:
-#' \item{fit}{a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
 #' \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
 #' non-zero estimates of the lower-triangular cholesky decomposition of the random effects
 #' covariance matrix (in vector form)}
@@ -42,7 +54,7 @@
 #' \item{J}{a sparse matrix of dimension q^2 x (q(q+1)/2) (where q = number of random effects) that 
 #' transforms the non-zero elements of the lower-triangular cholesky decomposition of the random 
 #' effects covariance matrix into a vector}
-#' \item{ll}{estimate of the log likelihood, calculated by integrating over the Monte Carlo draws}
+#' \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
 #' \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
 #' \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 #' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
@@ -52,21 +64,20 @@
 #' Output only if started initially with Rejection sampling}
 #' 
 #' 
+#' @importFrom bigmemory attach.big.matrix describe
+#' @importFrom dismo calc.deviance
 #' @export
-fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, 
-                   family = "binomial", offset_fit = NULL,
-                   trace = 0, penalty = c("MCP","SCAD","lasso"),
-                   alpha = 1, gamma_penalty = switch(penalty, SCAD = 4.0, 3.0), 
-                   group_X = 0:(ncol(dat$X)-1),
-                   nMC = 1000, nMC_max = 5000, t = 10,
-                   returnMC = T, ufull = NULL, coeffull = NULL, ufullinit = NULL, 
-                   maxitEM = 100, maxit_CD = 500,
-                   M = 10^4, gibbs = T, MwG_sampler = c("random_walk","independence"),
-                   adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                   fit_type = 1){
-  
-  # Things to address:
-  ## Eventually, delete this line and following 'ok' references: ok = which(diag(var) > 0)
+fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, 
+                     family = "binomial", offset_fit = NULL,
+                     trace = 0, penalty = c("MCP","SCAD","lasso"),
+                     alpha = 1, gamma_penalty = switch(penalty, SCAD = 4.0, 3.0), 
+                     group_X = 0:(ncol(dat$X)-1),
+                     nMC = 1000, nMC_max = 10000, t = 2,
+                     returnMC = T, ufull = NULL, coeffull = NULL, ufullinit = NULL, 
+                     maxitEM = 100, maxit_CD = 250,
+                     M = 10^4, gibbs = T, MwG_sampler = c("random_walk","independence"),
+                     adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
+                     fit_type = 1){
   
   
   penalty = penalty[1]
@@ -125,10 +136,10 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
   if(!(covar %in% c("unstructured","independent"))){
     stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
   }
-  if(covar == "unstructured" & ncol(Z)/d >= 10){
+  if(covar == "unstructured" & ncol(Z)/d >= 7){
     warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation \n",
             immediate. = T)
-    covar == "independent"
+    covar = "independent"
   }
   
   #initial fit
@@ -202,10 +213,10 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
   }else{
     
     # Coordinate descent ignoring random effects: naive fit
-    naive_fit = glm(y ~ 1, family = fam_fun, offset = offset_fit)
-    coef_init = c(naive_fit$coefficients, rep(0, times = ncol(X)-1))
+    int_only = glm(y ~ 1, family = fam_fun, offset = offset_fit)
+    coef_init = c(int_only$coefficients, rep(0, times = ncol(X)-1))
     coef = M_step(y, X, fam_fun, coef_init, offset_fit, group_X = group_X,
-                  maxit = 250, maxit_CD = 250, conv = 0.0001, fit_type = 2, 
+                  maxit = 200, maxit_CD = 200, conv = 0.0001, fit_type = 2, # 3 if allow grouped fixed effects
                   penalty = penalty, lambda = lambda0, gamma = gamma_penalty, alpha = alpha)
     
     if(trace == 1) print(coef)
@@ -269,16 +280,16 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
     }
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                                d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit)
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                                       d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = as.numeric(ufullinit[nrow(ufullinit),]))
     }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
-                                     d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = ufullinit,
-                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                            d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = as.numeric(ufullinit[nrow(ufullinit),]),
+                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                            offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
     
-    u = u0 = samplemc_out$u0
+    u0 = attach.big.matrix(samplemc_out$u0)
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
     if(gibbs | samplemc_out$switch){
@@ -304,18 +315,18 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
   }else{
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                                d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
-                                uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)))
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                                       d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
+                                       uold = rnorm(n = ncol(Z)))
     }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
-                                     d = d, okindex = okindex, trace = trace, gibbs = gibbs,
-                                     uold = matrix(rnorm(nMC*ncol(Z)), nrow = nMC, ncol = ncol(Z)),
-                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                            d = d, okindex = okindex, trace = trace, gibbs = gibbs,
+                                            uold = rnorm(n = ncol(Z)),
+                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                            offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
     
-    u = u0 = samplemc_out$u0
+    u0 = attach.big.matrix(samplemc_out$u0)
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
     if(gibbs | samplemc_out$switch){
@@ -338,8 +349,8 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
     
   }
   
-  nMC2 = nrow(u)  
-  etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u)) + Znew2%*%t(u)
+  nMC2 = nrow(u0)  
+  etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u0)) + Znew2%*%t(u0[,])
   mu = matrix(0, nrow = length(y), ncol = ncol(etae))
   for(i in 1:nrow(etae)){
     mu[i,] = invlink(link_int, matrix(etae[i,], ncol=1))
@@ -379,14 +390,14 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
     oldll = ll0
     
     if(family == "binomial"){
-      nTotal = rep(1, length(y[rep(1:nrow(X), each = nrow(u))]))
+      nTotal = rep(1, length(y[rep(1:nrow(X), each = nrow(u0))]))
     }else{
       nTotal = NULL
     }
     
     # M Step
     
-    coef = M_stepB(y, X, Z, u, J, group, family=fam_fun, coef, offset=offset_fit,
+    coef = M_stepB(y, X, Z, u0@address, nrow(u0), J, group, family=fam_fun, coef, offset=offset_fit,
                    maxit=maxit_CD, conv=0.0001, init=(i == 1), group_X, covgroup,
                    penalty, lambda0, lambda1, gamma=gamma_penalty, alpha,
                    fit_type=fit_type)
@@ -403,7 +414,8 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
     }
     
     # Q-function version of log-likelihoood
-    ll0 = Qfun(y, X, Z, u, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
+    ## Need to fix (incorporate big.matrix into this Rcpp function)
+    ll0 = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
     
     if(!is.finite(ll0)){
       problem = T
@@ -415,7 +427,7 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
       stop("Error in M step")
       out = list(coef = coef, sigma = cov, lambda0 = lambda0, lambda1 = lambda1, 
                  covgroup = covgroup, J = J)
-      if(returnMC == T) out$u = u0
+      if(returnMC == T) out$u = describe(u0)
       return(out)
     }
     
@@ -477,16 +489,16 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
     # E Step 
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample.mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                                d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = u0)
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                       d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
     }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                                     d = d, okindex = okindex, gibbs = gibbs, uold = u0,
-                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                           d = d, okindex = okindex, gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]),
+                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                           offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
     
-    u = u0 = samplemc_out$u0
+    u0 = attach.big.matrix(samplemc_out$u0)
     
     # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
     if(gibbs | samplemc_out$switch){
@@ -509,9 +521,7 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
       
     }
     
-    
-    
-    nMC2 = nrow(u)
+    nMC2 = nrow(u0)
     
     if(trace == 1) print(diag(cov))
     gc()
@@ -521,11 +531,17 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
   returnMC
   
   # Another E step for loglik calculation (number draws = M)
-  samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=M, trace = trace, family = family, group = group, 
-                                 d = d, okindex = okindex, gibbs = gibbs, uold = u0,
-                                 proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                 offset = offset_increment, burnin_batchnum = burnin_batchnum)
-  u = u0 = samplemc_out$u0
+  if(MwG_sampler == "independence"){
+    samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                     d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
+  }else{ # MwG_sampler == "random_walk"
+    samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                          d = d, okindex = okindex, gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]),
+                                          proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                          offset = offset_increment, burnin_batchnum = burnin_batchnum)
+  }
+  
+  u0 = attach.big.matrix(samplemc_out$u0)
   
   # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
   if(gibbs | samplemc_out$switch){
@@ -547,9 +563,14 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
   
   # Calculate loglik using Pajor method (see logLik_Pajor.R)
   if(sum(diag(cov) == 0) == nrow(cov)){
+    eta = X %*% coef[1:ncol(X)]
     if(family == "binomial"){
-      eta = X %*% coef[1:ncol(X)]
       ll = sum(dbinom(x = y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T))
+    }else if(family == "poisson"){
+      ll = sum(dpois(x = y, lambda = log(eta), log = T))
+    }else if(family == "gaussian"){
+      s2 = sum((y - eta)^2)/(length(y) - (sum(coef[1:ncol(X)] > 0)))
+      ll = sum(dnorm(x = y, mean = eta, sd = sqrt(s2), log = T))
     }
   }else{
     ll = CAME_IS(posterior = u, y = y, X = X, Z = Z, group = group,
@@ -559,24 +580,55 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
   
   # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
   # d = nlevels(group) = number independent subjects/groups
-  BICh = -2*ll + sum(diag(cov) != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
+  BICh = -2*ll + sum(coef[-c(1:ncol(X))] != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
   # Usual BIC
   BIC = -2*ll + sum(coef != 0)*log(nrow(X))
+  
+  # Calculate deviance
+  modes = colMeans(u0[,])
+  eta = X %*% matrix(coef[1:ncol(X)], ncol = 1) + Z %*% matrix(modes, ncol = 1)
+  # For now, assume canonical links only
+  if(family == "binomial"){
+    pred = exp(eta) / (1+exp(eta))
+  }else if(family == "poisson"){
+    pred = exp(eta)
+  }else if(family == "gaussian"){
+    pred = eta
+  }
+  dev = calc.deviance(obs = y, pred = pred, family = family)
   
   if(gibbs){
     out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
                extra = list(okindex = okindex, Znew2 = Znew2),
-               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
+               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
+               dev = dev)
   }else{
     out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
-               extra = list(okindex = okindex, Znew2 = Znew2))
+               extra = list(okindex = okindex, Znew2 = Znew2),
+               dev = dev)
   }
   
-  if(returnMC == T) out$u = u
+  if(returnMC == T){
+    
+    if(MwG_sampler == "independence"){
+      samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=5000, trace = trace, family = family, group = group, 
+                                d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
+    }else{ # MwG_sampler == "random_walk"
+      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=5000, trace = trace, family = family, group = group, 
+                                     d = d, okindex = okindex, gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]),
+                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
+    }
+    
+    u0 = samplemc_out$u0
+    out$u = u0
+  }else{
+    out$u = matrix(NA, nrow = 1, ncol = 1)
+  } 
   
   if((initial_gibbs == F) && rej_to_gibbs > 0){
     if(rej_to_gibbs <= 3){
@@ -602,8 +654,31 @@ fit_dat_B = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001,
 
 
 #' @export
-adaptControl = function(batch_length = 50.0, offset = 0.0, burnin_batchnum = 200){
+adaptControl = function(batch_length = 100, offset = 1000, burnin_batchnum = 8500){
   structure(list(batch_length = batch_length, offset = offset, burnin_batchnum = burnin_batchnum), 
-            class = c("adaptControl"))
+            class = "adaptControl")
+}
+
+#' @title Control of Penalized Generalized Linear Mixed Model Fitting
+#' 
+#' Constructs control structures for penalized mixed model fitting.
+#' 
+#' @inheritParams fit_dat
+#' @param nMC_start a positive integer for the initial number of Monte Carlo draws. 
+#' 
+#' @return The *Control functions return a list (inheriting from class "\code{optimControl}") 
+#' containing fit and optimization criteria values used in optimization routine.
+#' 
+#' @export
+#' @export
+optimControl = function(conv = 0.001, nMC_start = 1000, nMC_max = 10000,
+                        maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
+                        covar = c("unstructured","independence"),
+                        MwG_sampler = c("random_walk","independence"), gibbs = T, 
+                        fit_type = c(1,2,3,4)){
+  structure(list(conv = conv, nMC = nMC_start, nMC_max = nMC_max, maxitEM = maxitEM, 
+                 maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
+                 MwG_sampler = MwG_sampler[1], gibbs = gibbs, fit_type = fit_type[1]),
+            class = "optimControl")
 }
 

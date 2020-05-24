@@ -1,5 +1,9 @@
+#define ARMA_NO_DEBUG
+
+// [[Rcpp::depends(RcppArmadillo, BH, bigmemory)]]
+
 #include <RcppArmadillo.h>
-// [[Rcpp::depends(RcppArmadillo)]]
+#include <bigmemory/BigMatrix.h>
 
 using namespace Rcpp;
 
@@ -235,7 +239,7 @@ arma::vec varfun(const char* family, arma::vec mu){ // double phi
 
 // Q-function calculation
 // [[Rcpp::export]]
-double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const arma::mat& u, 
+double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
             const arma::vec& group, const arma::sp_mat& J_q,
             const arma::vec& beta, const arma::vec offset, arma::vec dims,
             const char* family, int link){
@@ -245,10 +249,15 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const ar
   const char* gaus = "gaussian";
   const char* Gamma = "Gamma";
   
-  int M = u.n_rows;
+  // Provide access to the big.matrix of posterior draws
+  XPtr<BigMatrix> pMat(pBigMat);
+  arma::Mat<double> u((double*) pMat->matrix(), pMat->nrow(), pMat->ncol(),false);
+  
+  int M = pMat->nrow();
   int N = y.n_elem;
   int p = X.n_cols; // Number fixed effects covariates
   int p2 = beta.n_elem; // Total number of coefficients 
+  int nonzero_p = sum(beta != 0); // Number of non-zero coefficients
   
   int m=0;
   arma::uvec m0(1);
@@ -260,10 +269,15 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const ar
   int q = dims(1); // Number random effect variables
   
   arma::uvec col_idx(q);
+  arma::vec const_ones(N); const_ones.ones();
   
   arma::mat eta(M,N);
   arma::vec mu(M);
-  double yi=0;
+  
+  // parameters needed for specific distributions
+  // Gaussian distribution:
+  double s2 = 0.0; // estimate of sigma^2 
+  double sig = 0.0; // square root of s2 
   
   double likQ = 1.0;
   double llQ = 0.0;
@@ -290,6 +304,20 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const ar
     
   } // End k for loop
   
+  // If gaussian family, calculate sigma^2 
+  if(std::strcmp(family, gaus) == 0){
+    // Sum up SSE
+    s2 = 0.0;
+    for(i=0;i<N;i++){
+      mu = invlink(link, eta.col(i));
+      mu = mu_adjust(family, mu);
+      s2 += sum((y(i)*const_ones - mu) % (y(i)*const_ones - mu));
+    }
+    
+    s2 = s2 / (N*M - nonzero_p);
+    sig = sqrt(s2);
+  }
+  
   // Calculate llQ
   
   
@@ -309,10 +337,8 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const ar
         llQ = llQ + R::dpois(y(i), mu(m), 1); // log value
       }
     }else if(std::strcmp(family, gaus) == 0){
-      stop("gaussian not yet available");
       for(m=0;m<M;m++){
-        // Need to calculate and include sigma
-        llQ = llQ + R::dnorm4(y(i), mu(m), 1.0, 1); // log value
+        llQ = llQ + R::dnorm4(y(i), mu(m), sig, 1); // log value
       }
     }else if(std::strcmp(family, Gamma) == 0){
       stop("Gamma not yet available");
@@ -328,41 +354,4 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const ar
 
 }
 
-// double QfunB(const char*family, double yi, arma::vec mu){
-//   
-//   const char* bin = "binomial";
-//   const char* pois = "poisson";
-//   const char* gaus = "gaussian";
-//   const char* Gamma = "Gamma";
-//   
-//   int m=0;
-//   int M = mu.n_elem;
-//   
-//   double llQ=0.0;
-//   
-//   if(std::strcmp(family, bin) == 0){
-//     for(m=0;m<M;m++){
-//       llQ = llQ + R::dbinom(yi, 1.0, mu(m), 1); // log value
-//     }
-//   }else if(std::strcmp(family, pois) == 0){
-//     for(m=0;m<M;m++){
-//       llQ = llQ + R::dpois(yi, mu(m), 1); // log value
-//     }
-//   }else if(std::strcmp(family, gaus) == 0){
-//     stop("gaussian not yet available");
-//     for(m=0;m<M;m++){
-//       // Need to calculate and include sigma
-//       llQ = llQ + R::dnorm4(yi, mu(m), 1.0, 1); // log value
-//     }
-//   }else if(std::strcmp(family, Gamma) == 0){
-//     stop("Gamma not yet available");
-//   }else{
-//     stop("invalid family \n");
-//   }
-//   
-//   llQ = llQ / M;
-//   
-//   return(llQ);
-//   
-// }
 ////////////////////////////////////////////////////////////////////////////////////////////////

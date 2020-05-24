@@ -126,7 +126,7 @@ M_step = function(y, X, family, coef, offset = NULL,
 
 # init: if this is the first attempt at a fit (using initial coef)
 #' @export
-M_stepB = function(y, X, Z, u, J, group, family, coef, offset = NULL,
+M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
                   maxit = 250, conv = 0.0001, init,
                   group_X = 0:(ncol(X)-1), covgroup,
                   penalty = c("MCP","SCAD","lasso"), lambda0, lambda1,
@@ -148,7 +148,6 @@ M_stepB = function(y, X, Z, u, J, group, family, coef, offset = NULL,
   
   p = ncol(X)
   N = length(y)
-  M = nrow(u)
   
   if(nrow(X) != N){
     stop("the dimension of X and y do not match\n")
@@ -241,15 +240,15 @@ M_stepB = function(y, X, Z, u, J, group, family, coef, offset = NULL,
   dims = c(p, N, d, q, M, J_XZ, conv, maxit)
   
   if(fit_type == 1){
-    coef_new = grp_CD_XZ_B1(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+    coef_new = grp_CD_XZ_B1(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else if(fit_type == 2){
-    coef_new = grp_CD_XZ_B2(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+    coef_new = grp_CD_XZ_B2(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else if(fit_type == 3){
-    coef_new = grp_CD_XZ_B1_std(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+    coef_new = grp_CD_XZ_B1_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else if(fit_type == 4){
-    coef_new = grp_CD_XZ_B2_std(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 5){
-    coef_new = grp_CD_XZ_B_ortho(y, X, Z, group, u, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+    coef_new = grp_CD_XZ_B2_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+  }else{
+    stop("fit_type", fit_type, "not available \n")
   }
   
   return(as.numeric(coef_new))

@@ -17,8 +17,8 @@ SCAD_soln <- function(zeta, nu, lambda, gamma, alpha) {
     .Call('_glmmPen_SCAD_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma, alpha)
 }
 
-coord_desc <- function(y, X, weights, resid, eta, offset, dims, beta, penalty, lambda, gamma, alpha, family, link) {
-    .Call('_glmmPen_coord_desc', PACKAGE = 'glmmPen', y, X, weights, resid, eta, offset, dims, beta, penalty, lambda, gamma, alpha, family, link)
+coord_desc <- function(y, X, weights, resid, eta, dims, beta, penalty, lambda, gamma, alpha, family, link) {
+    .Call('_glmmPen_coord_desc', PACKAGE = 'glmmPen', y, X, weights, resid, eta, dims, beta, penalty, lambda, gamma, alpha, family, link)
 }
 
 #' @export
@@ -31,24 +31,20 @@ glm_fit <- function(y, X, dims, beta, offset, family, link, fit_type, group_X, K
     .Call('_glmmPen_glm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, fit_type, group_X, K_X, penalty, lambda, params)
 }
 
-grp_CD_XZ_B1 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B1', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+grp_CD_XZ_B1 <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B1', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
-grp_CD_XZ_B1_std <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B1_std', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+grp_CD_XZ_B1_std <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B1_std', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
-grp_CD_XZ_B2 <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B2', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+grp_CD_XZ_B2 <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B2', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
-grp_CD_XZ_B2_std <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B2_std', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
-}
-
-grp_CD_XZ_B_ortho <- function(y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
-    .Call('_glmmPen_grp_CD_XZ_B_ortho', PACKAGE = 'glmmPen', y, X, Z, group, u, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+grp_CD_XZ_B2_std <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_B2_std', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
 logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
@@ -102,10 +98,6 @@ sample_mc_gibbs_adapt_rw <- function(f, z, y, NMC, u0, proposal_SD, batch, batch
     .Call('_glmmPen_sample_mc_gibbs_adapt_rw', PACKAGE = 'glmmPen', f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, burnin_batchnum, trace)
 }
 
-posterior <- function(yk, Xk, Zk, beta_fef, q, M, sigma, uold, proposal_SD_k, batch, batch_length, offset, burnin_batchnum, trace) {
-    .Call('_glmmPen_posterior', PACKAGE = 'glmmPen', yk, Xk, Zk, beta_fef, q, M, sigma, uold, proposal_SD_k, batch, batch_length, offset, burnin_batchnum, trace)
-}
-
 arma_test_value <- function(x) {
     invisible(.Call('_glmmPen_arma_test_value', PACKAGE = 'glmmPen', x))
 }
@@ -131,7 +123,7 @@ invlink <- function(link, eta) {
     .Call('_glmmPen_invlink', PACKAGE = 'glmmPen', link, eta)
 }
 
-Qfun <- function(y, X, Z, u, group, J_q, beta, offset, dims, family, link) {
-    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, u, group, J_q, beta, offset, dims, family, link)
+Qfun <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link) {
+    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link)
 }
 
