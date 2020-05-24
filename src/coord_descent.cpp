@@ -196,12 +196,12 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
   const char* lasso = "lasso";
   const char* mcp = "MCP";
   const char* scad = "SCAD";
-
+  
   // Families with specific majorization-minimization nu values (theoretically determined)
-      // definition of nu provided below
+  // definition of nu provided below
   const char* bin = "binomial";
   const char* gaus = "gaussian";
-
+  
   int p = dims(0); // number covariates (ncol(X))
   int N = dims(1); // total number observations (length(y))
   double conv = dims(2); // convergence criteria
@@ -211,25 +211,25 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
   int j=0;
   int iter=0;
   int converged=0; // 0 if not converged, 1 if converged
-
+  
   double nu=0.0; // max second deriv of loss function (max possible weight)
   double zetaj=0.0; // 1/N * t(X_j) %*% resid + beta0_j
   double zj_L2=0.0; // L2 norm of zetaj vector
   double v0 = sum(resid % resid) / N; // sum(residuals^2) / N
   double v0_last=0.0; // value of v0 from past iteration
-
+  
   arma::vec beta0(p); // Input initial beta / beta from last round of updates
   double bj=0.0; // place-holder for value of element of beta
-
+  
   arma::vec mu(N); // expected mean for observations (g(eta) where g = link function)
   arma::vec deriv(N); // (d_eta / d_mu) = g'(mu) where g = link function
   arma::vec Vmu(N); // variance = b''(theta) where b(theta) from exponential family
   arma::vec constant(N); // arbitrary vector used to create vector of ones
   arma::vec mu_check(N); // 1 if mu a valid number for given family, 0 otherwise
   arma::vec shift(N);
-
+  
   arma::vec lam = lambda * sqrt(K_X); // lambda_j = lambda * sqrt(Kj) where Kj = size of jth group
-
+  
   if(std::strcmp(family, bin) == 0){
     nu = 0.25;
   }else if(std::strcmp(family, gaus) == 0){
@@ -237,38 +237,38 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
   }else{
     nu = max(weights);
   }
-
+  
   while((iter<maxit_CD) & (converged==0)){
-
+    
     // Add to iter
     iter = iter + 1;
     // Save latest value of beta
     beta0 = beta;
     // Save latest v0
     v0_last = v0;
-
+    
     // Element-wise update of beta
     for(j=0; j<J_X; j++){
-
+      
       // Identify columns of X and elements of beta belonging to group j
       arma::uvec ids = find(group_X == j);
-
+      
       if((iter>=5) & (sum(beta.elem(ids)) == 0)){
         // If beta penalized to zero in past round, will stay zero in further rounds
         // Therefore, skip to next covariate grouping
         continue;
       }
-
+      
       // Update zeta
       arma::mat Xj = X.cols(ids); // Select cols of X belonging to group j
       arma::vec zj_vec = (Xj.t() * resid) / N + beta.elem(ids);
-
+      
       // Clarify: when and when not to cary though nu value
-
+      
       if(ids.n_elem == 1){ // Equivalent to if K_X(j) == 1
-
+        
         zetaj = as_scalar(zj_vec);
-
+        
         // Update beta
         if(j==0){
           // No penalization for the intercept and other covariates given group_X values of 0
@@ -282,15 +282,15 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
             bj = SCAD_soln(zetaj*nu, nu, lam(j), gamma, alpha);
           }
         }
-
+        
         arma::vec b(1);
         beta.elem(ids) = bj * b.ones();
-
+        
       }else{ // ids.n_elem > 1
-
+        
         // zj_L2 = norm(zj_vec); // unit vector = zj_vec / norm(zj_vec)
         zj_L2 = sqrt(sum(zj_vec % zj_vec));
-
+        
         // Update beta
         if(j==0){
           // No penalization for the intercept and other covariates given group_X values of 0
@@ -304,15 +304,15 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
             beta.elem(ids) = SCAD_soln(zj_L2*nu, nu, lam(j), gamma, alpha) * (zj_vec / zj_L2);
           }
         }
-
-      }
-
-        // Update eta and residuals
-        shift = Xj*(beta.elem(ids) - beta0.elem(ids));
-        eta = eta + shift;
-        resid = resid - shift;
         
-
+      }
+      
+      // Update eta and residuals
+      shift = Xj*(beta.elem(ids) - beta0.elem(ids));
+      eta = eta + shift;
+      resid = resid - shift;
+      
+      
     } // End j for loop
     
     // Update mu
@@ -334,19 +334,22 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
     
     // Update residuals
     resid = (y - mu) / nu;
-
+    
     // Check convergence criteria
-    v0 = sum(resid % resid) / N;
-    if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
+    if(arma::max(abs(beta0 - beta)) < conv){
       converged = 1;
     }
-
+    // v0 = sum(resid % resid) / N;
+    // if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
+    //   converged = 1;
+    // }
+    
     if((iter == maxit_CD) & (converged == 0)){
       warning("grouped coordinate descent algorithm did not converge \n");
     }
-
+    
   } // End while loop
-
+  
   return(beta);
-
+  
 }
