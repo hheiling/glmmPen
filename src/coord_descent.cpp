@@ -107,7 +107,6 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
   arma::vec Vmu(N); // variance = b''(theta) where b(theta) from exponential family
   arma::vec constant(N); // Arbitrary vector used to create vector of ones
   arma::vec mu_check(N); // 1 if mu a valid number for given family, 0 otherwise
-  arma::vec shift(N);
   
   v0 = sum(resid % resid) / N;
   
@@ -149,28 +148,24 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
         }
       }
       
-      // Update eta and residuals
-      shift = eta + X.col(j) * (beta(j) - beta0(j));
-      eta = eta + shift;
-      resid = resid - shift;
+      // Update eta and mu
+      eta = eta + X.col(j) * (beta(j) - beta0(j));
+      mu = invlink(link,eta);
+      mu_check = muvalid(family, mu);
+      
+      // Update residuals and weights
+      deriv = dlink(link, mu);
+      Vmu = varfun(family, mu);
+      resid = deriv % (y - mu);
+      weights = constant.ones() / (deriv % deriv % Vmu);
+      for(i=0; i<N; i++){
+        if(mu_check(i) == 0){
+          resid(i) = 0.0;
+          weights(i) = 0.0;
+        }
+      }
       
     } // End j for loop
-    
-    // Update eta and mu
-    mu = invlink(link,eta);
-    mu_check = muvalid(family, mu);
-    
-    // Update residuals and weights
-    deriv = dlink(link, mu);
-    Vmu = varfun(family, mu);
-    resid = deriv % (y - mu);
-    weights = constant.ones() / (deriv % deriv % Vmu);
-    for(i=0; i<N; i++){
-      if(mu_check(i) == 0){
-        resid(i) = 0.0;
-        weights(i) = 0.0;
-      }
-    }
     
     // Check convergence criteria
     v0 = sum(resid % resid) / N;
