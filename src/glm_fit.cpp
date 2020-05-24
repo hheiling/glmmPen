@@ -93,7 +93,7 @@ arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
       // If dimension too high or rank of X.t() * W * X < p, 
       // use lasso coordinate descent with lambda = 0.0 and alpha = 1.0
       const char* lasso = "lasso";
-      beta = coord_desc(y, X, weights, resid, eta, offset, dims, beta, lasso, 0.0, gamma, 1.0, family, link);
+      beta = coord_desc(y, X, weights, resid, eta, dims, beta, lasso, 0.0, gamma, 1.0, family, link);
       
     }else{
       
@@ -169,7 +169,7 @@ arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
     // Coordinate Descent (ungrouped)
     //-------------------------------------------------------------------------------//
     
-    beta = coord_desc(y, X, weights, resid, eta, offset, dims, beta, penalty, lambda, gamma, alpha, family, link);
+    beta = coord_desc(y, X, weights, resid, eta, dims, beta, penalty, lambda, gamma, alpha, family, link);
     
   }else if(fit_type == 3){ // Grouped coordinate descent
     
