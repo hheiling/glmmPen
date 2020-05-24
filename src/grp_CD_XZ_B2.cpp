@@ -1,6 +1,9 @@
-// [[Rcpp::depends(RcppArmadillo)]]
+#define ARMA_NO_DEBUG
+
+// [[Rcpp::depends(RcppArmadillo, BH, bigmemory)]]
 
 #include <RcppArmadillo.h>
+#include <bigmemory/BigMatrix.h>
 #include "utility_glm.h"
 #include "utility_grpCD.h"
 
@@ -16,7 +19,7 @@ using namespace arma;
 // [[Rcpp::export]]
 arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
                       const arma::vec& group,
-                      const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims,
+                      SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
                       arma::vec beta, const arma::vec& offset,
                       const char* family, int link, int init,
                       const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
@@ -26,7 +29,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
   // X = fixed effecs covariate matrix
   // Z = random effects matrix
   // group = index of observation groups
-  // u = matrix of MCMC draws (cols organized same as Z)
+  // pBigMat = big.matrix of MCMC draws (cols organized same as Z)
   // J = sparse matrix such that vec(Gamma) = J * gamma (converts lower triangular matrix to a vector)
   // dims = collection of useful values
   // beta = coefficient vector (for both fixed and random effects)
@@ -36,6 +39,10 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
   // K = size of XZ_groups
   // penalty = type of penalty (lasso, MCP, SCAD)
   // params = additional penalty parameters (gamma and alpha)
+  
+  // Provide access to the big.matrix of posterior draws
+  XPtr<BigMatrix> pMat(pBigMat);
+  arma::Mat<double> post((double*) pMat->matrix(), pMat->nrow(), pMat->ncol(),false);
 
   unsigned int p = dims(0); // number fixed effect covariates (ncol(X))
   int N = dims(1); // total number observations (length(y))
@@ -94,6 +101,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
   arma::uvec col_idx(q); // columns of Z and u to choose at a time
   arma::uvec m0(1);
   int H = J_q.n_cols; // From paper, J_q
+  arma::rowvec u(q);
   
   arma::uvec covgroup = XZ_group.subvec(p,p+H-1) - XZ_group(p); // Group index for random effects
   arma::vec K_vec = arma::conv_to<arma::vec>::from(K); // Size of groups
@@ -141,7 +149,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     
     for(m=0;m<M;m++){
       m0 = m;
-      arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
+      u = post.submat(m0,col_idx);
+      arma::mat A = kron(u, Zk) * J_q;
       eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A * beta.elem(ref_cols) + offset(ids));
       
     }
@@ -280,7 +289,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       
       for(m=0;m<M;m++){
         m0 = m;
-        arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q;
+        u = post.submat(m0,col_idx);
+        arma::mat A = kron(u, Zk) * J_q;
         Xj = A.cols(idxj - p);
         zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
 
@@ -354,7 +364,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
         
         for(m=0;m<M;m++){
           m0 = m;
-          arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+          u = post.submat(m0,col_idx);
+          arma::mat A = kron(u, Zk) * J_q;
           arma::rowvec shift = trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
           // Update random effects component of eta for each individual
           eta.submat(m0,ids) += shift;
@@ -423,7 +434,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       
       for(m=0;m<M;m++){
         m0 = m;
-        arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+        u = post.submat(m0,col_idx);
+        arma::mat A = kron(u, Zk) * J_q;
         // Update random effects component of eta for each individual
         eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
         

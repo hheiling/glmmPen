@@ -1,8 +1,14 @@
-// [[Rcpp::depends(RcppArmadillo)]]
+#define ARMA_NO_DEBUG
+
+// [[Rcpp::depends(RcppArmadillo, BH, bigmemory)]]
 
 #include <RcppArmadillo.h>
+#include <bigmemory/BigMatrix.h>
 #include "utility_glm.h"
 #include "utility_grpCD.h"
+
+// #include <bigmemory/MatrixAccessor.hpp>
+// #include <numeric>
 
 using namespace Rcpp;
 using namespace arma;
@@ -14,12 +20,12 @@ using namespace arma;
 
 // [[Rcpp::export]]
 arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
-                      const arma::vec& group,
-                      const arma::mat& u, const arma::sp_mat& J_q, arma::vec dims,
-                      arma::vec beta, const arma::vec& offset,
-                      const char* family, int link, int init,
-                      const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
-                      const char* penalty, arma::vec params) {
+                       const arma::vec& group,
+                       SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
+                       arma::vec beta, const arma::vec& offset,
+                       const char* family, int link, int init,
+                       const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
+                       const char* penalty, arma::vec params) {
 
   // y = response vector
   // X = fixed effecs covariate matrix
@@ -35,12 +41,16 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
   // K = size of XZ_groups
   // penalty = type of penalty (lasso, MCP, SCAD)
   // params = additional penalty parameters (gamma and alpha)
+  
+  // Provide access to the big.matrix of posterior draws
+  XPtr<BigMatrix> pMat(pBigMat);
+  arma::Mat<double> post((double*) pMat->matrix(), pMat->nrow(), pMat->ncol(),false);
 
   unsigned int p = dims(0); // number fixed effect covariates (ncol(X))
   int N = dims(1); // total number observations (length(y))
   int d = dims(2); // number of groups within observations
   int q = dims(3); // number of random effect covariates
-  int M = dims(4); // number of MCMC draws (nrow(u))
+  int M = dims(4); // number of MCMC draws (nrow(pBigMat))
   int J_XZ = dims(5); // number of covariate groups (in fixed and random effects)
   double conv = dims(6); // Convergence threshold
   int maxit = dims(7); // maximum number of iterations
@@ -91,8 +101,9 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
   arma::uvec ref_cols = as<arma::uvec>(wrap(seq(p, p + J_q.n_cols - 1)));
 
   arma::uvec col_idx(q); // columns of Z and u to choose at a time
-  arma::uvec m0(1);
+  arma::rowvec u(q); // A single row from the posterior matrix (extract from pBigMat)
   int H = J_q.n_cols; // From paper, J_q
+  arma::uvec m0(1);
 
   arma::uvec covgroup = XZ_group.subvec(p,p+H-1) - XZ_group(p); // Group index for random effects
   arma::vec K_vec = arma::conv_to<arma::vec>::from(K); // Size of groups
@@ -135,7 +146,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
       for(m=0;m<M;m++){
         m0 = m;
-        arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q; // n_k by H
+        u = post.submat(m0,col_idx);
+        arma::mat A = kron(u,Zk) * J_q; // n_k by H
         scale = scale + sum(A%A,0); // Add columns of A%A
       }
       
@@ -166,7 +178,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
       for(m=0;m<M;m++){
         m0 = m;
-        arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
+        u = post.submat(m0,col_idx);
+        arma::mat A = kron(u, Zk) * J_q;
 
         // Calculate t(A_j) * A_j for groups
         for(f=0;f<q;f++){
@@ -187,7 +200,7 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
 
   } // End if-else H == q
-
+  
   //-------------------------------------------------------------------------------//
   // Initialize nu = max possible weight
   //-------------------------------------------------------------------------------//
@@ -222,7 +235,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
     for(m=0;m<M;m++){
       m0 = m;
-      arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
+      u = post.submat(m0,col_idx);
+      arma::mat A = kron(u, Zk) * J_q;
       eta.submat(m0,ids) = trans(Xk * beta.elem(fef_cols) + A * beta.elem(ref_cols) + offset(ids));
 
     }
@@ -335,7 +349,7 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
 
     } // End j for loop for fixed effects
-
+    
     //----------------------------------------------------------------------------------//
     // Calculate zetaj for random intercept
     // Will not penalize random intercept
@@ -361,7 +375,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
       for(m=0;m<M;m++){
         m0 = m;
-        arma::mat A = kron(u.submat(m0,col_idx),Zk) * J_q;
+        u = post.submat(m0,col_idx);
+        arma::mat A = kron(u,Zk) * J_q;
         Xj = A.cols(idxj - p);
         zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
 
@@ -395,7 +410,7 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
     }
 
     r = J_X;
-
+    
     // ----------------------------------------------------------------------------------//
     // Element-wise update of random effects effects betaj
     // ----------------------------------------------------------------------------------//
@@ -442,7 +457,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
         
         for(m=0;m<M;m++){
           m0 = m;
-          arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+          u = post.submat(m0,col_idx);
+          arma::mat A = kron(u,Zk) * J_q;
           arma::rowvec shift = trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
           // Update random effects component of eta for each individual
           eta.submat(m0,ids) += shift;
@@ -505,7 +521,7 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
       r = j;
 
     } // End j for loop
-
+    
     // ----------------------------------------------------------------------------------//
     // Update eta with last betaj update (r = last j updated)
     // ----------------------------------------------------------------------------------//
@@ -525,7 +541,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
       
       for(m=0;m<M;m++){
         m0 = m;
-        arma::mat A = kron(u.submat(m0, col_idx),Zk) * J_q;
+        u = post.submat(m0,col_idx);
+        arma::mat A = kron(u,Zk) * J_q;
         // Update random effects component of eta for each individual
         eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
         
@@ -582,6 +599,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
     Rcout << "grouped coordinate descent algorithm did not converge" << std::endl;
   }
 
+  // Rcout << "isS4(beta): " << beta.isS4() << std::endl;
+  
   return beta;
 }
 
