@@ -9,9 +9,9 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
   family = "binomial", offset_fit = NULL, trace = 0,
   penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
   gamma_penalty = switch(penalty, SCAD = 4, 3),
-  group_X = 0:(ncol(dat$X) - 1), nMC = 1000, nMC_max = 5000,
-  t = 10, returnMC = T, ufull = NULL, coeffull = NULL,
-  ufullinit = NULL, maxitEM = 100, maxit_CD = 500, M = 10^4,
+  group_X = 0:(ncol(dat$X) - 1), nMC = 1000, nMC_max = 10000,
+  t = 2, returnMC = T, ufull = NULL, coeffull = NULL,
+  ufullinit = NULL, maxitEM = 100, maxit_CD = 250, M = 10^4,
   gibbs = T, MwG_sampler = c("random_walk", "independence"),
   adapt_RW_options = adaptControl(), covar = c("unstructured",
   "independent"), fit_type = 1)
@@ -28,19 +28,29 @@ observation}
 covariance parameters}
 
 \item{conv}{a non-negative numeric convergence criteria for the convergence of the 
-log likelihood in the EM algorithm}
+log likelihood in the EM algorithm. Default is 0.001.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat} this can be a character string naming a family function or a fmaily function. 
+For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 See \code{family} options in the Details section.}
 
+\item{offset_fit}{This can be used to specify an a priori known component to be included in the 
+linear predictor during fitting. This should be NULL or a numeric vector of length equal to the 
+number of cases.}
+
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
+(details ...)}
 
-\item{penalty}{character descripting the type of penalty to use in the variable selection procedure}
+\item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
+Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 
-\item{alpha}{?}
+\item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
+from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
+
+\item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
+Default is 4.0 for SCAD and 3.0 for MCP.}
 
 \item{nMC}{a positive integer for the initial number of Monte Carlo draws}
 
@@ -50,12 +60,14 @@ of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
 
 \item{maxitEM}{a positive integer for the maximum number of allowed EM iterations}
 
+\item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
+coordinate descent algorithms used within each EM iteration.}
+
 \item{gibbs}{logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
 (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?}
 }
 \value{
 a list with the following elements:
-\item{fit}{a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
 \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
 non-zero estimates of the lower-triangular cholesky decomposition of the random effects
 covariance matrix (in vector form)}
@@ -65,7 +77,7 @@ covariance matrix (in vector form)}
 \item{J}{a sparse matrix of dimension q^2 x (q(q+1)/2) (where q = number of random effects) that 
 transforms the non-zero elements of the lower-triangular cholesky decomposition of the random 
 effects covariance matrix into a vector}
-\item{ll}{estimate of the log likelihood, calculated by integrating over the Monte Carlo draws}
+\item{ll}{estimate of the log likelihood, calculated using the Pajor method}
 \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
 \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
@@ -79,6 +91,8 @@ Description
 }
 \section{Details}{
  
-Accepted families: binomial, poisson
+Accepted families: binomial, poisson, gaussian. Currently, the algorithm is only equipted to handle
+the canonical links associated with these families (logit link for binomial, log link for poisson,
+identity link for gaussian).
 }
 
