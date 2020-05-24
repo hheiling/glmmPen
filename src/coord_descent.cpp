@@ -107,6 +107,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
   arma::vec Vmu(N); // variance = b''(theta) where b(theta) from exponential family
   arma::vec constant(N); // Arbitrary vector used to create vector of ones
   arma::vec mu_check(N); // 1 if mu a valid number for given family, 0 otherwise
+  arma::vec shift(N);
   
   v0 = sum(resid % resid) / N;
   
@@ -148,45 +149,34 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
         }
       }
       
-      // Update eta and mu
-      eta = X * beta + offset;
-      mu = invlink(link,eta);
-      mu_check = muvalid(family, mu);
-      
-      // Update residuals and weights
-      deriv = dlink(link, mu);
-      Vmu = varfun(family, mu);
-      resid = deriv % (y - mu);
-      weights = constant.ones() / (deriv % deriv % Vmu);
-      for(i=0; i<N; i++){
-        if(mu_check(i) == 0){
-          resid(i) = 0.0;
-          weights(i) = 0.0;
-        }
-      }
-      
-      // ncvreg check of binomial weights
-      // for(i=0; i<N; i++){
-      //   if(weights(i) < 0.0001){
-      //     weights(i) = 0.00001; // minimum weight allowed (same as ncvreg)
-      //     resid(i) = (y(i) - mu(i)) / weights(i);
-      //   }
-      // }
+      // Update eta and residuals
+      shift = eta + X.col(j) * (beta(j) - beta0(j));
+      eta = eta + shift;
+      resid = resid - shift;
       
     } // End j for loop
+    
+    // Update eta and mu
+    mu = invlink(link,eta);
+    mu_check = muvalid(family, mu);
+    
+    // Update residuals and weights
+    deriv = dlink(link, mu);
+    Vmu = varfun(family, mu);
+    resid = deriv % (y - mu);
+    weights = constant.ones() / (deriv % deriv % Vmu);
+    for(i=0; i<N; i++){
+      if(mu_check(i) == 0){
+        resid(i) = 0.0;
+        weights(i) = 0.0;
+      }
+    }
     
     // Check convergence criteria
     v0 = sum(resid % resid) / N;
     if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
       converged = 1;
     }
-    
-    // Alternative convergence criteria
-    // Compare old vs new beta, check convergence criteria
-    // euclid_dist = sqrt(sum((beta0 - beta) % (beta0 - beta)));
-    // if(euclid_dist < conv){ 
-    //   converged = 1;
-    // }
     
     if((iter == maxit_CD) & (converged == 0)){
       warning("coord_desc algorithm did not converge \n");
@@ -241,6 +231,7 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
   arma::vec Vmu(N); // variance = b''(theta) where b(theta) from exponential family
   arma::vec constant(N); // arbitrary vector used to create vector of ones
   arma::vec mu_check(N); // 1 if mu a valid number for given family, 0 otherwise
+  arma::vec shift(N);
 
   arma::vec lam = lambda * sqrt(K_X); // lambda_j = lambda * sqrt(Kj) where Kj = size of jth group
 
@@ -321,29 +312,33 @@ arma::vec grp_CD(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid,
 
       }
 
-        // Update eta  and mu
-        // eta = X * beta + offset; // simplify eta update (Breheny and Huang 2015)
-        eta = eta + Xj*(beta.elem(ids) - beta0.elem(ids));
-        mu = invlink(link,eta);
-
-        // If not binomial or gaussian family, update nu by recalculating weights
-          // Binomial: nu stays at 0.25 always
-          // Gaussian: nu stays at 1.0 always
-        if((std::strcmp(family, bin) != 0) & (std::strcmp(family, gaus) != 0)){
-
-          // Update weights
-          deriv = dlink(link, mu);
-          Vmu = varfun(family, mu);
-          weights = constant.ones() / (deriv % deriv % Vmu);
-
-          // Update nu
-          nu = max(weights);
-        }
-
-        // Update residuals
-        resid = (y - mu) / nu;
+        // Update eta and residuals
+        shift = Xj*(beta.elem(ids) - beta0.elem(ids));
+        eta = eta + shift;
+        resid = resid - shift;
+        
 
     } // End j for loop
+    
+    // Update mu
+    mu = invlink(link,eta);
+    
+    // If not binomial or gaussian family, update nu by recalculating weights
+    // Binomial: nu stays at 0.25 always
+    // Gaussian: nu stays at 1.0 always
+    if((std::strcmp(family, bin) != 0) & (std::strcmp(family, gaus) != 0)){
+      
+      // Update weights
+      deriv = dlink(link, mu);
+      Vmu = varfun(family, mu);
+      weights = constant.ones() / (deriv % deriv % Vmu);
+      
+      // Update nu
+      nu = max(weights);
+    }
+    
+    // Update residuals
+    resid = (y - mu) / nu;
 
     // Check convergence criteria
     v0 = sum(resid % resid) / N;
