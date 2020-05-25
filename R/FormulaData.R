@@ -29,7 +29,7 @@
 #' 
 #' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @export
-formulaData = function(formula, data = NULL, na.action){
+formulaData = function(formula, data = NULL, na.action = na.omit){
   # Note: need to deal with potential offsets and weights
   
   ## substitute | for +
@@ -48,7 +48,7 @@ formulaData = function(formula, data = NULL, na.action){
       if(identical(na.action, na.omit) | identical(na.action, "na.omit")){ 
         data = na.omit(data[,colnames(model.frame(formula_full, data = data))])
       }else if(identical(na.action, na.pass) | identical(na.action, "na.pass")){
-          data = data
+        data = data
       }else{
         print(na.action)
         stop("na.action must be na.omit or na.pass for formulaData function")
@@ -67,7 +67,6 @@ formulaData = function(formula, data = NULL, na.action){
   }else{ # if is.null(data)
     ## Full data frame with both fixed and random effects
     mf = model.frame(formula_full)
-    
     # Check here to see if any character vars
     if(any(is.character(mf))){
       warning("If data = NULL, all variables - including the group variable - must be numeric \n")
@@ -88,23 +87,25 @@ formulaData = function(formula, data = NULL, na.action){
       }
     }
     
+    
     ## Get fixed effects X matrix
     ## mm = model.matrix
     mm = model.matrix(formula_nobars)
     
     # Deal with NAs
-    if(identical(na.action, na.omit) | identical(na.action, "na.omit")){  
-      na_rows = rowSums(is.na(frame_full))
-      frame_full = na.omit(frame_full)
-      Y = Y[-na_rows]
-      mm = mm[-na_rows,]
-    }else{
-      warning("This function not equipted to deal with NA values. \n
-              Please check that data does not contain NA values. \n", immediate. = T)
-    }
+    na_rows = which(rowSums(is.na(frame_full)) > 0)
+    if(length(na_rows) > 0){
+      if(identical(na.action, na.omit) | identical(na.action, "na.omit")){  
+        frame_full = na.omit(frame_full)
+        Y = Y[-na_rows]
+        mm = mm[-na_rows,]
+      }else{
+        stop("This function not equipted to deal with NA values. \n
+             Please check that data does not contain NA values. \n")
+      }
+      }
     
-    
-  } # End if/else
+    } # End if/else
   
   ## Identify random effects
   ### If no | (no random effects listed) then stop - mkBlist called by mkReTrms gives this error
@@ -133,14 +134,15 @@ formulaData = function(formula, data = NULL, na.action){
   
   # Problem if variable specified in formula is the intercept / a constant column 
   # and -1 not included in formula
-  constant_cols = mm[,apply(mm, 2, var, na.rm=TRUE) == 0]
+  # ignore newly created intercept term
+  constant_cols = apply(mm[,-1], 2, var, na.rm=TRUE)
   
-  if(class(constant_cols) == "matrix"){ 
+  if(any(constant_cols == 0)){
     # If true, more than one column with zero variance
     # If only one column, class(constant_cols) == "numeric"
     stop("Variable(s) in formula has zero variance (constant column).
          Either remove this variable from formula or specify -1 in formula")
-  } 
+  }
   
   ## Make sure colnames random effects subset of colnames mm
   cnms = reTrms$cnms[[1]] # Assume only one group
