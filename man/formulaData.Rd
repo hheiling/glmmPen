@@ -4,7 +4,7 @@
 \alias{formulaData}
 \title{Extracting Useful Vectors and Matrices from Formula and Data Information}
 \usage{
-formulaData(formula, data = NULL, na.action)
+formulaData(formula, data = NULL, na.action = na.omit)
 }
 \arguments{
 \item{formula}{a two-sided linear formula object describing both the fixed-effects and 
