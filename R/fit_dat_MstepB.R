@@ -4,7 +4,6 @@
 #' 
 #' Description
 #' 
-#' @inheritParams optimControl
 #' @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
 #' Z (model matrix for the random effects), and group (vector whose value indicates 
 #' the study, batch, or other group identity to which on observation belongs), with each row an 
