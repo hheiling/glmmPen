@@ -6,8 +6,7 @@
 #' \code{sample.mc2} calculates the Monte Carlo draws by either Rejection sampling or 
 #' Metropolis-within-Gibbs sampling needed for Monte Carlo Expectation Conditional Minimization (MCECM)
 #'
-#' @inheritParams fit_dat
-#' @param fit a grpreg fit object (set \code{\link[grpreg]{grpreg}})
+#' @inheritParams fit_dat_B
 #' @param cov the random effects covariance matrix estimated from the last M step of the EM algorithm
 #' @param y a numeric vector of the response variable
 #' @param X a model matrix of the fixed effects covariates
