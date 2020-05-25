@@ -133,7 +133,7 @@ etaCalc = function(X, Z, beta, U){
 
   if(class(U) == "numeric"){ # U = vector instead of matrix; highly unlikely
     gamma = mean(U)
-  }else{
+  }else{ # U is a matrix
     gamma = colMeans(U)
   }
   
@@ -144,12 +144,13 @@ etaCalc = function(X, Z, beta, U){
 
 #' @export
 invLink = function(family, eta){
+  fam = family$family
   # Inverse link functions (canonical links only)
-  if(family == "binomial"){
+  if(fam == "binomial"){
     mu = exp(eta) / (1+exp(eta))
-  }else if(family == "poisson"){
+  }else if(fam == "poisson"){
     mu = exp(eta)
-  }else if(family == "gaussian"){
+  }else if(fam == "gaussian"){
     mu = eta
   }else{
     stop("fitted means for given family not available")
@@ -164,7 +165,7 @@ fitted.pglmmObj = function(object){
   ## ToDo: add names/rownames (from X?)
   ## ToDo: Take into account potential offset (in etaCalc)
   
-  eta = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$gibbs_mcmc)
+  eta = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$posterior_draws)
   mu = invLink(family = family(object), eta)
   
   return(mu)
@@ -185,7 +186,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     if(!fixed.only){
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
                     link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), 
-                                   U = object$gibbs_mcmc),
+                                   U = object$posterior_draws),
                     response = fitted(object))
     }else{ # Fixed.only = T
       eta = object$X %*% fixef(object)
@@ -204,12 +205,12 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
       if(nlevels(fD_out$group) != nlevels(object$group[[1]])){
         levs_orig = levels(object$group[[1]])
         levs_new = levels(fD_out$group)
-        # Columns of Z and object$gibbs_mcmc organized first by vars, then by group within vars
+        # Columns of Z and object$posterior_draws organized first by vars, then by group within vars
         present_levs = as.numeric(levs_new %in% levs_orig)
         keep_cols = rep(present_levs, each = ncol(object$Z)/nlevels(object$group[[1]]))
-        U = object$gibbs_mcmc[,keep_cols]
+        U = object$posterior_draws[,keep_cols]
       }else{
-        U = object$gibbs_mcmc
+        U = object$posterior_draws
       }
       eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = U)
       pred = switch(type[1], 
@@ -454,7 +455,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     type = plots
   }
   
-  U = object$gibbs_mcmc
+  U = object$posterior_draws
   U_cols = colnames(U)
   # colnames organization = var_name:grp_name
   
