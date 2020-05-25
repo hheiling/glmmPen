@@ -14,7 +14,6 @@
 #' covariance parameters
 #' @param conv a non-negative numeric convergence criteria for the convergence of the 
 #' log likelihood in the EM algorithm. Default is 0.001.
-#' @param nMC a positive integer for the initial number of Monte Carlo draws
 #' @param family a description of the error distribution and link function to be used in the model. 
 #' For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 #' See \code{family} options in the Details section.
@@ -31,13 +30,42 @@
 #' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
 #' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 #' Default is 4.0 for SCAD and 3.0 for MCP.
+#' @param nMC a positive integer for the initial number of Monte Carlo draws
 #' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws
-#' @param returnMC logical, should the final Monte Carlo draws be returned? Default \code{TRUE}.
-#' @param gibbs logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
-#' (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?
-#' @param maxitEM a positive integer for the maximum number of allowed EM iterations
+#' @param t the convergence criteria is based on the average Euclidean distance between 
+#' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
+#' Positive integer, default equals 2.
+#' @param returnMC logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.
+#' @param nMC_report positive integer specifying number of Monte Carlo posterior draws to return
+#' when the function ends. Default 5,000. Warning: the returned draws are formatted in a regular
+#' matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
+#' and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
+#' \code{nMC_report} by (q*d) does not cause memory issues on your operating system.
+#' @param maxitEM a positive integer for the maximum number of allowed EM iterations. Default equals 100.
 #' @param maxit_CD a positive integer for the maximum number of allowed interations for the
-#' coordinate descent algorithms used within each EM iteration.
+#' coordinate descent algorithms used within each EM iteration. Default equals 250.
+#' @param M positive integer specifying the number of posterior draws to use within the 
+#' Pajor log-likelihood calculation
+#' @param gibbs logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
+#' (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})? 
+#' Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects
+#' @param MwG_sampler character value specifying whether the Metropolis-within-Gibbs procedure 
+#' should incorporate an adaptive random walk sampler (default, "random_walk") or an
+#' independence sampler ("independence"). 
+#' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
+#' containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
+#' Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"
+#' @param covar character value specifying whether the covariance matrix should be unstructured
+#' ("unstructured") or diagonal with no covariances between variables ("independent").
+#' Default is "unstructured", but if the number of random effects (including the intercept) is 
+#' greater than 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+#' independent covariance structure (covar switched to "independent").
+#' @param fit_type integer specifying the verion of the grouped coordinate descent algorithm to use.
+#' Default equals 2, the 'naive fit', assuming that the random effects covariates do not need any
+#' additional standardization or adjustments to account for absence of orthogonalization.
+#' For the time being, this version is recommended. Version 4 adds standardization of the random
+#' effects covariates compared to version 2. Version 1 adds an adjustment to account for absence
+#' of orthogonalization, and version 3 adds standardization compared to version 1.
 #' 
 #' @section Details: 
 #' Accepted families: binomial, poisson, gaussian. Currently, the algorithm is only equipted to handle
@@ -50,19 +78,27 @@
 #' covariance matrix (in vector form)}
 #' \item{sigma}{random effects covariance matrix}
 #' \item{lambda0, lambda1}{the penalty parameters input into the function}
-#' \item{covgroup}{?}
-#' \item{J}{a sparse matrix of dimension q^2 x (q(q+1)/2) (where q = number of random effects) that 
-#' transforms the non-zero elements of the lower-triangular cholesky decomposition of the random 
-#' effects covariance matrix into a vector}
+#' \item{covgroup}{Organization of how random effects coefficients are grouped.}
+#' \item{J}{a sparse matrix that transforms the non-zero elements of the lower-triangular cholesky 
+#' decomposition of the random effects covariance matrix into a vector. For unstructured
+#' covariance matrices, dimension of dimension q^2 x (q(q+1)/2) (where q = number of random effects).
+#' For independent covariance matrices, q^2 x q.}
 #' \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
 #' \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
+#' \item{BIC}{Regular BIC estimate}
 #' \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 #' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
 #' Output if \code{returnMC} = \code{TRUE}}
+#' \item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
+#' and each group (rows)}
+#' \item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
+#' random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
+#' each group (rows)}
+#' \item{dev}{deviance value}
 #' \item{rej_to_gibbs}{logical, did the Monte Carlo sampling switch from Rejection sampling 
 #' to Metropolis-within-Gibbs sampling due to unacceptably small acceptance rates in the Rejection sampling?
 #' Output only if started initially with Rejection sampling}
-#' 
+#'  
 #' 
 #' @importFrom bigmemory attach.big.matrix describe
 #' @importFrom dismo calc.deviance
@@ -70,10 +106,10 @@
 fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, 
                      family = "binomial", offset_fit = NULL,
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
-                     alpha = 1, gamma_penalty = switch(penalty, SCAD = 4.0, 3.0), 
+                     alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
                      nMC = 1000, nMC_max = 10000, t = 2,
-                     returnMC = T, ufull = NULL, coeffull = NULL, ufullinit = NULL, 
+                     returnMC = T, nMC_report = 5000, ufull = NULL, coeffull = NULL, ufullinit = NULL, 
                      maxitEM = 100, maxit_CD = 250,
                      M = 10^4, gibbs = T, MwG_sampler = c("random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
@@ -396,7 +432,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
     }
     
     # M Step
-    
     coef = M_stepB(y, X, Z, u0@address, nrow(u0), J, group, family=fam_fun, coef, offset=offset_fit,
                    maxit=maxit_CD, conv=0.0001, init=(i == 1), group_X, covgroup,
                    penalty, lambda0, lambda1, gamma=gamma_penalty, alpha,
@@ -573,7 +608,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
       ll = sum(dnorm(x = y, mean = eta, sd = sqrt(s2), log = T))
     }
   }else{
-    ll = CAME_IS(posterior = u, y = y, X = X, Z = Z, group = group,
+    ll = CAME_IS(posterior = u0, y = y, X = X, Z = Z, group = group,
                  coef = coef, sigma = cov, family = family, M = M)
   }
   
@@ -615,11 +650,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
   if(returnMC == T){
     
     if(MwG_sampler == "independence"){
-      samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=5000, trace = trace, family = family, group = group, 
-                                d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
+      samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
+                                d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, matrix(u0[nrow(u0),], nrow = 1))
     }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=5000, trace = trace, family = family, group = group, 
-                                     d = d, okindex = okindex, gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]),
+      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
+                                     d = d, okindex = okindex, gibbs = gibbs, uold = matrix(u0[nrow(u0),], nrow = 1),
                                      proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
                                      offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
@@ -651,34 +686,4 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
   return(out)
 }
 
-
-
-#' @export
-adaptControl = function(batch_length = 100, offset = 1000, burnin_batchnum = 8500){
-  structure(list(batch_length = batch_length, offset = offset, burnin_batchnum = burnin_batchnum), 
-            class = "adaptControl")
-}
-
-#' @title Control of Penalized Generalized Linear Mixed Model Fitting
-#' 
-#' Constructs control structures for penalized mixed model fitting.
-#' 
-#' @inheritParams fit_dat
-#' @param nMC_start a positive integer for the initial number of Monte Carlo draws. 
-#' 
-#' @return The *Control functions return a list (inheriting from class "\code{optimControl}") 
-#' containing fit and optimization criteria values used in optimization routine.
-#' 
-#' @export
-#' @export
-optimControl = function(conv = 0.001, nMC_start = 1000, nMC_max = 10000,
-                        maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
-                        covar = c("unstructured","independence"),
-                        MwG_sampler = c("random_walk","independence"), gibbs = T, 
-                        fit_type = c(1,2,3,4)){
-  structure(list(conv = conv, nMC = nMC_start, nMC_max = nMC_max, maxitEM = maxitEM, 
-                 maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
-                 MwG_sampler = MwG_sampler[1], gibbs = gibbs, fit_type = fit_type[1]),
-            class = "optimControl")
-}
 
