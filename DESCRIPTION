@@ -2,7 +2,7 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.4.8.3
+Version: 1.4.8.4
 Date: 2018-10-26
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
@@ -14,8 +14,8 @@ Description: Fits penalized high and low dimensional generalized linear mixed mo
     Supports fitting of logistic regression models and MCP penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
-Imports: stringr, reshape2, ggplot2
-Depends: lme4, irr, ncvreg, mvtnorm, ROCR, grpreg, glmnet, inline, bigalgebra,
+Imports: stringr, reshape2, ggplot2, ncvreg, dismo
+Depends: irr, ncvreg, mvtnorm, ROCR, inline, bigalgebra,
     Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
 LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
 RoxygenNote: 6.1.0.9000
