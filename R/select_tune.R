@@ -1,17 +1,65 @@
 
+#' Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+#' Minimization (MCECM) 
+#' 
+#' \code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
+#' Conditional Minimization (MCECM) over multiple tuning parameters
+#' 
+#' @inheritParams fit_dat_B
+#' @inheritParams glmmPen
+#' 
+#' 
+#' @return A list with the following elements:
+#' \item{results}{matrix of summary results for each lambda tuning parameter combination, used
+#' to select the 'best' model}
+#' \item{out}{list of \code{\link{fit_dat_B}} results for the models with the minimum BICh and 
+#' minimum BIC values}
+#' \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
+#' Rows correspond with the rows of the results matrix.}
+#'  
+#' @importFrom dismo calc.deviance
+#' @importFrom stringr str_c
 #' @export
-select_tune = function(dat, nMC, lambda0_range,lambda1_range, family, 
-                       penalty, returnMC = T,
-                       conv, nMC_max, trace = 0, ufull = NULL, coeffull = NULL, 
-                       gibbs = T, maxitEM = 100, alpha = 1, t = 10,
-                       M = 10^4, MwG_sampler = c("random_walk","independence"), 
+select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
+                       penalty, lambda0_range, lambda1_range,
+                       alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
+                       returnMC = T, trace = 0, ufull = NULL, coeffull = NULL, 
                        adapt_RW_options = adaptControl(),
-                       covar = c("unstructured","independent")){
+                       optim_options = optimControl()){
+  
+  # Input modification and restriction for family
+  if(is.character(family)){
+    family = get(family, mode = "function", envir = parent.frame())
+  }
+  if(is.function(family)){
+    family = family()
+  }
+  if(class(family) == "family"){
+    fam = family$family
+  }
+  
+  # Extract variables from optimControl
+  conv = optim_options$conv
+  nMC = optim_options$nMC
+  nMC_max = optim_options$nMC_max
+  maxitEM = optim_options$maxitEM
+  maxit_CD = optim_options$maxit_CD
+  M = optim_options$M
+  t = optim_options$t
+  covar = optim_options$covar
+  MwG_sampler = optim_options$MwG_sampler
+  gibbs = optim_options$gibbs
+  fit_type = optim_options$fit_type
   
   covar = covar[1]
   if(!(covar %in% c("unstructured","independent"))){
     stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
   }
+  
+  # Calculate null deviance (intercept only model)
+  y = dat$y
+  int_only = glm(y ~ 1, family = family, offset = offset)
+  nullDev = calc.deviance(obs = y, pred = predict(int_only, type = "response"), family = fam)
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
@@ -21,8 +69,12 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
   # res2 = matrix(0, n2, 4) 
   coef = NULL
   outl = list()
-  for(i in 1:n1){
-    for(j in 1:n2){
+  
+  saturated = FALSE
+  fout = list()
+  
+  for(j in 1:n2){
+    for(i in 1:n1){
       if(i == 1 & j == 1){
         # start from the full model values
         coeffull0 = coeffull
@@ -43,14 +95,15 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
       print("------------------------------------------------------------------")
       print(sprintf("lambda0 %f lambda1 %f", lambda0_range[i], lambda1_range[j]))
       print("------------------------------------------------------------------")
-      out = try(fit_dat(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
-                        nMC = nMC, family = family, penalty = penalty,
-                        trace = trace, conv = conv, nMC_max = nMC_max, 
-                        ufull = ufull, coeffull = coeffull0, 
-                        gibbs = gibbs, maxitEM = maxitEM + maxitEM*(j==1), 
-                        returnMC = returnMC, ufullinit = ufullinit, alpha = alpha, t = t,
-                        M = M, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
-                        covar = covar))
+      out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
+                          nMC = nMC, family = family, offset_fit = offset, group_X = group_X,
+                          penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                          trace = trace, conv = conv, nMC_max = nMC_max, 
+                          ufull = ufull, coeffull = coeffull0, 
+                          gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
+                          returnMC = returnMC, ufullinit = ufullinit, t = t,
+                          M = M, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
+                          covar = covar, fit_type = fit_type))
       
       
       if(is.character(out)) next
@@ -60,8 +113,6 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
         coeffulli0 = out$coef
         ui0 = out$u 
       }
-      
-      fout = list()
       
       BICh = out$BICh
       print(BICh)
@@ -83,65 +134,44 @@ select_tune = function(dat, nMC, lambda0_range,lambda1_range, family,
         BICold = BIC
       }
       
-      res[(i-1)*(n2)+j,1] = lambda0_range[i]
-      res[(i-1)*(n2)+j,2] = lambda1_range[j]
-      res[(i-1)*(n2)+j,3] = BICh
-      # res[(i-1)*(n2)+j,4] = out$llb
-      res[(i-1)*(n2)+j,4] = out$ll
-      res[(i-1)*(n2)+j,5] = sum(out$coef[2:ncol(dat$X)] !=0)
-      res[(i-1)*(n2)+j,6] = sum(diag(out$sigma) !=0)
-      res[(i-1)*(n2)+j,7] = sum(out$coef !=0)
+      res[(j-1)*n1+i,1] = lambda0_range[i]
+      res[(j-1)*n1+i,2] = lambda1_range[j]
+      res[(j-1)*n1+i,3] = BICh
+      # res[(j-1)*n1+i,4] = out$llb
+      res[(j-1)*n1+i,4] = out$ll
+      res[(j-1)*n1+i,5] = sum(out$coef[2:ncol(dat$X)] !=0)
+      res[(j-1)*n1+i,6] = sum(diag(out$sigma) !=0)
+      res[(j-1)*n1+i,7] = sum(out$coef !=0)
       # if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
-      if(maxitEM > 1) res[(i-1)*(n2)+j,8] = out$ll
+      if(maxitEM > 1) res[(j-1)*n1+i,8] = out$ll
       # res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
-      res[(i-1)*(n2)+j,9] = BIC
-      outl[[(i-1)*(n2)+j]] = 1
+      res[(j-1)*n1+i,9] = BIC
+      outl[[(j-1)*n1+i]] = 1
       coef = rbind(coef, out$coef)
-      print(res[(i-1)*(n2)+j,])
-      colnames(res) = c("lambda0","lambda1","BICh","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef",
-                        "ll_Pajor","BIC")
+      print(res[(j-1)*n1+i,])
       
+      
+      Dev = out$dev
+      # Check for model saturation
+      if(Dev / nullDev < 0.01){
+        print("Reached model saturation")
+        saturated = TRUE
+        break
+      }
+      
+    } # End i loop for lambda0_range
+    
+    if(saturated){
+      break
     }
-  }
+    
+  } # end j loop for lambda1_range
   
-  # print("Start of ncvreg code for internal comparison")
-  # 
-  # library(ncvreg)
-  # if(n2 > 1){ 
-  #   outcv = try(cv.ncvreg(y = dat$y, X = dat$X[,-1], family = family, nlambda = n2, alpha = alpha))
-  #   if(is.character(outcv)){
-  #     out2 = NULL
-  #   }else{
-  #     bicglm = 2*outcv$fit$loss + 
-  #       log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
-  #     lambda.min = outcv$fit$lambda[which.min(bicglm)]
-  #     out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
-  #   }
-  #   outind = list()
-  #   for(jj in 1:max(as.numeric(dat$group))){
-  #     outcv = try(cv.ncvreg(y = dat$y[dat$group == jj], X = dat$X[dat$group == jj,-1], family = family, nlambda = n2, alpha = alpha))
-  #     
-  #     if(is.character(outcv)){
-  #       outind[[jj]] = NULL
-  #     }else{	
-  #       bicglm = 2*outcv$fit$loss + log(outcv$fit$n)*as.numeric(apply(outcv$fit$beta, 2, FUN = function(x) sum(x[-1]!=0)))
-  #       lambda.min = outcv$fit$lambda[which.min(bicglm)]
-  #       outind[[jj]] = try(ncvreg(y = dat$y[dat$group == jj], X = dat$X[dat$group == jj,-1], family = family, lambda = lambda.min, alpha = alpha))
-  #       if(is.character(outind[[jj]])){
-  #         outind[[jj]] = list(beta = outcv$fit$beta[,which.min(bicglm)])
-  #       }
-  #     }
-  #   }
-  #   
-  # }else{
-  #   lambda.min = 0.000001
-  #   outcv = NULL
-  #   outind = NULL
-  #   out2 = ncvreg(y = dat$y, X = dat$X[,-1], family = family, lambda = lambda.min, alpha = alpha)
-  # }
+  colnames(res) = c("lambda0","lambda1","BICh","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef",
+                    "ll_Pajor","BIC")
+  colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
-  # return(list(result = res, out = fout, res2 = outcv, out2 = out2, coef = coef, outind = outind))
+  return(list(results = res, out = fout, coef = coef))
   
-  return(list(result = res, out = fout, coef = coef))
 }
 
