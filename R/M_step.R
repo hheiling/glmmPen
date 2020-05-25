@@ -6,7 +6,7 @@ M_step = function(y, X, family, coef, offset = NULL,
                   group_X = 0:(ncol(X)-1), 
                   maxit = 250, maxit_CD = 250, conv = 0.0001, fit_type,
                   penalty = c("MCP","SCAD","lasso"), lambda,
-                  gamma = switch(penalty, SCAD = 3.7, 3.0), alpha = 1.0){
+                  gamma = switch(penalty[1], SCAD = 3.7, 3.0), alpha = 1.0){
   
   if (!is.double(y)) {
     tmp <- try(y <- as.double(y), silent=TRUE)
@@ -130,7 +130,7 @@ M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
                   maxit = 250, conv = 0.0001, init,
                   group_X = 0:(ncol(X)-1), covgroup,
                   penalty = c("MCP","SCAD","lasso"), lambda0, lambda1,
-                  gamma = switch(penalty, SCAD = 4.0, 3.0), alpha = 1.0,
+                  gamma = switch(penalty[1], SCAD = 4.0, 3.0), alpha = 1.0,
                   fit_type = 1){
   
   if (!is.double(y)) {
