@@ -25,10 +25,10 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
   num_var = ncol(Z) / d
   Gamma = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
   eta_fef = X %*% coef[1:ncol(X)]
-  post_mean = colMeans(posterior)
+  post_mean = colMeans(posterior[,])
   
   # Calculate bounds of the posterior for each dimension
-  bounds = apply(posterior, 2, range)
+  bounds = apply(posterior[,], 2, range)
   
   # Thin posterior draws based on acf results
   grp_names = as.numeric(levels(group))
@@ -150,7 +150,7 @@ CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
   # post_cov = sigma
   
   # Calculate bounds of the posterior for each dimension
-  bounds = apply(posterior, 2, range)
+  bounds = apply(posterior[,], 2, range)
   
   ll = 0
   
