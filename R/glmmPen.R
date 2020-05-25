@@ -6,18 +6,22 @@
 #' Conditional Minimization (MCECM)
 #' 
 #' @inheritParams formulaData
-#' @inheritParams fit_dat
-#' @param offset an optional vector of an \emph{a priori} known component to be included in the 
-#' linear predictor during fitting. One or more \code{\link[stats]{offset}} terms can be included in 
-#' formula instead or as well. If more than one is specified, their sum is use. 
-#' See \code{\link[stats]{model.offset}}.
-#' @param weights an optional vector of 'prior weights' to be used in the fitting process.
-#' Should be \code{NULL} or a numeric vector.
-#' @param control a list (of correct class, resulting from lambdaControl() or selectControl()) 
-#' containing control parameters. If the user wants to run the algorithm using one specific set of
+#' @inheritParams fit_dat_B
+#' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
+#' linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
+#' number of cases. Currently, the formula does not allow specification of an offset.
+#' @param optim_options a list of class "optimControl" created from function \code{\link{optimControl}}
+#' that specifies optimization parameters.
+#' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
+#' containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
+#' Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"
+#' @param tuning_options a list of class selectControl or lambdaControl resulting from 
+#' \code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
+#' If the user wants to run the algorithm using one specific set of
 #' penalty parameters \code{lambda0} and \code{lambda1}, then use \code{lambdaControl()}. 
+#' If no penalization is desired, use this setting with \code{lambda0} = \code{lambda1} = 0.
 #' If the user wants to run the algorithm over multiple possible \code{lambda0} and \code{lambda1},
-#' then use \code{lambdaControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
+#' then use \code{selectControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
 #' documentation for details
 #' 
 ## #' @inheritSection fit_dat
@@ -25,14 +29,13 @@
 #' @return An reference class object of class \code{\link{pglmmObj}} for which many methods are 
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #'  
-#' @importFrom stringr str_to_lower
+#' @importFrom stringr str_to_lower str_c
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omit,
-                  offset = NULL, weights = NULL, penalty = "grMCP",
-                  nMC = 100, nMC_max = 2000, returnMC = T,
-                  maxitEM = 100, trace = 0, conv = 0.001, 
-                  alpha = 1, gibbs = NULL, control = lambdaControl()
-                  ){
+                   offset = NULL, fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
+                   alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
+                   optim_options = optimControl(), adapt_RW_options = adaptControl(),
+                   returnMC = T, trace = 0, tuning_options = selectControl()){
   # Things to address / Questions to answer:
   ## Add option for different penalties
   ## Specify what fit_dat output will be
@@ -41,30 +44,28 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   
   # Input modification and restriction for family
   if(is.character(family)){
-    # library(stringr)
-    family = str_to_lower(family)
+    family = get(family, mode = "function", envir = parent.frame())
   }
   if(is.function(family)){
-    family = family$family
+    family = family()
   }
-  if(!(family %in% c("binomial"))){
-    print(family)
-    stop("'family' not recognized")
+  if(class(family) == "family"){
+    if(!(family$family %in% c("binomial","poisson","gaussian"))){
+      stop("family must be binomial, poisson, or gaussian")
+    }
   }
-
-  # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
-  if(class(data) != "data.frame"){
-    stop("data must be of class 'data.frame'")
-  }
-  if(sum(c(nMC, nMC_max, maxitEM) %% 1) > 0 | sum(c(nMC, nMC_max, maxitEM) <= 0) > 0){
-    stop("nMC, nMC_max, and maxitEM must be positive integers")
-  }
-  if(nMC_max < nMC){
-    warning("nMC_max should not be smaller than nMC \n", immediate. = T)
+  
+  penalty = penalty[1]
+  if(!(penalty %in% c("lasso","MCP","SCAD"))){
+    stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
   }
 
   # Convert formula and data to useful forms to plug into fit_dat
   fD_out = formulaData(formula, data, na.action)
+  if(!any(fD_out$cnms == "(Intercept)")){
+    print(fD_out$cnms)
+    stop("Model requires an intercept term")
+  }
   
   ## Convert group to numeric factor - for fit_dat
   ## Even if already numeric, convert to levels 1,2,3,... (consecutive integers)
@@ -82,14 +83,22 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   
   coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
   
-  if(is.null(gibbs)){
-    if(length(fD_out$cnms) > 20){
-      gibbs = T
-    }else{
-      gibbs = F
+  # Identify fixed effects that should not be penalized in select_tune or fit_dat (if any)
+  if(is.null(fixef_noPen)){
+    group_X = 0:(ncol(data_input$X)-1)
+  }else if(is.numeric(fixef_noPen)){
+    if(length(fixef_noPen) != (ncol(data_input$X)-1)){
+      stop("length of fixef_noPen must match number of fixed effects covariates")
     }
-  }else if(!is.logical(gibbs)){
-    stop("gibbs is a logical variable; must be TRUE or FALSE")
+    if(sum(fixef_noPen == 0) == 0){
+      group_X = 0:(ncol(data_input$X)-1)
+    }else{
+      ones = which(fixef_noPen == 1) + 1
+      zeros = which(fixef_noPen == 0) + 1
+      sq = 1:length(ones)
+      group_X = rep(0, times = ncol(data_input$X)-1)
+      group_X[ones] = sq
+    }
   }
   
   # Things that should be included in call:
@@ -97,108 +106,122 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   call = match.call(expand.dots = F)
   
   # rho = environment()
-  if(!is.list(control) | !inherits(control, "pglmmControl")){
-    stop("control parameter must be a list of type lambdaControl() or selectControl()")
+  if(!is.list(tuning_options) | !inherits(tuning_options, "pglmmControl")){
+    stop("tuning_option parameter must be a list of type lambdaControl() or selectControl()")
   }
   
-  if(inherits(control, "lambdaControl")){
-    lambda0 = control$lambda0
-    lambda1 = control$lambda1
+  if(inherits(tuning_options, "lambdaControl")){
+    lambda0 = tuning_options$lambda0
+    lambda1 = tuning_options$lambda1
     if(lambda0 < 0 | lambda1 < 0){
       stop("lambda0 and lambda1 cannot be negative")
     }
+    
+    # Extract variables from optimControl
+    conv = optim_options$conv
+    nMC = optim_options$nMC
+    nMC_max = optim_options$nMC_max
+    maxitEM = optim_options$maxitEM
+    maxit_CD = optim_options$maxit_CD
+    M = optim_options$M
+    t = optim_options$t
+    covar = optim_options$covar
+    MwG_sampler = optim_options$MwG_sampler
+    gibbs = optim_options$gibbs
+    fit_type = optim_options$fit_type
+    
     # Call fit_dat function
     # fit_dat function found in "/R/fit_dat.R" file
-    fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, nMC = nMC,
-                  family = family, trace = trace, penalty = penalty,
-                  conv = conv, nMC_max = nMC_max, returnMC = returnMC, gibbs = gibbs,
-                  maxitEM = maxitEM, alpha = alpha)
+    fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
+                    conv = conv, family = family, offset_fit = offset, trace = trace, 
+                    group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                    nMC = nMC, nMC_max = nMC_max, t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
+                    M = M, gibbs = gibbs, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
+                    covar = covar, fit_type = fit_type, returnMC = returnMC)
     
-  }else if(inherits(control, "selectControl")){
-    stop("selectControl option not yet available")
+    selection_results = matrix(NA, nrow = 1, ncol = 1)
+    optim_results = matrix(NA, nrow = 1, ncol = 1)
     
-    if(is.null(control$lambda0_seq)){
-      lambda0_range = LambdaRange(X = data_input$X, y = data_input$y, nlambda = control$nlambda)
+  }else if(inherits(tuning_options, "selectControl")){
+    if(is.null(tuning_options$lambda0_seq)){
+      lambda0_range = LambdaRange(X = data_input$X[,-1], y = data_input$y, family = family$family, 
+                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen)
     }else{
-      lambda0_range = control$lambda0_seq
+      lambda0_range = tuning_options$lambda0_seq
       if(!is.numeric(lambda0_range) | any(lambda0_range < 0)){
         stop("lambda0_seq must be a positive numeric sequence")
       }
     }
-    if(is.null(control$lambda1_seq)){
+    if(is.null(tuning_options$lambda1_seq)){
       lambda1_range = lambda0_range
     }else{
-      lambda1_range = control$lambda1_seq
+      lambda1_range = tuning_options$lambda1_seq
       if(!is.numeric(lambda1_range) | any(lambda1_range < 0)){
         stop("lambda1_seq must be a positive numeric sequence")
       }
     }
     
-    fit = select_tune(dat = data_input, lambda0_range = lambda0_range, lambda1 = lambda1_range,
-                      penalty = penalty, returnMC = returnMC,
-                      nMC = nMC, nMC_max = nMC_max, family = family, trace = trace,
-                      ufull = NULL, coeffull = NULL, gibbs = gibbs,
-                      maxitEM = maxitEM, alpha = alpha)
+    fit_select = select_tune(dat = data_input, offset = offset, family = family,
+                             lambda0_range = lambda0_range, lambda1_range = lambda1_range,
+                             penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                             returnMC = returnMC, trace = trace,
+                             adapt_RW_options = adapt_RW_options, 
+                             optim_options = optim_options)
     
+    if(tuning_options$BIC_option == "BICh"){
+      fit = fit_select$out[["BICh"]]
+    }else{
+      fit = fit_select$out[["BIC"]]
+    }
+    
+    resultsA = fit_select$results
+    coef_results = fit_select$coef
+    # Unstandardize coefficient results
+    beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
+    beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X)], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
+    for(i in 1:nrow(beta_results)){
+      beta_results[,-1] = coef_results[,2:ncol(data_input$X)] / std_out$X_scale
+    }
+    colnames(beta_results) = c(coef_names$fixed)
+    
+    selection_results = cbind(resultsA,beta_results,coef_results[,(ncol(data_input$X)+1):ncol(coef_results)])
+    
+    if(tuning_options$BIC_option == "BICh"){
+      optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
+    }else{
+      optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
+    }
+    colnames(optim_results) = colnames(selection_results)
   }
   
   # Things that should be included in fit_dat:
   ## (fill in later)
   
-  if(gibbs){
-    sampling = "Gibbs Sampling"
+  if(optim_options$gibbs){
+    sampling = "Metropolis-within-Gibbs Sampling"
   }else{
     if(fit$rej_to_gibbs < 3){
       sampling = "Rejection Sampling"
     }else{
-      sampling = "Gibbs Sampling"
+      sampling = "Metropolis-within-Gibbs Sampling"
     }
   }
   
   # Format Output - create pglmmObj object
-  output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y, 
-                       X = fD_out$X, Z = fD_out$Z, group = fD_out$flist, 
+  output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y,
+                       X = fD_out$X, Z = fD_out$Z, group = fD_out$flist,
                        coef_names = coef_names, family = family,
-                       offset = offset, weights = weights, frame = fD_out$frame,
-                       sampling = sampling, std_out = std_out))
+                       offset = offset, frame = fD_out$frame, 
+                       sampling = sampling, std_out = std_out, 
+                       selection_results = selection_results, optim_results = optim_results))
 
   out_object = pglmmObj$new(output)
   return(out_object)
+  
+  # return(fit)
 
 }
 
-#' @name lambdaControl
-#' @aliases selectControl
-#' 
-#' @title Control of Penalized Generalized Linear Mixed Model Fitting
-#' 
-#' Constructs control structures for penalized mixed model fitting.
-#' 
-#' @inheritParams fit_dat
-#' @param lambda0_seq a range of non-negative numeric penalty parameter for the fixed 
-#' effects parameters. If \code{NULL}, then a range will be calculated as described by (...).
-#' @param lambda1_seq a range of non-negative numeric penalty parameter for the grouped random 
-#' effects covariance parameters. If \code{NULL}, then a range will be calculated as described 
-#' by (...).
-#' 
-#' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
-#' containing penalization parameter values, presented either as an individual set or as a range of
-#' possible values.
-#' 
-#' @export
-lambdaControl = function(lambda0 = 0, lambda1 = 0){
-  structure(list(lambda0 = lambda0, lambda1 = lambda1), 
-            class = c("lambdaControl","pglmmControl"))
-}
-
-#' @rdname lambdaControl
-#' @export
-selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 40){
-  structure(list(lambda0_seq = lambda0_seq,
-                 lambda1_seq = lambda1_seq,
-                 nlambda = nlambda),
-            class = c("selectControl", "pglmmControl"))
-}
 
 #' @importFrom ncvreg std
 #' @export
@@ -211,7 +234,7 @@ XZ_std = function(fD_out, group_num){
   X_scale = attr(X_noInt_std, "scale")
   # Note: X_noInt_std = (X[,-1] - X_center) / X_scale
   
-  var_subset = (colnames(X) %in% fD_out$cnms)
+  var_subset = which(colnames(X) %in% fD_out$cnms)
   Z_center = X_center[var_subset]
   Z_scale = X_scale[var_subset]
   
@@ -220,10 +243,16 @@ XZ_std = function(fD_out, group_num){
   d = nlevels(group_num)
   num_vars = ncol(Z_sparse) / d
   
-  Z_std = Matrix(data = 0, nrow = nrow(Z_sparse), ncol = ncol(Z_sparse), sparse = T)
+  Z_std = Z_sparse
   
-  for(v in 1:num_vars){ 
-    if("(Intercept)" %in% cnms) next # Don't need to scale intercept
+  if("(Intercept)" %in% fD_out$cnms){
+    v_start = 2
+  }else{
+    stop("Model requires the assumption of an intercept")
+    v_start = 1
+  }
+  
+  for(v in v_start:num_vars){ 
     cols = seq(from = (v - 1)*d + 1, to = v*d, by = 1)
     for(k in 1:nlevels(group_num)){
       ids = which(group_num == k)
@@ -238,14 +267,14 @@ XZ_std = function(fD_out, group_num){
 
 #' @importFrom ncvreg setupLambda
 #' @export
-LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 40,
+LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 20,
                        penalty.factor = NULL){
   # Borrowed elements from `ncvreg` function
   n = nrow(X)
   p = ncol(X)
   
   if(family == "gaussian"){
-    yy = y = mean(y)
+    yy = y - mean(y)
   }else{
     yy = y
   }

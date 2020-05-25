@@ -6,10 +6,11 @@
 Minimization (MCECM)}
 \usage{
 glmmPen(formula, data = NULL, family = "binomial",
-  na.action = na.omit, offset = NULL, weights = NULL,
-  penalty = "grMCP", nMC = 100, nMC_max = 2000, returnMC = T,
-  maxitEM = 100, trace = 0, conv = 0.001, alpha = 1,
-  gibbs = NULL, control = lambdaControl())
+  na.action = na.omit, offset = NULL, fixef_noPen = NULL,
+  penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
+  gamma_penalty = switch(penalty[1], SCAD = 4, 3),
+  optim_options = optimControl(), adapt_RW_options = adaptControl(),
+  returnMC = T, trace = 0, tuning_options = selectControl())
 }
 \arguments{
 \item{formula}{a two-sided linear formula object describing both the fixed-effects and 
@@ -24,47 +25,46 @@ will be recognized. The random effects covariates need to be a subset of the fix
 omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat} this can be a character string naming a family function or a fmaily function. 
+For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 See \code{family} options in the Details section.}
 
 \item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
 options \code{na.omit} and \code{na.pass} are recognized by this function.}
 
-\item{offset}{an optional vector of an \emph{a priori} known component to be included in the 
-linear predictor during fitting. One or more \code{\link[stats]{offset}} terms can be included in 
-formula instead or as well. If more than one is specified, their sum is use. 
-See \code{\link[stats]{model.offset}}.}
+\item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
+linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
+number of cases. Currently, the formula does not allow specification of an offset.}
 
-\item{weights}{an optional vector of 'prior weights' to be used in the fitting process.
-Should be \code{NULL} or a numeric vector.}
+\item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
+Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 
-\item{penalty}{character descripting the type of penalty to use in the variable selection procedure}
+\item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
+from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
 
-\item{nMC}{a positive integer for the initial number of Monte Carlo draws}
+\item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
+Default is 4.0 for SCAD and 3.0 for MCP.}
 
-\item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws}
+\item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
+that specifies optimization parameters.}
 
-\item{returnMC}{logical, should the final Monte Carlo draws be returned? Default \code{TRUE}.}
+\item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
+containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
+Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"}
 
-\item{maxitEM}{a positive integer for the maximum number of allowed EM iterations}
+\item{returnMC}{logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
+(details ...)}
 
-\item{conv}{a non-negative numeric convergence criteria for the convergence of the 
-log likelihood in the EM algorithm}
-
-\item{alpha}{?}
-
-\item{gibbs}{logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
-(if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?}
-
-\item{control}{a list (of correct class, resulting from lambdaControl() or selectControl()) 
-containing control parameters. If the user wants to run the algorithm using one specific set of
+\item{tuning_options}{a list of class selectControl or lambdaControl resulting from 
+\code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
+If the user wants to run the algorithm using one specific set of
 penalty parameters \code{lambda0} and \code{lambda1}, then use \code{lambdaControl()}. 
+If no penalization is desired, use this setting with \code{lambda0} = \code{lambda1} = 0.
 If the user wants to run the algorithm over multiple possible \code{lambda0} and \code{lambda1},
-then use \code{lambdaControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
+then use \code{selectControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
 documentation for details}
 }
 \value{
