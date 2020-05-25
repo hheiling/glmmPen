@@ -86,20 +86,42 @@ sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binom
     }
     if(any(is.na(y))){
       ok = which(is.na(y))
-      print("")
-      print(mu[ok])
-      print(mu0[ok])
-      print(mu00[ok])
-      print(mu000[ok])
-      print(dim(mu0001))
-      print(mu0001)
-      print(dim(mu0002))
-      print(mu0002[ok])
-      print(X0)
-      print("")
-      #print((Z0%*%matrix(z1, ncol = 1))[ok])
-      #print((X0%*%beta + Z0%*%matrix(z1, ncol = 1))[ok])
-      #print(exp(X0%*%beta + Z0%*%matrix(z1, ncol = 1))[ok])
+      stop("y resulted in NA values")
+    }
+    
+  }else if(family == "gaussian"){
+    
+    if(is.null(beta)){
+      if(pnonzerovar > 0){
+        beta <- c(0, rep(2, p1), rep(0, pnonzerovar))
+        X0 = X[,1:(p1+pnonzerovar+1)]
+      }else{
+        beta <- c(0, rep(2, p1))
+        X0 = X[,1:(p1+1)]
+      }
+    }else{
+      if(length(beta) < p1+pnonzerovar+1) beta = c(beta, rep(0, pnonzerovar))
+      X0 = X[,1:(p1+pnonzerovar+1)]
+    }
+    if(slopes == T) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
+    z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
+    
+    
+    # create coefficient matrix for fixed effects, leaving fixed for now
+    mu0001 = rowSums(X0 * matrix(beta, ncol = length(beta), nrow = nrow(X0), byrow = T))  #X0%*%matrix(beta, ncol = 1)
+    mu0002 = Z0%*%matrix(z1, ncol = 1)
+    mu000 = mu0001 + mu0002
+    mu00 = as.numeric(mu000) 
+    mu = mu00
+    
+    #y  = rbinom(n = n, size = 1, prob = mu)
+    y = rep(NA, n)
+    for(ii in 1:n){
+      y[ii] = rnorm(n = 1, mean = mu[ii], sd = 0.5)
+    }
+    if(any(is.na(y))){
+      ok = which(is.na(y))
+      stop("y resulted in NA values")
     }
     
   }else{
