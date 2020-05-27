@@ -14,9 +14,8 @@ Description: Fits penalized high and low dimensional generalized linear mixed mo
     Supports fitting of logistic regression models and MCP penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
-Imports: stringr, reshape2, ggplot2, ncvreg, dismo
-Depends: irr, ncvreg, mvtnorm, ROCR, inline, bigalgebra,
-    Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
+Imports: stringr, reshape2, ggplot2, ncvreg, Matrix
+Depends: irr, mvtnorm, ROCR, inline, bigalgebra, Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
 LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
 RoxygenNote: 6.1.0.9000
 NeedsCompilation: yes
