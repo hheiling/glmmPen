@@ -56,7 +56,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 #' containing parameter specifications for the adaptive random walk sampling procedure.
 #' 
 #' @export
-adaptControl = function(batch_length = 100, offset = 1000, burnin_batchnum = 8500){
+adaptControl = function(batch_length = 100, offset = 8000, burnin_batchnum = 1000){
   structure(list(batch_length = batch_length, offset = offset, burnin_batchnum = burnin_batchnum), 
             class = "adaptControl")
 }
@@ -72,7 +72,7 @@ adaptControl = function(batch_length = 100, offset = 1000, burnin_batchnum = 850
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
 #' @export
-optimControl = function(conv = 0.001, nMC_start = 1000, nMC_max = 10000, nMC_report = 5000,
+optimControl = function(conv = 0.001, nMC_start = 200, nMC_max = 10000, nMC_report = 5000,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
                         covar = c("unstructured","independence"),
                         MwG_sampler = c("random_walk","independence"), gibbs = T, 

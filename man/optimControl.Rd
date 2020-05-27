@@ -6,7 +6,7 @@
 
 Constructs the control structure for penalized mixed model fitting.}
 \usage{
-optimControl(conv = 0.001, nMC_start = 1000, nMC_max = 10000,
+optimControl(conv = 0.001, nMC_start = 200, nMC_max = 10000,
   nMC_report = 5000, maxitEM = 100, maxit_CD = 250, M = 10000,
   t = 2, covar = c("unstructured", "independence"),
   MwG_sampler = c("random_walk", "independence"), gibbs = T,
