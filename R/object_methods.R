@@ -4,11 +4,13 @@
 # Properties: 
 ## Reference Class object
 
+#' @method fixef pglmmObj
 #' @export
 fixef.pglmmObj = function(object){
   object$fixef
 }
 
+#' @method ranef pglmmObj
 #' @export
 ranef.pglmmObj = function(object){
   object$ranef
