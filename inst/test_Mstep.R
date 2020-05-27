@@ -270,6 +270,44 @@ for(i in c(1:5, length(lambda_vec))){
 #   
 # }
 
+library(Matrix)
+d = 5
+q = 5
+Z = matrix(0, nrow = 1, ncol = d*q)
+covar = "unstructured"
 
+if(covar == "unstructured"){ # Originally: ncol(Z)/d <= 15 
+  # create J, q2 x q*(q+1)/2
+  J = Matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2, sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d)*((ncol(Z)/d)+1)/2)
+  index = 0
+  indexc = 0
+  sumy = 0
+  sumx = 0
+  zeros = 0
+  covgroup = NULL
+  for(i in 1:(ncol(Z)/d)){
+    J[ sumx + zeros + 1:(ncol(Z)/d - (i-1)), sumy + 1:(ncol(Z)/d - (i-1))] = diag((ncol(Z)/d - (i-1)))
+    sumy = sumy + (ncol(Z)/d - (i-1))
+    sumx = sumy 
+    zeros = zeros + i
+    covgroup = rbind(covgroup, rep(i, (ncol(Z)/d)))
+  }
+  covgroup = covgroup[lower.tri(covgroup, diag = T)]
+}else{ # covar == "independent". Originally: ncol(Z)/d > 15
+  J = Matrix(0,(ncol(Z)/d)^2, (ncol(Z)/d), sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d))
+  index = 0
+  indexc = 0
+  sumy = 0
+  sumx = 0
+  zeros = 0
+  covgroup = NULL
+  for(i in 1:(ncol(Z)/d)){
+    J[ sumx + zeros + 1, i] = 1
+    sumy = sumy + (ncol(Z)/d - (i-1))
+    sumx = sumy 
+    zeros = zeros + i
+  }
+  covgroup = rep(1:(ncol(Z)/d))
+}
 
 ########################################################################################################
