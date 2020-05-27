@@ -100,7 +100,6 @@
 #'  
 #' 
 #' @importFrom bigmemory attach.big.matrix describe
-#' @importFrom dismo calc.deviance
 #' @export
 fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, 
                      family = "binomial", offset_fit = NULL,
@@ -522,12 +521,20 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
     
     # E Step 
     
+    # if(i %% 5 == 0){
+    #   uold = rnorm(n = ncol(u0), mean = 0, sd = 1)
+    # }else{
+    #   uold = as.numeric(u0[nrow(u0),])
+    # }
+    
+    uold = as.numeric(u0[nrow(u0),])
+    
     if(MwG_sampler == "independence"){
       samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                                       d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
+                                       d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = uold)
     }else{ # MwG_sampler == "random_walk"
       samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                                           d = d, okindex = okindex, gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]),
+                                           d = d, okindex = okindex, gibbs = gibbs, uold = uold,
                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
                                            offset = offset_increment, burnin_batchnum = burnin_batchnum)
     }
@@ -618,32 +625,17 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
   # Usual BIC
   BIC = -2*ll + sum(coef != 0)*log(nrow(X))
   
-  # Calculate deviance
-  modes = colMeans(u0[,])
-  eta = X %*% matrix(coef[1:ncol(X)], ncol = 1) + Z %*% matrix(modes, ncol = 1)
-  # For now, assume canonical links only
-  if(family == "binomial"){
-    pred = exp(eta) / (1+exp(eta))
-  }else if(family == "poisson"){
-    pred = exp(eta)
-  }else if(family == "gaussian"){
-    pred = eta
-  }
-  dev = calc.deviance(obs = y, pred = pred, family = family)
-  
   if(gibbs){
     out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
                extra = list(okindex = okindex, Znew2 = Znew2),
-               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
-               dev = dev)
+               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
   }else{
     out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
-               extra = list(okindex = okindex, Znew2 = Znew2),
-               dev = dev)
+               extra = list(okindex = okindex, Znew2 = Znew2))
   }
   
   if(returnMC == T){

@@ -17,7 +17,6 @@
 #' \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
 #' Rows correspond with the rows of the results matrix.}
 #'  
-#' @importFrom dismo calc.deviance
 #' @importFrom stringr str_c
 #' @export
 select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
@@ -56,10 +55,26 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
   }
   
-  # Calculate null deviance (intercept only model)
-  y = dat$y
-  int_only = glm(y ~ 1, family = family, offset = offset)
-  nullDev = calc.deviance(obs = y, pred = predict(int_only, type = "response"), family = fam)
+  # Calculate loglik for null model (mu set to y; n parameters, one per observation)
+  if(fam == "binomial"){
+    null_ll = 0
+  }else if(fam == "poisson"){
+    stop("poisson family not yet operational \n")
+    null_ll = 0
+    y = dat$y
+    for(i in 1:length(y)){
+      if(y[i] > 0){
+        null_ll = null_ll + dpois(x = y[i], lambda = y[i], log = T)
+      }
+    }
+  }else if(fam == "gaussian"){
+    stop("gaussian family not yet operational \n")
+  }else{
+    print(family)
+    stop("specified family not recognized \n")
+  }
+  # Set null deviance arbitrarily to 1 for the moment
+  nullDev = 1.0
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
@@ -137,22 +152,26 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       res[(j-1)*n1+i,1] = lambda0_range[i]
       res[(j-1)*n1+i,2] = lambda1_range[j]
       res[(j-1)*n1+i,3] = BICh
+      res[(j-1)*n1+i,4] = BIC
       # res[(j-1)*n1+i,4] = out$llb
-      res[(j-1)*n1+i,4] = out$ll
-      res[(j-1)*n1+i,5] = sum(out$coef[2:ncol(dat$X)] !=0)
-      res[(j-1)*n1+i,6] = sum(diag(out$sigma) !=0)
-      res[(j-1)*n1+i,7] = sum(out$coef !=0)
+      res[(j-1)*n1+i,5] = out$ll
+      res[(j-1)*n1+i,6] = sum(out$coef[2:ncol(dat$X)] !=0)
+      res[(j-1)*n1+i,7] = sum(diag(out$sigma) !=0)
+      res[(j-1)*n1+i,8] = sum(out$coef !=0)
       # if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
-      if(maxitEM > 1) res[(j-1)*n1+i,8] = out$ll
+      # if(maxitEM > 1) res[(j-1)*n1+i,8] = out$ll
       # res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
-      res[(j-1)*n1+i,9] = BIC
       outl[[(j-1)*n1+i]] = 1
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])
       
-      
-      Dev = out$dev
       # Check for model saturation
+      ## set null deviance as deviance for model with fixed and random intercepts only
+      if((i==1) & (j==1)){
+        nullDev = 2*(null_ll - out$ll)
+      }
+      ## Calculate deviance
+      Dev = 2*(null_ll - out$ll)
       if(Dev / nullDev < 0.01){
         print("Reached model saturation")
         saturated = TRUE
@@ -167,8 +186,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     
   } # end j loop for lambda1_range
   
-  colnames(res) = c("lambda0","lambda1","BICh","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef",
-                    "ll_Pajor","BIC")
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef")
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
   return(list(results = res, out = fout, coef = coef))
