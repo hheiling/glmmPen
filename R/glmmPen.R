@@ -30,6 +30,7 @@
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #'  
 #' @importFrom stringr str_to_lower str_c
+#' @importFrom Matrix Matrix
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omit,
                    offset = NULL, fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),

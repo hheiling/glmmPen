@@ -28,6 +28,7 @@
 #' grouping variable}
 #' 
 #' @importFrom lme4 mkReTrms nobars subbars findbars
+#' @importFrom Matrix Matrix
 #' @export
 formulaData = function(formula, data = NULL, na.action = na.omit){
   # Note: need to deal with potential offsets and weights
