@@ -100,6 +100,7 @@
 #     gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
 #     cov = var = gamma %*% t(gamma)
 #     fit$coef = coef[c(1:ncol(X))]
+#     coef = coef[c(1:ncol(X))]
 #     ok = which(diag(var) > 0)# & coef[1:ncol(X)] != 0)
 #     if(length(ok) == 0) ok = 1 # at least include the random intercept
 #     okindex = NULL
