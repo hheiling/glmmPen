@@ -640,18 +640,27 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
   
   if(returnMC == T){
     
-    if(MwG_sampler == "independence"){
-      samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
-                                d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, matrix(u0[nrow(u0),], nrow = 1))
-    }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
-                                     d = d, okindex = okindex, gibbs = gibbs, uold = matrix(u0[nrow(u0),], nrow = 1),
-                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                     offset = offset_increment, burnin_batchnum = burnin_batchnum)
+    if(nrow(u0) >= nMC_report){
+      # Take last nMC_report rows
+      r_start = nrow(u0) - nMC_report + 1
+      r_end = nrow(u0)
+      u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
+    }else{
+      if(MwG_sampler == "independence"){
+        samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
+                                  d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, matrix(u0[nrow(u0),], nrow = 1))
+      }else{ # MwG_sampler == "random_walk"
+        samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
+                                       d = d, okindex = okindex, gibbs = gibbs, uold = matrix(u0[nrow(u0),], nrow = 1),
+                                       proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                       offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      }
+      
+      u0_out = samplemc_out$u0
     }
     
-    u0 = samplemc_out$u0
-    out$u = u0
+    out$u = u0_out
+    
   }else{
     out$u = matrix(NA, nrow = 1, ncol = 1)
   } 
