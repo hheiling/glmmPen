@@ -35,6 +35,11 @@ options \code{na.omit} and \code{na.pass} are recognized by this function.}
 linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
 number of cases. Currently, the formula does not allow specification of an offset.}
 
+\item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effect covariates
+used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
+penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
+fixed effects given in the formula.}
+
 \item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 

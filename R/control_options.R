@@ -72,7 +72,8 @@ adaptControl = function(batch_length = 100, offset = 8000, burnin_batchnum = 100
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
 #' @export
-optimControl = function(conv = 0.001, nMC_start = 200, nMC_max = 10000, nMC_report = 5000,
+optimControl = function(conv_EM = 0.001, conv_IRLS = 0.0001, conv_CD = 0.0001, 
+                        nMC_start = 200, nMC_max = 10000, nMC_report = 5000,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
                         covar = c("unstructured","independence"),
                         MwG_sampler = c("random_walk","independence"), gibbs = T, 
@@ -86,7 +87,8 @@ optimControl = function(conv = 0.001, nMC_start = 200, nMC_max = 10000, nMC_repo
     stop("nMC_max should not be smaller than nMC_start \n")
   }
   
-  structure(list(conv = conv, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, maxitEM = maxitEM, 
+  structure(list(conv_EM = conv_EM, conv_IRLS = conv_IRLS, conv_CD = conv_CD, 
+                 nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, maxitEM = maxitEM, 
                  maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
                  MwG_sampler = MwG_sampler[1], gibbs = gibbs, fit_type = fit_type[1]),
             class = "optimControl")

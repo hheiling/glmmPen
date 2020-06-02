@@ -11,8 +11,12 @@
 #' @param lambda0 a non-negative numeric penalty parameter for the fixed effects parameters
 #' @param lambda1 a non-negative numeric penalty parameter for the grouped random effects
 #' covariance parameters
-#' @param conv a non-negative numeric convergence criteria for the convergence of the 
-#' log likelihood in the EM algorithm. Default is 0.001.
+#' @param conv_EM a non-negative numeric convergence criteria for the convergence of the 
+#' EM algorithm. Default is 0.001.
+#' @param conv_IRLS a non-negative numeric convergence criteria for the convergenc of the 
+#' outer IRLS loop within the grouped coordinate descent algorithm. Default 0.0001
+#' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
+#' inner coordinate descent loop within the grouped coordinate descent algorithm. Default 0.0001.
 #' @param family a description of the error distribution and link function to be used in the model. 
 #' For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 #' See \code{family} options in the Details section.
@@ -100,8 +104,10 @@
 #'  
 #' 
 #' @importFrom bigmemory attach.big.matrix describe
+#' @importFrom ncvreg ncvreg
 #' @export
-fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001, 
+fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, 
+                     conv_IRLS = 0.0001, conv_CD = 0.0001,
                      family = "binomial", offset_fit = NULL,
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
@@ -247,11 +253,20 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
   }else{
     
     # Coordinate descent ignoring random effects: naive fit
-    int_only = glm(y ~ 1, family = fam_fun, offset = offset_fit)
-    coef_init = c(int_only$coefficients, rep(0, times = ncol(X)-1))
-    coef = M_step(y, X, fam_fun, coef_init, offset_fit, group_X = group_X,
-                  maxit = 200, maxit_CD = 200, conv = 0.0001, fit_type = 2, # 3 if allow grouped fixed effects
-                  penalty = penalty, lambda = lambda0, gamma = gamma_penalty, alpha = alpha)
+    # int_only = glm(y ~ 1, family = fam_fun, offset = offset_fit)
+    # coef_init = c(int_only$coefficients, rep(0, times = ncol(X)-1))
+    # coef = M_step(y, X, fam_fun, coef_init, offset_fit, group_X = group_X,
+    #               maxit = 200, maxit_CD = 200, conv = conv_IRLS, fit_type = 2, # 3 if allow grouped fixed effects
+    #               penalty = penalty, lambda = lambda0, gamma = gamma_penalty, alpha = alpha)
+    
+    penalty_factor = numeric(ncol(X)-1)
+    penalty_factor[which(group_X[-1] == 0)] = 0
+    penalty_factor[which(group_X[-1] != 0)] = 1
+    
+    fit_naive = ncvreg(X[,-1], y, family = family, penalty = penalty, gamma = gamma_penalty,
+                       alpha = alpha, lambda = lambda0, penalty.factor = penalty_factor)
+    
+    coef = as.numeric(fit_naive$beta)
     
     if(trace == 1) print(coef)
     
@@ -431,7 +446,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
     
     # M Step
     coef = M_stepB(y, X, Z, u0@address, nrow(u0), J, group, family=fam_fun, coef, offset=offset_fit,
-                   maxit=maxit_CD, conv=0.0001, init=(i == 1), group_X, covgroup,
+                   maxit_outer=maxit_CD, maxit_inner=maxit_CD, conv_outer=conv_IRLS, 
+                   conv_inner=conv_CD, init=(i == 1), group_X, covgroup,
                    penalty, lambda0, lambda1, gamma=gamma_penalty, alpha,
                    fit_type=fit_type)
     
@@ -500,7 +516,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv = 0.001,
     coef_record = rbind(coef_record[-1,], t(coef))
     # coef_record_all[i,] = coef
     
-    if( sum(diff[i:max(i-2, 1)] < conv) >=3 ) break
+    if( sum(diff[i:max(i-2, 1)] < conv_EM) >=3 ) break
     
     # if current q is within 95% emp CI of old q, increase nMC
     if(diff[i] > 10^-10){

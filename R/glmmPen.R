@@ -10,6 +10,10 @@
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
 #' linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
 #' number of cases. Currently, the formula does not allow specification of an offset.
+#' @param fixef_noPen Optional vector of 0's and 1's of the same length as the number of fixed effect covariates
+#' used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
+#' penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
+#' fixed effects given in the formula.
 #' @param optim_options a list of class "optimControl" created from function \code{\link{optimControl}}
 #' that specifies optimization parameters.
 #' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
@@ -119,7 +123,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     }
     
     # Extract variables from optimControl
-    conv = optim_options$conv
+    conv_EM = optim_options$conv_EM
+    conv_IRLS = optim_options$conv_IRLS
+    conv_CD = optim_options$conv_CD
     nMC = optim_options$nMC
     nMC_max = optim_options$nMC_max
     maxitEM = optim_options$maxitEM
@@ -134,7 +140,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # Call fit_dat function
     # fit_dat function found in "/R/fit_dat.R" file
     fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
-                    conv = conv, family = family, offset_fit = offset, trace = trace, 
+                    conv_EM = conv_EM, conv_IRLS = conv_IRLS, conv_CD = conv_CD,
+                    family = family, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                     nMC = nMC, nMC_max = nMC_max, t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, gibbs = gibbs, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
