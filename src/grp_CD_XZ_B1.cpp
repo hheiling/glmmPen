@@ -52,8 +52,10 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
   int q = dims(3); // number of random effect covariates
   int M = dims(4); // number of MCMC draws (nrow(pBigMat))
   int J_XZ = dims(5); // number of covariate groups (in fixed and random effects)
-  double conv = dims(6); // Convergence threshold
-  int maxit = dims(7); // maximum number of iterations
+  double conv1 = dims(6); // Convergence threshold for outer IRLS loop
+  double conv2 = dims(7); // Convergence threshold for inner outer CD loop
+  int maxit1 = dims(8); // maximum number of iterations for outer IRLS loop
+  int maxit2 = dims(9); // maximum number of iterations for inner CD loop
   int J_X = XZ_group(p); // Covariate group corresponding to random intercept
 
   int Kj = 0; // Size of covariate group j
@@ -65,8 +67,10 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
   int f=0;
   int r=0;
   int k=0; // index of observation group (from 0 to d-1)
-  int iter=0; // while loop iteration
-  int converged = 0; // 1 if algorithm converged, 0 otherwise
+  int iter1=0; // outer IRLS while loop iteration
+  int iter2=0; // inner CD while loop iteration
+  int converged1 = 0; // 1 if outer IRLS algorithm converged, 0 otherwise
+  int converged2 = 0; // 1 if inner CD algorithm converged, 0 otherwise
 
   // Define available penalties
   const char* lasso = "lasso";
@@ -94,7 +98,8 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
   double nu=0.0; // max second deriv of loss function (max possible weight)
   double zetaj_L2=0.0; // L2 norm of zetaj vector
 
-  arma::vec beta0 = beta; // Input initial beta / beta from last round of updates
+  arma::vec beta0 = beta; // beta from last round of updates in outer IRLS loop
+  arma::vec beta0_outer = beta; // beta from last round of updates in inner CD loop
   double bj=0.0; // place-holder for value of element of beta
   arma::vec vec_ones(1); vec_ones.ones();
   arma::uvec fef_cols = as<arma::uvec>(wrap(seq(0,p-1)));
@@ -259,191 +264,120 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
   //-------------------------------------------------------------------------------//
   // Grouped Coordinate Descent
+  // Outer IRLS Loop
   //-------------------------------------------------------------------------------//
 
-  while((iter<maxit) & (converged==0)){
+  while((iter1<maxit1) & (converged1==0)){
 
-    // Add to iter
-    iter = iter + 1;
+    // Add to iter1 (outer IRLS loop)
+    iter1 = iter1 + 1;
+    // Reset iter2 (inner CD loop)
+    iter2 = 0;
     // Save last beta
-    beta0 = beta;
+    beta0_outer = beta;
     // Save latest v0
     v0_last = v0;
 
     // ----------------------------------------------------------------------------------//
     // Element-wise update of fixed effects betaj first
+    // Inner Coordinate Descent Loop
     // ----------------------------------------------------------------------------------//
-
-    for(j=0; j<J_X; j++){
-
-      // Identify covariates belonging to group j
-      arma::uvec idxj = find(XZ_group == j);
-      Kj = idxj.n_elem;
-
-      if((init == 1) & (iter>=3) & (sum(beta.elem(idxj)) == 0.0)){
-        // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
-        // update all beta a few times regardless of whether betaj == 0.
-        // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
-        // Therefore, skip to next covariate grouping
-        continue;
-      }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
-        // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
-        // Therefore, skip to next covariate grouping
-        continue;
-      }
-
-      //----------------------------------------------------------------------------------//
-      // Calculate zetaj for current group j given most recent eta update
-      //----------------------------------------------------------------------------------//
-
-      // Calculate zetaj vector (initialize as zero, then sum components of interest)
-      arma::vec zetaj(Kj); zetaj.zeros();
-
-      // Calculate zetaj for fixed effects covariates in group j
-        // zeta_fixef_calc() function in 'utility_grpCD.cpp'
-      zetaj = zeta_fixef_calc(X, resid, idxj);
+    
+    while((iter2<maxit2) & (converged2==0)){
       
-      // Finish calc of zetaj
-      zetaj = zetaj / (N*M) + beta.elem(idxj);
-
-      // L2 norm of zetaj
-      if(idxj.n_elem == 1){
-        zetaj_L2 = as_scalar(zetaj);
-      }else{
-        zetaj_L2 = sqrt(sum(zetaj % zetaj));
-      }
-
-      // Update betaj
-      if(j==0){
-        // j = 0: fixed effects intercept, other fixed effects covariates given XZ_group values of 0
-        // No penalization for above scenarios
-        beta.elem(idxj) = zetaj;
-      }else{
-        if(std::strcmp(penalty, lasso) == 0){
-          bj = soft_thresh(zetaj_L2*nu, lam(j)*alpha) / (nu * (1.0 + lam(j)*(1.0 - alpha)));
-        }else if(std::strcmp(penalty, mcp) == 0){
-          bj = MCP_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
-        }else if(std::strcmp(penalty, scad) == 0){
-          bj = SCAD_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
+      // Add to iter 2 (inner CD loop)
+      iter2 = iter2 + 1;
+      // Save last beta
+      beta0 = beta;
+      
+      for(j=0; j<J_X; j++){
+        
+        // Identify covariates belonging to group j
+        arma::uvec idxj = find(XZ_group == j);
+        Kj = idxj.n_elem;
+        
+        if((init == 1) & (iter1>=3) & (sum(beta.elem(idxj)) == 0.0)){
+          // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
+          // update all beta a few times regardless of whether betaj == 0.
+          // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
+          // Therefore, skip to next covariate grouping
+          continue;
+        }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
+          // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
+          // Therefore, skip to next covariate grouping
+          continue;
         }
-
+        
+        //----------------------------------------------------------------------------------//
+        // Calculate zetaj for current group j given most recent eta update
+        //----------------------------------------------------------------------------------//
+        
+        // Calculate zetaj vector (initialize as zero, then sum components of interest)
+        arma::vec zetaj(Kj); zetaj.zeros();
+        
+        // Calculate zetaj for fixed effects covariates in group j
+        // zeta_fixef_calc() function in 'utility_grpCD.cpp'
+        zetaj = zeta_fixef_calc(X, resid, idxj);
+        
+        // Finish calc of zetaj
+        zetaj = zetaj / (N*M) + beta.elem(idxj);
+        
+        // L2 norm of zetaj
         if(idxj.n_elem == 1){
-          beta.elem(idxj) = bj * vec_ones;
+          zetaj_L2 = as_scalar(zetaj);
         }else{
-          beta.elem(idxj) = bj * (zetaj / zetaj_L2);
+          zetaj_L2 = sqrt(sum(zetaj % zetaj));
         }
-
-      } // End if-else update to beta for group j
-
-
-      // Update fixed effects component of eta
-      arma::mat Xj = X.cols(idxj);
-      arma::rowvec shift = trans(Xj * (beta.elem(idxj) - beta0.elem(idxj)));
-      eta = eta.each_row() + shift;
-      resid = resid.each_row() - shift;
-
-      // Reset nu to 0 if not binomial or gaussian with canonical link
-      if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
-        nu = 0.0;
-      }
-
-
-    } // End j for loop for fixed effects
-    
-    //----------------------------------------------------------------------------------//
-    // Calculate zetaj for random intercept
-    // Will not penalize random intercept
-    //----------------------------------------------------------------------------------//
-
-    // Identify covariates belonging to random intercept (group j = J_X)
-    arma::uvec idxj = find(XZ_group == J_X);
-    Kj = idxj.n_elem;
-
-    // Calculate zetaj vector (initialize as zero, then sum components of interest)
-    arma::vec zetaj(Kj); zetaj.zeros();
-
-    for(k=0;k<d;k++){
-      // Rows of Z to use
-      arma::uvec ids = find(group == (k+1));
-      // Index of appropriate columns for Z and u
-      for(f=0;f<q;f++){
-        col_idx(f) = k + f*d;
-      }
-
-      arma::mat Zk = Z.submat(ids, col_idx);
-      arma::mat Xj(ids.n_elem, Kj); Xj.zeros();
-
-      for(m=0;m<M;m++){
-        m0 = m;
-        u = post.submat(m0,col_idx);
-        arma::mat A = kron(u,Zk) * J_q;
-        Xj = A.cols(idxj - p);
-        zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
-
-      } // End m for loop
-
-    } // End k for loop
-
-    // Finish calc of zetaj
-    if(H == q){ // sigma specified with independence structure (diagonal)
-      // Calculated xTx/(N*M) within scale vector
-      zetaj = zetaj / (N*M) + scale(0) * beta.elem(idxj);
-    }else{ // H = q(q+1)/2, unstructured sigma
-      // Calculated xTx/(N*M) within list L
-      arma::mat xTx = L[0];
-      zetaj = zetaj / (N*M) + xTx * beta.elem(idxj);
-    } // End if-else H == q
-    
-    // Update beta (no penalization)
-    if(H == q){ 
-      // Calculated xTx/(N*M) within scale vector
-      beta.elem(idxj) = zetaj / scale(0);
-    }else{ 
-      // Calculated xTx/(N*M) within list L
-      arma::mat xTx = L[0];
-      beta.elem(idxj) = xTx.i() * zetaj;
-    } // End if-else H == q
-    
-    // Reset nu to 0 if not binomial or gaussian with canonical link
-    if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
-      nu = 0.0;
-    }
-
-    r = J_X;
-    
-    // ----------------------------------------------------------------------------------//
-    // Element-wise update of random effects effects betaj
-    // ----------------------------------------------------------------------------------//
-
-    for(j=(J_X+1); j<J_XZ; j++){
-
-      // Identify covariates belonging to group j
-      arma::uvec idxj = find(XZ_group == j);
+        
+        // Update betaj
+        if(j==0){
+          // j = 0: fixed effects intercept, other fixed effects covariates given XZ_group values of 0
+          // No penalization for above scenarios
+          beta.elem(idxj) = zetaj;
+        }else{
+          if(std::strcmp(penalty, lasso) == 0){
+            bj = soft_thresh(zetaj_L2*nu, lam(j)*alpha) / (nu * (1.0 + lam(j)*(1.0 - alpha)));
+          }else if(std::strcmp(penalty, mcp) == 0){
+            bj = MCP_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
+          }else if(std::strcmp(penalty, scad) == 0){
+            bj = SCAD_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
+          }
+          
+          if(idxj.n_elem == 1){
+            beta.elem(idxj) = bj * vec_ones;
+          }else{
+            beta.elem(idxj) = bj * (zetaj / zetaj_L2);
+          }
+          
+        } // End if-else update to beta for group j
+        
+        
+        // Update fixed effects component of eta
+        arma::mat Xj = X.cols(idxj);
+        arma::rowvec shift = trans(Xj * (beta.elem(idxj) - beta0.elem(idxj)));
+        eta = eta.each_row() + shift;
+        resid = resid.each_row() - shift;
+        
+        // Reset nu to 0 if not binomial or gaussian with canonical link
+        if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
+          nu = 0.0;
+        }
+        
+        
+      } // End j for loop for fixed effects
+      
+      //----------------------------------------------------------------------------------//
+      // Calculate zetaj for random intercept
+      // Will not penalize random intercept
+      //----------------------------------------------------------------------------------//
+      
+      // Identify covariates belonging to random intercept (group j = J_X)
+      arma::uvec idxj = find(XZ_group == J_X);
       Kj = idxj.n_elem;
-
-      if((init == 1) & (iter>=3) & (sum(beta.elem(idxj)) == 0.0)){
-        // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
-        // update all beta a few times regardless of whether betaj == 0.
-        // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
-        // Therefore, skip to next covariate grouping
-        continue;
-      }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
-        // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
-        // Therefore, skip to next covariate grouping
-        continue;
-      }
-
-      //----------------------------------------------------------------------------------//
-      // Update eta from last updated beta (group r)
-      // Calculate zetaj for current group j
-      //----------------------------------------------------------------------------------//
-
-      // Find index of covariates corresponding to previous j in sequence (r)
-      arma::uvec idxr = find(XZ_group == r);
-
+      
       // Calculate zetaj vector (initialize as zero, then sum components of interest)
       arma::vec zetaj(Kj); zetaj.zeros();
-
+      
       for(k=0;k<d;k++){
         // Rows of Z to use
         arma::uvec ids = find(group == (k+1));
@@ -451,9 +385,174 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
         for(f=0;f<q;f++){
           col_idx(f) = k + f*d;
         }
-
+        
         arma::mat Zk = Z.submat(ids, col_idx);
         arma::mat Xj(ids.n_elem, Kj); Xj.zeros();
+        
+        for(m=0;m<M;m++){
+          m0 = m;
+          u = post.submat(m0,col_idx);
+          arma::mat A = kron(u,Zk) * J_q;
+          Xj = A.cols(idxj - p);
+          zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
+          
+        } // End m for loop
+        
+      } // End k for loop
+      
+      // Finish calc of zetaj
+      if(H == q){ // sigma specified with independence structure (diagonal)
+        // Calculated xTx/(N*M) within scale vector
+        zetaj = zetaj / (N*M) + scale(0) * beta.elem(idxj);
+      }else{ // H = q(q+1)/2, unstructured sigma
+        // Calculated xTx/(N*M) within list L
+        arma::mat xTx = L[0];
+        zetaj = zetaj / (N*M) + xTx * beta.elem(idxj);
+      } // End if-else H == q
+      
+      // Update beta (no penalization)
+      if(H == q){ 
+        // Calculated xTx/(N*M) within scale vector
+        beta.elem(idxj) = zetaj / scale(0);
+      }else{ 
+        // Calculated xTx/(N*M) within list L
+        arma::mat xTx = L[0];
+        beta.elem(idxj) = xTx.i() * zetaj;
+      } // End if-else H == q
+      
+      // Reset nu to 0 if not binomial or gaussian with canonical link
+      if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
+        nu = 0.0;
+      }
+      
+      r = J_X;
+      
+      // ----------------------------------------------------------------------------------//
+      // Element-wise update of random effects effects betaj
+      // ----------------------------------------------------------------------------------//
+      
+      for(j=(J_X+1); j<J_XZ; j++){
+        
+        // Identify covariates belonging to group j
+        arma::uvec idxj = find(XZ_group == j);
+        Kj = idxj.n_elem;
+        
+        if((init == 1) & (iter1>=3) & (sum(beta.elem(idxj)) == 0.0)){
+          // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
+          // update all beta a few times regardless of whether betaj == 0.
+          // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
+          // Therefore, skip to next covariate grouping
+          continue;
+        }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
+          // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
+          // Therefore, skip to next covariate grouping
+          continue;
+        }
+        
+        //----------------------------------------------------------------------------------//
+        // Update eta from last updated beta (group r)
+        // Calculate zetaj for current group j
+        //----------------------------------------------------------------------------------//
+        
+        // Find index of covariates corresponding to previous j in sequence (r)
+        arma::uvec idxr = find(XZ_group == r);
+        
+        // Calculate zetaj vector (initialize as zero, then sum components of interest)
+        arma::vec zetaj(Kj); zetaj.zeros();
+        
+        for(k=0;k<d;k++){
+          // Rows of Z to use
+          arma::uvec ids = find(group == (k+1));
+          // Index of appropriate columns for Z and u
+          for(f=0;f<q;f++){
+            col_idx(f) = k + f*d;
+          }
+          
+          arma::mat Zk = Z.submat(ids, col_idx);
+          arma::mat Xj(ids.n_elem, Kj); Xj.zeros();
+          
+          for(m=0;m<M;m++){
+            m0 = m;
+            u = post.submat(m0,col_idx);
+            arma::mat A = kron(u,Zk) * J_q;
+            arma::rowvec shift = trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
+            // Update random effects component of eta for each individual
+            eta.submat(m0,ids) += shift;
+            // Update residuals
+            resid.submat(m0,ids) -= shift;
+            // Calculate zetaj
+            Xj = A.cols(idxj - p);
+            zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
+            
+          }
+          
+        } // End k for loop
+        
+        // Finish calc of zetaj
+        
+        if(H == q){ // sigma specified with independence structure (diagonal)
+          // Calculated xTx/(N*M) within scale vector
+          zetaj = zetaj / (N*M) + scale(j - J_X) * beta.elem(idxj);
+        }else{ // H = q(q+1)/2, unstructured sigma
+          // Calculated xTx/(N*M) within list L
+          arma::mat xTx = L[j - J_X];
+          zetaj = zetaj / (N*M) + xTx * beta.elem(idxj);
+        } // End if-else H == q
+        
+        // L2 norm of zetaj
+        if(idxj.n_elem == 1){
+          zetaj_L2 = as_scalar(zetaj);
+        }else{
+          zetaj_L2 = sqrt(sum(zetaj % zetaj));
+        }
+        
+        // Update betaj
+        if(std::strcmp(penalty, lasso) == 0){
+          bj = soft_thresh(zetaj_L2*nu, lam(j)*alpha) / (nu * (1.0 + lam(j)*(1.0 - alpha)));
+        }else if(std::strcmp(penalty, mcp) == 0){
+          bj = MCP_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
+        }else if(std::strcmp(penalty, scad) == 0){
+          bj = SCAD_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
+        }
+        
+        if(H == q){ 
+          // sigma specified with independence structure (diagonal)
+          // group size = 1
+          beta.elem(idxj) = bj * vec_ones / scale(j - J_X);
+        }else{ 
+          // H = q(q+1)/2, unstructured sigma
+          // group size > 1 for random effect that is not random intercept
+          arma::mat xTx = L[j - J_X];
+          beta.elem(idxj) = xTx.i() * bj * (zetaj / zetaj_L2);
+        } // End if-else H == q
+        
+        // Reset nu to 0 if not binomial or gaussian with canonical link
+        if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
+          nu = 0.0;
+        }
+        
+        // Save r as the most recent updated j
+        r = j;
+        
+      } // End j for loop
+      
+      // ----------------------------------------------------------------------------------//
+      // Update eta with last betaj update (r = last j updated)
+      // Update residuals using quick update
+      // ----------------------------------------------------------------------------------//
+      
+      // Find index of covariates corresponding to previous j in sequence (r)
+      arma::uvec idxr = find(XZ_group == r);
+      
+      for(k=0;k<d;k++){
+        // Rows of Z to use
+        arma::uvec ids = find(group == (k+1));
+        // Index of appropriate columns for Z and u
+        for(f=0;f<q;f++){
+          col_idx(f) = k + f*d;
+        }
+        
+        arma::mat Zk = Z.submat(ids, col_idx);
         
         for(m=0;m<M;m++){
           m0 = m;
@@ -462,93 +561,19 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
           arma::rowvec shift = trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
           // Update random effects component of eta for each individual
           eta.submat(m0,ids) += shift;
-          // Update residuals
           resid.submat(m0,ids) -= shift;
-          // Calculate zetaj
-          Xj = A.cols(idxj - p);
-          zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
-          
         }
-
-      } // End k for loop
-
-      // resid in above = (y-mu), need resid = (y-mu)/nu
-      // Therefore, incorporate (1/nu) into zetaj and (1/nu^2) into v0 = mean(resid^2)
-      // Finish calc of zetaj
-      
-      if(H == q){ // sigma specified with independence structure (diagonal)
-        // Calculated xTx/(N*M) within scale vector
-        zetaj = zetaj / (N*M) + scale(j - J_X) * beta.elem(idxj);
-      }else{ // H = q(q+1)/2, unstructured sigma
-        // Calculated xTx/(N*M) within list L
-        arma::mat xTx = L[j - J_X];
-        zetaj = zetaj / (N*M) + xTx * beta.elem(idxj);
-      } // End if-else H == q
-      
-      // L2 norm of zetaj
-      if(idxj.n_elem == 1){
-        zetaj_L2 = as_scalar(zetaj);
-      }else{
-        zetaj_L2 = sqrt(sum(zetaj % zetaj));
-      }
-
-      // Update betaj
-      if(std::strcmp(penalty, lasso) == 0){
-        bj = soft_thresh(zetaj_L2*nu, lam(j)*alpha) / (nu * (1.0 + lam(j)*(1.0 - alpha)));
-      }else if(std::strcmp(penalty, mcp) == 0){
-        bj = MCP_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
-      }else if(std::strcmp(penalty, scad) == 0){
-        bj = SCAD_soln(zetaj_L2*nu, nu, lam(j), gamma, alpha);
-      }
-
-      if(H == q){ 
-        // sigma specified with independence structure (diagonal)
-        // group size = 1
-        beta.elem(idxj) = bj * vec_ones / scale(j - J_X);
-      }else{ 
-        // H = q(q+1)/2, unstructured sigma
-        // group size > 1 for random effect that is not random intercept
-        arma::mat xTx = L[j - J_X];
-        beta.elem(idxj) = xTx.i() * bj * (zetaj / zetaj_L2);
-      } // End if-else H == q
-
-      // Reset nu to 0 if not binomial or gaussian with canonical link
-      if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
-        nu = 0.0;
-      }
-
-      // Save r as the most recent updated j
-      r = j;
-
-    } // End j for loop
-    
-    // ----------------------------------------------------------------------------------//
-    // Update eta with last betaj update (r = last j updated)
-    // ----------------------------------------------------------------------------------//
-
-    // Find index of covariates corresponding to previous j in sequence (r)
-    arma::uvec idxr = find(XZ_group == r);
-
-    for(k=0;k<d;k++){
-      // Rows of Z to use
-      arma::uvec ids = find(group == (k+1));
-      // Index of appropriate columns for Z and u
-      for(f=0;f<q;f++){
-        col_idx(f) = k + f*d;
-      }
-
-      arma::mat Zk = Z.submat(ids, col_idx);
-      
-      for(m=0;m<M;m++){
-        m0 = m;
-        u = post.submat(m0,col_idx);
-        arma::mat A = kron(u,Zk) * J_q;
-        // Update random effects component of eta for each individual
-        eta.submat(m0,ids) += trans(A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr)));
         
+      } // End k for loop
+      
+      // Check for convergence of inner loop
+      if(arma::max(abs(beta0 - beta)) < conv2){
+        converged2 = 1;
       }
+      
+    } // End inner while loop
 
-    } // End k for loop
+    
 
     // Re-set nu if necessary
     if((std::strcmp(family, bin) == 0) & (link == 10)){
@@ -583,24 +608,23 @@ arma::vec grp_CD_XZ_B1(const arma::vec& y, const arma::mat& X, const arma::mat& 
     // ----------------------------------------------------------------------------------//
     
     // Convergence criteria after every full beta update
-    if(arma::max(abs(beta0 - beta)) < conv){
-      converged = 1;
+    if(arma::max(abs(beta0_outer - beta)) < conv1){
+      converged1 = 1;
     }
     // if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
     //   converged = 1;
     // }
 
-  } // End while loop
+  } // End outer while loop
 
-  Rprintf("Number iterations in grouped coord descent: %i \n", iter);
+  Rprintf("Number iterations in grouped coord descent (IRLS loop): %i \n", iter1);
 
-  if(converged == 0){
+  if(converged1 == 0){
     // warning("grouped coordinate descent algorithm did not converge \n");
     Rcout << "grouped coordinate descent algorithm did not converge" << std::endl;
   }
 
-  // Rcout << "isS4(beta): " << beta.isS4() << std::endl;
-  
   return beta;
+  
 }
 
