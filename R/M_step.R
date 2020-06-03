@@ -127,7 +127,7 @@ M_step = function(y, X, family, coef, offset = NULL,
 # init: if this is the first attempt at a fit (using initial coef)
 #' @export
 M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
-                  maxit_outer = 250, maxit_inner = 250, conv_outer = 0.0001, conv_inner = 0.0001, 
+                  maxit_CD = 250, conv_CD = 0.0001,
                   init, group_X = 0:(ncol(X)-1), covgroup,
                   penalty = c("MCP","SCAD","lasso"), lambda0, lambda1,
                   gamma = switch(penalty[1], SCAD = 4.0, 3.0), alpha = 1.0,
@@ -237,13 +237,11 @@ M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
   # Number of random effect variables
   q = ncol(Z) / d
   
-  dims = c(p, N, d, q, M, J_XZ, conv_outer, maxit_outer)
+  dims = c(p, N, d, q, M, J_XZ, conv_CD, maxit_CD)
   
   if(fit_type == 1){
-    dims = c(p, N, d, q, M, J_XZ, conv_outer, conv_inner, maxit_outer, maxit_inner)
     coef_new = grp_CD_XZ_B1(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else if(fit_type == 2){
-    dims = c(p, N, d, q, M, J_XZ, conv_outer, conv_inner, maxit_outer, maxit_inner)
     coef_new = grp_CD_XZ_B2(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else if(fit_type == 3){
     coef_new = grp_CD_XZ_B1_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)

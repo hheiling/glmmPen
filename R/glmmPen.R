@@ -124,7 +124,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     
     # Extract variables from optimControl
     conv_EM = optim_options$conv_EM
-    conv_IRLS = optim_options$conv_IRLS
     conv_CD = optim_options$conv_CD
     nMC = optim_options$nMC
     nMC_max = optim_options$nMC_max
@@ -140,7 +139,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # Call fit_dat function
     # fit_dat function found in "/R/fit_dat.R" file
     fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
-                    conv_EM = conv_EM, conv_IRLS = conv_IRLS, conv_CD = conv_CD,
+                    conv_EM = conv_EM, conv_CD = conv_CD,
                     family = family, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                     nMC = nMC, nMC_max = nMC_max, t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,

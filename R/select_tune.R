@@ -39,7 +39,6 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   
   # Extract variables from optimControl
   conv_EM = optim_options$conv_EM
-  conv_IRLS = optim_options$conv_IRLS
   conv_CD = optim_options$conv_CD
   nMC = optim_options$nMC
   nMC_max = optim_options$nMC_max
@@ -115,8 +114,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
                           nMC = nMC, family = family, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                          trace = trace, conv_EM = conv_EM, conv_IRLS = conv_IRLS,
-                          conv_CD = conv_CD, nMC_max = nMC_max, 
+                          trace = trace, conv_EM = conv_EM, conv_CD = conv_CD, nMC_max = nMC_max, 
                           ufull = ufull, coeffull = coeffull0, 
                           gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
                           returnMC = returnMC, ufullinit = ufullinit, t = t,

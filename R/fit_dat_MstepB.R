@@ -13,10 +13,8 @@
 #' covariance parameters
 #' @param conv_EM a non-negative numeric convergence criteria for the convergence of the 
 #' EM algorithm. Default is 0.001.
-#' @param conv_IRLS a non-negative numeric convergence criteria for the convergenc of the 
-#' outer IRLS loop within the grouped coordinate descent algorithm. Default 0.0001
 #' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
-#' inner coordinate descent loop within the grouped coordinate descent algorithm. Default 0.0001.
+#' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.
 #' @param family a description of the error distribution and link function to be used in the model. 
 #' For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 #' See \code{family} options in the Details section.
@@ -106,8 +104,7 @@
 #' @importFrom bigmemory attach.big.matrix describe
 #' @importFrom ncvreg ncvreg
 #' @export
-fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, 
-                     conv_IRLS = 0.0001, conv_CD = 0.0001,
+fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
                      family = "binomial", offset_fit = NULL,
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
@@ -267,6 +264,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
                        alpha = alpha, lambda = lambda0, penalty.factor = penalty_factor)
     
     coef = as.numeric(fit_naive$beta)
+    print("initial coef:")
+    print(coef)
     
     if(trace == 1) print(coef)
     
@@ -446,10 +445,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
     
     # M Step
     coef = M_stepB(y, X, Z, u0@address, nrow(u0), J, group, family=fam_fun, coef, offset=offset_fit,
-                   maxit_outer=maxit_CD, maxit_inner=maxit_CD, conv_outer=conv_IRLS, 
-                   conv_inner=conv_CD, init=(i == 1), group_X, covgroup,
+                   maxit_CD=maxit_CD, conv_CD=conv_CD, init=(i == 1), group_X, covgroup,
                    penalty, lambda0, lambda1, gamma=gamma_penalty, alpha,
                    fit_type=fit_type)
+    print("Updated coef:")
+    print(coef)
     
     problem = F
     if(any(is.na(coef))){
