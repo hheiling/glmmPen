@@ -6,6 +6,16 @@ indicator = function(bounds, samples){
   apply(samples, 1, inbounds)
 }
 
+indicator_1 = function(bounds, samples){
+  inbounds = function(x){mean(x > bounds[1,] & x < bounds[2,]) == 1}
+  apply(samples, 1, inbounds)
+}
+
+indicator_2 = function(bounds, samples){
+  inbounds = function(x){mean(x > bounds[1] & x < bounds[2]) == 1}
+  apply(samples, 1, inbounds)
+}
+
 # Pajor IS CAME Method for logLik calcuations
 #' @export
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
@@ -15,10 +25,10 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
   num_var = ncol(Z) / d
   Gamma = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
   eta_fef = X %*% coef[1:ncol(X)]
-  post_mean = colMeans(posterior)
+  post_mean = colMeans(posterior[,])
   
   # Calculate bounds of the posterior for each dimension
-  bounds = apply(posterior, 2, range)
+  bounds = apply(posterior[,], 2, range)
   
   # Thin posterior draws based on acf results
   grp_names = as.numeric(levels(group))
@@ -55,15 +65,23 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     y_k = y[ids]
     n_k = sum(ids)
     
-    # Identify columns corresponding to group k
+    # Identify columns for variables corresponding to group k
     cols_all = seq(from = k, by = d, length.out = num_var)
     # Restrict above colums to those belonging to variables with non-zero random effect variance
     cols = cols_all[which(diag(sigma) != 0)]
     Z_k = Z[ids,cols]
+    if(length(cols) == 1){
+      Z_k = matrix(Z_k, ncol = 1)
+    }
     
     # Sample M samples from the importance function
     ## Importance function: multivariate normal (multivariate t?)
-    post_cov = cov(post_thin[,cols])
+    if(length(cols) > 1){
+      post_cov = var(post_thin[,cols])
+    }else{
+      post_cov = matrix(var(post_thin[,cols]), nrow = 1, ncol = 1)
+    }
+    
     imp_samp = rmvnorm(M, mean = post_mean[cols], sigma = post_cov)
     # imp_samp = rmvnorm(M, mean = post_mean[cols], sigma = sigma)
     # imp_samp = rmvt(M, df = 10, delta = post_mean[cols], sigma = sigma)
@@ -84,7 +102,11 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     eta = eta_fef_k[rep(1, M),] + eta_ref
     
     # Calculate indicator function
-    indic = indicator(bounds[,cols], imp_samp)
+    if(length(cols) > 1){
+      indic = indicator_1(bounds[,cols], imp_samp)
+    }else{
+      indic = indicator_2(bounds[,cols], imp_samp)
+    }
     cat("proportion of samples inside bounds:", mean(indic), "\n")
     
     dens_k = rep(1, times = M)
@@ -128,7 +150,7 @@ CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
   # post_cov = sigma
   
   # Calculate bounds of the posterior for each dimension
-  bounds = apply(posterior, 2, range)
+  bounds = apply(posterior[,], 2, range)
   
   ll = 0
   

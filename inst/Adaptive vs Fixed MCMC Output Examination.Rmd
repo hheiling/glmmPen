@@ -333,7 +333,7 @@ plot(x = c(original_rate_matrix), y = c(proposal_SD), ylim = c(0, exp(1)+0.1),
 abline(h = c(exp(-1),exp(1)))
 ```
 
-Summary: It looks like once the acceptance rate was already low, increasing the proposal variance / SD didn't increase the acceptance rates (or at least not enough to reach the desired area of (0.4, 0.5)), so the proposal SD / variance kept increasing with no obvious effect.
+Summary: It looks like once the acceptance rate was already low, increasing the proposal variance / SD didn't increase the acceptance rates (or at least not enough to reach the desired area of (0.4, 0.5)), so the proposal SD / variance kept increasing to its upper bound with no obvious effect.
 
 
 The End

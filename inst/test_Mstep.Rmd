@@ -1,0 +1,269 @@
+---
+title: "test_Mstep"
+author: "Hillary Heiling"
+date: "April 14, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ncvreg)
+library(glmmPen)
+library(knitr)
+library(stringr)
+library(mvtnorm)
+```
+
+## IRLS Test
+
+```{r}
+# Create dataset to test IRLS (no random effects)
+set.seed(2020)
+N = 100
+X = matrix(rnorm(5*N), nrow = N, ncol = 5)
+X = cbind(1, X)
+beta = rep(1, times = ncol(X))
+
+eta = X %*% beta
+y = rbinom(n = N, size = 1, prob = exp(eta)/(1+exp(eta)))
+
+# Test IRLS
+
+## The gold standard result 
+fit1 = glm(formula = y ~ X[,-1], family = binomial())
+
+int_only = glm(formula = y ~ 1, family = binomial())
+
+## Matrix inversion IRLS (can only use for low-dimensional cases)
+fit2 = M_step(y, X, family = binomial(),
+              coef = c(int_only$coefficients, rep(0, times = ncol(X)-1)),
+              maxit = 1000, conv = 0.0001, fit_type = 1, lambda = 0)
+
+## Coordinate descent with lambda == 0 (coord descent version of IRLS)
+fit3 = M_step(y, X, family = binomial(),
+              coef = c(int_only$coefficients, rep(0, times = ncol(X)-1)),
+              penalty = "lasso", maxit_CD = 1000, conv = 0.0001, fit_type = 2, lambda = 0)
+
+## Grouped coordinate descent with all gropus comprised on one covariate, lambda == 0
+fit4 = M_step(y, X, family = binomial(),
+              coef = c(int_only$coefficients, rep(0, times = ncol(X)-1)),
+              penalty = "lasso", maxit_CD = 1000, conv = 0.0001, fit_type = 3, lambda = 0)
+
+output = cbind(fit1$coefficients, fit2$coef, fit3$coef, fit4$coef)
+rownames(output) = c("(Intercept)", str_c("X",1:5))
+
+kable(output, 
+      col.names = c("glm()","Trad. IRLS","Coord Desc","Grp Coord Desc"),
+      caption = "IRLS vs CD with lambda = 0")
+```
+
+
+## Singular Coordinate Descent Test
+
+```{r}
+# Create dataset to test Coordinate Descent (no random effects)
+
+penalty = "MCP"
+
+set.seed(2020)
+N = 100
+X = matrix(rnorm(5*N), nrow = N, ncol = 10)
+## Standardize the X matrix
+X_std = std(X)
+X_toUse = cbind(1, X_std)
+beta = c(0, 2, 2, rep(0, times = 8))
+
+eta = X_toUse %*% beta
+y = rbinom(n = N, size = 1, prob = exp(eta)/(1+exp(eta)))
+
+# Test coordinate descent
+
+fitA = ncvreg(X_std, y, family = "binomial", penalty = penalty, nlambda = 20,
+              max.iter = 1000, alpha = 1.0)
+
+## Fit intercept-only model
+int_only = glm(formula = y ~ 1, family = binomial())
+## Use same lambda values as ncvreg
+lambda_vec = fitA$lambda
+
+beta = matrix(NA, nrow = 11, ncol = length(lambda_vec)) # Same set-up as ncvreg$beta
+
+for(i in 1:length(lambda_vec)){
+  if(i == 1){
+    beta_init = c(int_only$coefficients, rep(0, times = ncol(X_toUse)-1))
+  }else{
+    beta_init = beta[,i-1]
+  }
+  
+  fitB = M_step(y, X_toUse, family = binomial(),
+                coef = beta_init, penalty = penalty, alpha = 1.0,
+                maxit_CD = 1000, conv = 0.0001, fit_type = 2, lambda = lambda_vec[i])
+  beta[,i] = fitB
+}
+
+colnames(beta) = round(lambda_vec, 5)
+
+# beta2 = matrix(NA, nrow = 11, ncol = length(lambda_vec)) # Same set-up as ncvreg$beta
+# 
+# for(i in 1:length(lambda_vec)){
+#   if(i == 1){
+#     beta_init = c(int_only$coefficients, rep(0, times = ncol(X_toUse)-1))
+#   }else{
+#     beta_init = beta2[,i-1]
+#   }
+# 
+#   fitC = M_step(y, X_toUse, family = binomial(),
+#                 coef = beta_init, penalty = penalty, alpha = 1.0,
+#                 maxit_CD = 1000, conv = 0.0001, fit_type = 3, lambda = lambda_vec[i])
+#   beta2[,i] = fitC
+# }
+# 
+# colnames(beta2) = round(lambda_vec, 5)
+# 
+# # Side-by-side comparison of beta output
+# for(i in 1:7){
+#   cat("lambda: ", lambda_vec[i], "\n")
+#   out = cbind(fitA$beta[,i], beta[,i], beta2[,i], (fitA$beta[,i] - beta[,i]),
+#               (fitA$beta[,i] - beta2[,i]))
+#   colnames(out) = c("ncvreg","Pkg CD","Pkg Grp CD","Bias CD","Bias Grp CD")
+#   print(round(out, 6))
+# }
+
+for(i in 1:7){
+  cat("lambda: ", lambda_vec[i], "\n")
+  out = cbind(fitA$beta[,i], beta[,i], (fitA$beta[,i] - beta[,i]))
+  colnames(out) = c("ncvreg","Pkg CD","Bias CD")
+  print(round(out, 6))
+}
+
+
+```
+
+
+## Group Coordinate Descent Test ($\eta = X\beta$)
+
+```{r}
+# Create dataset to test Grouped Coordinate Descent 
+## (no random effects, linear predictor = X*Beta only)
+
+penalty = "lasso"
+grpPen = "grLasso"
+
+set.seed(2020)
+N = 100
+x1 = std(rmvnorm(N, sigma = matrix(c(1,0.7,0.7,1), nrow = 2)))
+x1_SVD = svd(x1)
+x2 = std(rmvnorm(N, sigma = matrix(c(1,-0.5,-0.5,1), nrow = 2, byrow = T)))
+x2_SVD = svd(x2)
+x3 = std(rmvnorm(N, sigma = matrix(c(1,0.5,0.1,0.5,1,0.5,0.1,0.5,1), nrow = 3, byrow = T)))
+x3_SVD = svd(x3)
+
+# Use orthonormal groups
+X = cbind(x1%*%x1_SVD$v%*%diag(sqrt(N)/x1_SVD$d), 
+          x2%*%x2_SVD$v%*%diag(sqrt(N)/x2_SVD$d), 
+          x3%*%x3_SVD$v%*%diag(sqrt(N)/x3_SVD$d))
+
+# Check: The following should all equal the Identity matrix
+# t(X[,1:2])%*%X[,1:2] / N
+# t(X[,3:4])%*%X[,3:4] / N
+# t(X[,5:7])%*%X[,5:7] / N
+
+X_toUse = cbind(1, X)
+group_X = c(0, rep(1,2), rep(2,2), rep(3,3))
+
+beta = c(0, 2, 2, 1, 1, rep(0, times = 3))
+
+eta = X_toUse %*% beta
+y = rbinom(n = N, size = 1, prob = exp(eta)/(1+exp(eta)))
+
+# Test coordinate descent
+
+fit_grpA = grpreg(X, y, group = group_X[-1], family = "binomial", penalty = grpPen, nlambda = 20,
+                  max.iter = 1000, alpha = 1.0)
+
+## Fit intercept-only model
+int_only = glm(formula = y ~ 1, family = binomial())
+## Use same lambda values as ncvreg
+lambda_vec = fit_grpA$lambda
+
+beta = matrix(NA, nrow = ncol(X_toUse), ncol = length(lambda_vec)) # Same set-up as ncvreg$beta
+
+if(penalty == "SCAD"){
+  Gam = 4
+}else{ # penalty == "MCP" or lasso
+  Gam = 3
+}
+
+for(i in 1:length(lambda_vec)){
+  if(i == 1){
+    beta_init = c(int_only$coefficients, rep(0, times = ncol(X_toUse)-1))
+  }else{
+    beta_init = beta[,i-1]
+  }
+  
+  fit_grpB = M_step(y, X_toUse, group_X = group_X, family = binomial(),
+                    coef = beta_init, penalty = penalty, alpha = 1.0, gamma = Gam,
+                    maxit_CD = 1000, conv = 0.0001, fit_type = 3, lambda = lambda_vec[i])
+  beta[,i] = fit_grpB
+}
+
+colnames(beta) = round(lambda_vec, 5)
+
+# Side-by-side comparison of beta output
+for(i in c(1:7, length(lambda_vec))){
+  out = cbind(fit_grpA$beta[,i], beta[,i], fit_grpA$beta[,i] - beta[,i])
+  colnames(out) = c("grpreg","Grp CD","Bias")
+  print(round(out,6))
+}
+```
+
+## Grouped Coordinate Descent Test ($\eta = X\beta + Z\gamma)
+
+```{r}
+library(glmmPen)
+
+dat = sim.data2(n = 500, ptot = 2, pnonzero = 2, nstudies = 5, sd_raneff = 1.0, family = 'binomial',
+                slopes = T, seed = 2020, imbalance = 1, pnonzerovar = 0, beta = c(0, 2, 2))
+
+out_fit = fit_dat_B(dat, nMC = 100, lambda0 = 0,
+                    lambda1 = 0, family = "binomial",
+                    penalty = "MCP", returnMC = T,
+                    conv = 0.001, nMC_max = 10000, trace = 0, ufull = NULL, coeffull = NULL,
+                    gibbs = T, maxitEM = 100, alpha = 1, t = 2,
+                    M = M, MwG_sampler = "random_walk",
+                    adapt_RW_options = adaptControl(batch_length = 100,
+                                                    burnin_batchnum = 1000,
+                                                    offset = 8500),
+                    covar = "unstructured", maxit_CD = 150, fit_type = 4)
+```
+
+```{r}
+out_original = fit_dat(dat, nMC = 100, lambda0 = 0,
+                        lambda1 = 0, family = "binomial",
+                        penalty = "grMCP", returnMC = T,
+                        conv = 0.001, nMC_max = 5000, trace = 0, ufull = NULL, coeffull = NULL,
+                        gibbs = T, maxitEM = 100, alpha = 1, t = 5,
+                        M = M, MwG_sampler = "random_walk",
+                        adapt_RW_options = adaptControl(batch_length = 100,
+                                                        burnin_batchnum = 1000,
+                                                        offset = 8500),
+                        covar = "unstructured")
+```
+
+### Issue with Version C M-step
+
+In order to update $\beta$ coefficients, need to update residuals using last updated $\beta$.
+
+In order to update residuals when updating the random effects, need to update $\eta$ as follows:
+
+$$(z_{im}^*)^T = (\alpha_{km} \otimes z_{ki})^T * J$$
+
+$$\eta_{im}^{new} = \eta_{im}^{old} + (z_{jim}^*)^T*(\beta_j^{new}-\beta_j^{old})$$
+
+If the posterior draws are not saved, then can only update/re-calculate eta by re-drawing from the posterior.
+
+
+The End

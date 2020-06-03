@@ -8,9 +8,9 @@ pglmmObj = setRefClass("pglmmObj",
               group = "list",
               sigma = "matrix", 
                 # sigma: Turn in to "dgCMatrix"? - sparse for large dimensions matrix
-                # alternatively, if large dims, assume diagonal, report matrix with ncol = 1
-              gibbs_mcmc = "matrix",
-              family = "character",
+                # alternatively, if large dims, assume diagonal, could report matrix with ncol = 1
+              posterior_draws = "matrix",
+              family = "family",
               J = "dgCMatrix", # sparse matrix
               # BIC_ICQ = "numeric",
               # penalty = "list", # type, chosen optimal values for fixed and random effects
@@ -23,6 +23,8 @@ pglmmObj = setRefClass("pglmmObj",
               Z = "dgCMatrix",
               frame = "data.frame",
               sampling = "character",
+              selection_FullResults = "matrix",
+              optim_results = "matrix",
               extra = "list"
             ),
             methods = list(
@@ -48,23 +50,30 @@ pglmmObj = setRefClass("pglmmObj",
                   rownames(Z) <<- rownames(X)
                 frame <<- x$frame
                 
-                # Fixed effects coefficients
-                p = ncol(X)
-                fixef <<- x$coef[1:p]
+                # Fixed effects coefficients - need to unstandardize
+                
+                  p = ncol(X)
+                  beta = x$coef[1:p]
+                  center = x$std_out$X_center
+                  scale = x$std_out$X_scale
+                  beta[1] = beta[1] - sum(center*beta[-1]/scale)
+                  beta[-1] = beta[-1] / scale
+                fixef <<- beta
                 names(fixef) <<- x$coef_names$fixed
                 nonzeroFE <<- fixef[which(fixef != 0)]
                 
                 # Covariance matrix of random effects
                 sigma <<- x$sigma
+                colnames(sigma) <<- x$coef_names$random
+                rownames(sigma) <<- x$coef_names$random
                 # nonzervarRE <<- sum(rowSums(covar) != 0)
-                # Add names of random effects to matrix (either rownames or colnames)
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
-                gibbs_mcmc <<- x$u 
-                colnames(gibbs_mcmc) <<- colnames(Z)
+                posterior_draws <<- x$u 
+                colnames(posterior_draws) <<- colnames(Z)
                 
                 # Random effects coefficients
-                rand = colMeans(gibbs_mcmc) 
+                rand = colMeans(posterior_draws) 
                 q = ncol(Z) / d # Number random variables
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
@@ -79,8 +88,10 @@ pglmmObj = setRefClass("pglmmObj",
                 # BIC_ICQ <<- x$BIC
                 # penalty <<- x$penalty
                 sampling <<- x$sampling
+                selection_FullResults <<- x$selection_results
+                optim_results <<- x$optim_results
                 
-                extra <<- list(fit = x$extra$fit, okindex = x$extra$okindex, 
+                extra <<- list(okindex = x$extra$okindex, 
                                Znew2 = x$extra$Znew2, coef = x$coef)
               },
               show = function(){

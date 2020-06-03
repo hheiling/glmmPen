@@ -4,12 +4,10 @@
 \alias{sample.mc2}
 \title{Calculate Monte Carlo draws}
 \usage{
-sample.mc2(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
-  d, nZ, okindex, gibbs = F, uold)
+sample.mc2(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, nZ,
+  okindex, gibbs = F, uold)
 }
 \arguments{
-\item{fit}{a grpreg fit object (set \code{\link[grpreg]{grpreg}})}
-
 \item{cov}{the random effects covariance matrix estimated from the last M step of the EM algorithm}
 
 \item{y}{a numeric vector of the response variable}
@@ -21,11 +19,10 @@ sample.mc2(fit, cov, y, X, Z, nMC, trace = 0, family = family, group,
 \item{nMC}{a positive integer for the initial number of Monte Carlo draws}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...), with alternative options of 1 (details ...) or 2 (output acceptance rate information
-of the Monte Carlo draws computed in \code{\link{sample_mc_adapt}})}
+(details ...)}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat} this can be a character string naming a family function or a fmaily function. 
+For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 See \code{family} options in the Details section.}
 
 \item{group}{a factor vector of the grouping variable, converted to a factor of 
@@ -36,7 +33,8 @@ consecutive numeric integers}
 \item{okindex}{?}
 
 \item{gibbs}{logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
-(if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})?}
+(if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})? 
+Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects}
 
 \item{uold}{a matrix of the Monte Carlo draws from the last E step of the EM algorithm}
 }
