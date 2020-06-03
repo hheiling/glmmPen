@@ -23,7 +23,7 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
                            const char* family, int link, int init,
                            const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
                            const char* penalty, arma::vec params) {
-
+  
   // y = response vector
   // X = fixed effecs covariate matrix
   // Z = random effects matrix
@@ -80,9 +80,6 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
   double lambda1 = params(1);
   double gamma = params(2);
   double alpha = params(3);
-
-  double v0 = 0.0; // sum(residuals^2) / (N*M)
-  double v0_last = 0.0; // v0 from last iteration
 
   arma::mat eta(M,N); // linear predictors
   arma::mat resid(M,N); // residuals
@@ -218,21 +215,17 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
     }
   }
   
-  // Update residuals, determine initial nu and v0
-  v0 = 0.0; // Initialize to 0, will add up components
+  // Update residuals, determine initial nu
   for(i=0;i<N;i++){
-    tmp_out = resid_nu_v0_i(y(i), eta.col(i), family, link, nu);
+    tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu);
     resid.col(i) = tmp_out.subvec(0,M-1);
     nu = tmp_out(M);
-    v0 += tmp_out(M+1);
   }
   
   // Note: resid in the above calculation is (y - mu), but really want (y-mu)/nu
   // Therefore, divide entire residual matrix by nu
-  // Also, need v0 = mean(resid^2), so divide given v0 by N*M*nu^2
   resid = resid / nu;
-  v0 = v0 / (N*M*nu*nu);
-
+  
   //-------------------------------------------------------------------------------//
   // Grouped Coordinate Descent
   //-------------------------------------------------------------------------------//
@@ -243,9 +236,7 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
     iter = iter + 1;
     // Save last beta
     beta0 = beta;
-    // Save latest v0
-    v0_last = v0;
-
+    
     // ----------------------------------------------------------------------------------//
     // Element-wise update of fixed effects betaj first
     // ----------------------------------------------------------------------------------//
@@ -479,7 +470,7 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
     // ----------------------------------------------------------------------------------//
     // Update eta with last betaj update (r = last j updated)
     // Recalculate residuals using updated eta
-    // Recalculate v0 and nu (if necessary)
+    // Recalculate nu (if necessary)
     // ----------------------------------------------------------------------------------//
 
     // Find index of covariates corresponding to previous j in sequence (r)
@@ -520,21 +511,17 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
       nu = 0.0;
     }
     
-    // Re-calculate residuals from updated eta, update nu and v0
-    v0 = 0.0; // Initialize to 0, will add up components
+    // Re-calculate residuals from updated eta, update nu 
     for(i=0;i<N;i++){
-      tmp_out = resid_nu_v0_i(y(i), eta.col(i), family, link, nu);
+      tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu);
       resid.col(i) = tmp_out.subvec(0,M-1);
       nu = tmp_out(M);
-      v0 += tmp_out(M+1);
     }
     
     // Note: resid in the above calculation is (y - mu), but really want (y-mu)/nu
     // Therefore, divide entire residual matrix by nu
-    // Also, need v0 = mean(resid^2), so divide given v0 by N*M*nu^2
     resid = resid / nu;
-    v0 = v0 / (N*M*nu*nu);
-
+    
     // ----------------------------------------------------------------------------------//
     // Check Convergence Criteria
     // ----------------------------------------------------------------------------------//
@@ -543,10 +530,7 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
     if(arma::max(abs(beta0 - beta)) < conv){
       converged = 1;
     }
-    // if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
-    //   converged = 1;
-    // }
-
+    
   } // End while loop
   
   Rprintf("Number iterations in grouped coord descent: %i \n", iter);

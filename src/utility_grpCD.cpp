@@ -7,7 +7,7 @@
 using namespace Rcpp;
 
 // Calculates the M residuals for an individual given eta, updates nu and v0
-arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, double nu){
+arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, double nu){
   
   int M = eta.n_elem;
   int m = 0;
@@ -26,7 +26,7 @@ arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, 
   double nu_tmp = 0.0;
   double v0 = 0.0;
   
-  arma::vec output(M+2);
+  arma::vec output(M+1);
   
   // Update mu, resid, weights
   mu = invlink(link, eta);
@@ -57,11 +57,9 @@ arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, 
     }
   }
   
-  v0 = sum(resid % resid); // Will divide v0 by nu^2 and M*N later
   
   output.subvec(0,M-1) = resid;
   output(M) = nu;
-  output(M+1) = v0;
   
   return(output);
 }

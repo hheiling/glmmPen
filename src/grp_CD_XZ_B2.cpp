@@ -86,12 +86,9 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
   double gamma = params(2);
   double alpha = params(3);
 
-  double v0 = 0.0; // sum(residuals^2) / (N*M)
-  double v0_last = 0.0; // v0 from last iteration
-
   arma::mat eta(M,N); // linear predictors
   arma::mat resid(M,N); // residuals
-  arma::vec tmp_out(M+2);
+  arma::vec tmp_out(M+1);
   
   double nu=0.0; // max second deriv of loss function (max possible weight)
   double zetaj_L2=0.0; // L2 norm of zetaj vector
@@ -139,7 +136,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
   // Initialize eta and residual matrices
   //-------------------------------------------------------------------------------//
 
-  // Update eta
+  // Initialize eta
   for(k=0;k<d;k++){
 
     // Rows of X and Z to use
@@ -161,21 +158,17 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     }
   }
   
-  // Update residuals, determine initial nu and v0
-  v0 = 0.0; // Initialize to 0, will add up components
+  // Initialize residuals, determine initial nu 
   for(i=0;i<N;i++){
-    tmp_out = resid_nu_v0_i(y(i), eta.col(i), family, link, nu);
+    tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu);
     resid.col(i) = tmp_out.subvec(0,M-1);
     nu = tmp_out(M);
-    v0 += tmp_out(M+1);
   }
   
   // Note: resid in the above calculation is (y - mu), but really want (y-mu)/nu
   // Therefore, divide entire residual matrix by nu
-  // Also, need v0 = mean(resid^2), so divide given v0 by N*M*nu^2
   resid = resid / nu;
-  v0 = v0 / (N*M*nu*nu);
-
+  
   //-------------------------------------------------------------------------------//
   // Grouped Coordinate Descent
   // Outer IRLS Loop
@@ -187,10 +180,10 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     iter1 = iter1 + 1;
     // Reset iter2 (inner CD loop)
     iter2 = 0;
+    // Reset converged2
+    converged2 = 0;
     // Save last beta
     beta0_outer = beta;
-    // Save latest v0
-    v0_last = v0;
 
     // ----------------------------------------------------------------------------------//
     // Element-wise update of fixed effects betaj first
@@ -208,7 +201,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
         
         // Identify covariates belonging to group j
         arma::uvec idxj = find(XZ_group == j);
-        Kj = idxj.n_elem;
+        Kj = idxj.n_elem; // size of group j
         
         if((init == 1) & (iter1>=3) & (sum(beta.elem(idxj)) == 0.0)){
           // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
@@ -327,11 +320,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       // Update beta (no penalization)
       beta.elem(idxj) = zetaj;
       
-      // Reset nu to 0 if not binomial or gaussian with canonical link
-      if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
-        nu = 0.0;
-      }
-      
+      // Save r as the most recent updated j
       r = J_X;
       
       // ----------------------------------------------------------------------------------//
@@ -419,11 +408,6 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
           beta.elem(idxj) = bj * (zetaj / zetaj_L2);
         }
         
-        // Reset nu to 0 if not binomial or gaussian with canonical link
-        if(!((std::strcmp(family, bin) == 0) & (link == 10)) & !((std::strcmp(family, gaus) == 0) & (link == 30))){
-          nu = 0.0;
-        }
-        
         // Save r as the most recent updated j
         r = j;
         
@@ -470,7 +454,7 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
 
     // ----------------------------------------------------------------------------------//
     // Recalculate residuals using updated eta
-    // Recalculate v0 and nu (if necessary)
+    // Recalculate nu (if necessary)
     // ----------------------------------------------------------------------------------//
     
     // Re-set nu if necessary
@@ -486,21 +470,17 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
       nu = 0.0;
     }
     
-    // Re-calculate residuals from updated eta, update nu and v0
-    v0 = 0.0; // Initialize to 0, will add up components
+    // Re-calculate residuals from updated eta, update nu
     for(i=0;i<N;i++){
-      tmp_out = resid_nu_v0_i(y(i), eta.col(i), family, link, nu);
+      tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu);
       resid.col(i) = tmp_out.subvec(0,M-1);
       nu = tmp_out(M);
-      v0 += tmp_out(M+1);
     }
     
     // Note: resid in the above calculation is (y - mu), but really want (y-mu)/nu
     // Therefore, divide entire residual matrix by nu
-    // Also, need v0 = mean(resid^2), so divide given v0 by N*M*nu^2
     resid = resid / nu;
-    v0 = v0 / (N*M*nu*nu);
-
+    
     // ----------------------------------------------------------------------------------//
     // Check Convergence Criteria
     // ----------------------------------------------------------------------------------//
@@ -509,11 +489,8 @@ arma::vec grp_CD_XZ_B2(const arma::vec& y, const arma::mat& X, const arma::mat& 
     if(arma::max(abs(beta0_outer - beta)) < conv1){
       converged1 = 1;
     }
-    // if(fabs(v0 - v0_last)/(v0_last+0.1) < conv*0.001){
-    //   converged = 1;
-    // }
 
-  } // End while loop
+  } // End outer while loop
   
   Rprintf("Number iterations in grouped coord descent (IRLS loop): %i \n", iter1);
 

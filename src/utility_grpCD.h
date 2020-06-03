@@ -22,7 +22,7 @@ double SCAD_soln(double zeta, double nu, double lambda, double gamma, double alp
 //----------------------------------------------------------------------------------------//
 
 // Calculating residuals by individual using eta as input
-arma::vec resid_nu_v0_i(double yi, arma::vec eta, const char* family, int link, double nu);
+arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, double nu);
 
 // Calculates fixed effects zetaj using residuals matrix
 arma::vec zeta_fixef_calc(arma::mat X, arma::mat resid, arma::uvec idxj);
