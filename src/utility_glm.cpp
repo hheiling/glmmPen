@@ -279,7 +279,6 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
   double s2 = 0.0; // estimate of sigma^2 
   double sig = 0.0; // square root of s2 
   
-  double likQ = 1.0;
   double llQ = 0.0;
   
   // Calculate MxN eta matrix

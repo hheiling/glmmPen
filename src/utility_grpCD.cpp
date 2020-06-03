@@ -24,7 +24,6 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
   const char* gaus = "gaussian";
   
   double nu_tmp = 0.0;
-  double v0 = 0.0;
   
   arma::vec output(M+1);
   
