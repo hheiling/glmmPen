@@ -114,16 +114,16 @@ colnames(beta) = round(lambda_vec, 5)
 #   }else{
 #     beta_init = beta2[,i-1]
 #   }
-#   
+# 
 #   fitC = M_step(y, X_toUse, family = binomial(),
 #                 coef = beta_init, penalty = penalty, alpha = 1.0,
 #                 maxit_CD = 1000, conv = 0.0001, fit_type = 3, lambda = lambda_vec[i])
-#   beta2[,i] = fitC$coef
+#   beta2[,i] = fitC
 # }
 # 
 # colnames(beta2) = round(lambda_vec, 5)
-
-# Side-by-side comparison of beta output
+# 
+# # Side-by-side comparison of beta output
 # for(i in 1:7){
 #   cat("lambda: ", lambda_vec[i], "\n")
 #   out = cbind(fitA$beta[,i], beta[,i], beta2[,i], (fitA$beta[,i] - beta[,i]),
@@ -149,8 +149,8 @@ for(i in 1:7){
 # Create dataset to test Grouped Coordinate Descent 
 ## (no random effects, linear predictor = X*Beta only)
 
-penalty = "MCP"
-grpPen = "grMCP"
+penalty = "lasso"
+grpPen = "grLasso"
 
 set.seed(2020)
 N = 100
