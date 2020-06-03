@@ -237,12 +237,12 @@ arma::vec varfun(const char* family, arma::vec mu){ // double phi
   
 }
 
-// Q-function calculation
+// Complete LogLik calculation
 // [[Rcpp::export]]
-double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
-            const arma::vec& group, const arma::sp_mat& J_q,
-            const arma::vec& beta, const arma::vec offset, arma::vec dims,
-            const char* family, int link){
+double ll_comp(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
+               const arma::vec& group, const arma::sp_mat& J_q,
+               const arma::vec& beta, const arma::vec offset, arma::vec dims,
+               const char* family, int link){
   
   const char* bin = "binomial";
   const char* pois = "poisson";

@@ -462,9 +462,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       u2[,seq(ii, ncol(Z), by = d)] = rmvnorm(n = nMC2,sigma=var)
     }
     
-    # Q-function version of log-likelihoood
-    ## Need to fix (incorporate big.matrix into this Rcpp function)
-    ll0 = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
+    # Complete log-likelihoood
+    ll0 = ll_comp(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
     
     if(!is.finite(ll0)){
       problem = T
