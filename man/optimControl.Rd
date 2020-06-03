@@ -6,22 +6,18 @@
 
 Constructs the control structure for penalized mixed model fitting.}
 \usage{
-optimControl(conv_EM = 0.001, conv_IRLS = 1e-04, conv_CD = 1e-04,
-  nMC_start = 200, nMC_max = 10000, nMC_report = 5000,
-  maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
-  covar = c("unstructured", "independence"),
-  MwG_sampler = c("random_walk", "independence"), gibbs = T,
-  fit_type = 2)
+optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_start = 200,
+  nMC_max = 10000, nMC_report = 5000, maxitEM = 100,
+  maxit_CD = 250, M = 10000, t = 2, covar = c("unstructured",
+  "independence"), MwG_sampler = c("random_walk", "independence"),
+  gibbs = T, fit_type = 2)
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
 EM algorithm. Default is 0.001.}
 
-\item{conv_IRLS}{a non-negative numeric convergence criteria for the convergenc of the 
-outer IRLS loop within the grouped coordinate descent algorithm. Default 0.0001}
-
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
-inner coordinate descent loop within the grouped coordinate descent algorithm. Default 0.0001.}
+grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
 
 \item{nMC_start}{a positive integer for the initial number of Monte Carlo draws.}
 

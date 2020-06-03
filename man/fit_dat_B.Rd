@@ -6,9 +6,9 @@
 Minimization (MCECM)}
 \usage{
 fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
-  conv_IRLS = 1e-04, conv_CD = 1e-04, family = "binomial",
-  offset_fit = NULL, trace = 0, penalty = c("MCP", "SCAD", "lasso"),
-  alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4, 3),
+  conv_CD = 1e-04, family = "binomial", offset_fit = NULL,
+  trace = 0, penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
+  gamma_penalty = switch(penalty[1], SCAD = 4, 3),
   group_X = 0:(ncol(dat$X) - 1), nMC = 1000, nMC_max = 10000,
   t = 2, returnMC = T, nMC_report = 5000, ufull = NULL,
   coeffull = NULL, ufullinit = NULL, maxitEM = 100, maxit_CD = 250,
@@ -30,11 +30,8 @@ covariance parameters}
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
 EM algorithm. Default is 0.001.}
 
-\item{conv_IRLS}{a non-negative numeric convergence criteria for the convergenc of the 
-outer IRLS loop within the grouped coordinate descent algorithm. Default 0.0001}
-
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
-inner coordinate descent loop within the grouped coordinate descent algorithm. Default 0.0001.}
+grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
