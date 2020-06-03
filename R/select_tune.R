@@ -81,8 +81,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   n2 = length(lambda1_range)
   BICold = BIC = BIC2old2 = BIC2= Inf
   BIChold = BICh = Inf
-  res = matrix(0, n1*n2, 9)
-  # res2 = matrix(0, n2, 4) 
+  res = matrix(0, n1*n2, 8)
   coef = NULL
   outl = list()
   
