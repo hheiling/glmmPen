@@ -47,18 +47,6 @@ grp_CD_XZ_B2_std <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, f
     .Call('_glmmPen_grp_CD_XZ_B2_std', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
-logLik_cpp <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
-    .Call('_glmmPen_logLik_cpp', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
-}
-
-logLik_modif <- function(U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family) {
-    .Call('_glmmPen_logLik_modif', PACKAGE = 'glmmPen', U_means, sigma, M, group, n_levels, df, y, eta_fef, Z, Gamma, family)
-}
-
-logLik_MCI <- function(M, group, n_levels, y, eta_fef, Z, Gamma, family) {
-    .Call('_glmmPen_logLik_MCI', PACKAGE = 'glmmPen', M, group, n_levels, y, eta_fef, Z, Gamma, family)
-}
-
 #' Obtaining Rejection Sampling Monte Carlo Draws
 #' 
 #' Description
@@ -123,7 +111,7 @@ invlink <- function(link, eta) {
     .Call('_glmmPen_invlink', PACKAGE = 'glmmPen', link, eta)
 }
 
-Qfun <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link) {
-    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link)
+ll_comp <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link) {
+    .Call('_glmmPen_ll_comp', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link)
 }
 
