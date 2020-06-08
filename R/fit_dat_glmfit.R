@@ -248,6 +248,9 @@ fit_dat_glm = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     }
     
   }
+  
+  post_modes = matrix(colMeans(u0), nrow = 1)
+  
   #u = bmmat(u)
   nMC2 = nrow(u)
   etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u) ) + Znew2%*%t(u)
@@ -320,35 +323,6 @@ fit_dat_glm = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     c0 = c0 + (coef == 0)^2
     
     fit = fitM
-    # fit0 = grpreg(Znew, y[rep(1:nrow(X), each = nrow(u))], group=covgroup,
-    #               penalty="grMCP", family="binomial",lambda = lambda1,
-    #               offset = X[rep(1:nrow(X), each = nrow(u)),] %*% matrix(coef[1:ncol(X)],ncol = 1),
-    #               alpha = alpha, active = active0,
-    #               initbeta = c(0,coef[-c(1:ncol(X))]))
-    # gc()
-    # coef = rep(0,length(covgroup) + ncol(X))
-    # coef[-c(1:ncol(X))] = fit0$beta[-1]
-    # c0[-c(1:ncol(X))] = c0[-c(1:ncol(X))] + (fit0$beta[-1] == 0)^2
-    # 
-    # cat("full fit0$beta output: ", fit0$beta, "\n")
-    # fit0_record[i,] = fit0$beta
-    # 
-    # if(ncol(X) > 2){
-    #   fit1 = grpreg(X[rep(1:nrow(X), each = nrow(u)),-1], y[rep(1:nrow(X), each = nrow(u))],
-    #                 group=1:(ncol(X)-1), penalty="grMCP", family="binomial",lambda = lambda0,
-    #                 offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)),
-    #                 alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-    # }else{
-    #   fit1 = grpreg(matrix(X[rep(1:nrow(X), each = nrow(u)),-1], nrow = nrow(X)*nrow(u)),
-    #                 y[rep(1:nrow(X), each = nrow(u))], group=1:(ncol(X)-1), penalty="grMCP",
-    #                 family="binomial",lambda = lambda0,
-    #                 offset = bigmemory::as.matrix(Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1)),
-    #                 alpha = alpha, active = active1, initbeta = coef[c(1:ncol(X))])
-    # }
-    # gc()
-    # coef[c(1:ncol(X))] = fit1$beta
-    # c0[c(1:ncol(X))] = c0[c(1:ncol(X))] + (fit1$beta == 0)^2
-    # fit = fit1
     
     # need to compile code first before running.  Actives will default to 1 to test, then uncomment the below to skip groups
     # update active set every 5 iterations
@@ -517,7 +491,7 @@ fit_dat_glm = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
       
     }
     
-    
+    post_modes = rbind(post_modes,colMeans(u0))
     
     nMC2 = nrow(u)
     
@@ -553,27 +527,6 @@ fit_dat_glm = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
     gc()
   }
   
-  ## calculate BIC
-  # if(is.null(ufull)){
-  #   BIC = -2*ll0 + log(length(y))*sum(coef != 0) # switched BIC and BIC0 11/28
-  #   BIC0 = -2*ll + log(length(y))*sum(coef != 0)
-  #   BIC20 = -2*ll20 + log(length(y))*sum(coef!=0)
-  #   llb = ll0b = 0
-  # }else{
-  #   rm(Znew)
-  #   gc()
-  #   BIC20 = -2*ll20  + log(length(y))*sum(coef!=0)
-  #   Znew = big.matrix(nrow = nrow(X)*nrow(ufull), ncol = ncol(J))
-  #   Znew_gen2(ufull, Z, group, seq(as.numeric(group[1]), ncol(Z), by = d),nrow(Z),ncol(Z)/d,d, Znew@address, J)
-  #   etae = as.numeric(X[rep(1:nrow(X), each = nrow(ufull)),] %*% matrix(coef[1:ncol(X)],ncol = 1) + Znew %*% matrix(coef[-c(1:ncol(X))],ncol = 1))
-  #   llb = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))) + sum(dnorm(ufull, 0,1, log = T)))/nrow(ufull)
-  #   BIC = -2*llb + log(length(y))*sum(coef != 0)
-  #   ll0b = (sum((dbinom(y[rep(1:nrow(X), each = nrow(ufull))], size = 1, prob = exp(etae)/(1+exp(etae)), log = T))))/nrow(ufull)
-  #   BIC0 = -2*ll0b + log(length(y))*sum(coef != 0)
-  #   rm(Znew)
-  #   gc()
-  # }
-  
   
   print(sqrt(diag(cov)[1:3]))
   returnMC
@@ -584,6 +537,8 @@ fit_dat_glm = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
                                  proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
                                  offset = offset, burnin_batchnum = burnin_batchnum)
   u = u0 = samplemc_out$u0
+  
+  post_modes = rbind(post_modes, colMeans(u0))
   
   # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
   if(gibbs | samplemc_out$switch){
@@ -654,6 +609,9 @@ fit_dat_glm = function(dat,  lambda0 = 0, lambda1 = 0, conv = 0.001, nMC = 1000,
   if(!is.null(cov_record)){
     out$cov_record = cov_record
   }
+  
+  # record the posterior modes over EM iterations
+  out$post_modes = post_modes
   
   return(out)
 }
