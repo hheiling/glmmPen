@@ -23,7 +23,7 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
   # Define variables
   d = nlevels(group)
   num_var = ncol(Z) / d
-  Gamma = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
+  Gam = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
   eta_fef = X %*% coef[1:ncol(X)]
   post_mean = colMeans(posterior[,])
   
@@ -97,7 +97,8 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     ## Fixed-effects component of eta (linear predictor)
     eta_fef_k = matrix(eta_fef[ids], nrow = 1) # 1 X n_k
     ## Random-effects component of eta (linear predictor)
-    eta_ref = imp_samp %*% Gamma %*% t(Z_k) # M x n_k
+    ## switched Gam to be transposed
+    eta_ref = imp_samp %*% t(Gam) %*% t(Z_k) # M x n_k
     ## Full eta - fixed + random effects component
     eta = eta_fef_k[rep(1, M),] + eta_ref
     
@@ -144,7 +145,7 @@ CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
   # Define variables
   d = nlevels(group)
   num_var = ncol(Z) / d
-  Gamma = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
+  Gam = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
   eta_fef = X %*% coef[1:ncol(X)]
   # post_mean = colMeans(posterior)
   # post_cov = sigma
@@ -176,7 +177,7 @@ CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
     ## Fixed-effects component of eta (linear predictor)
     eta_fef_k = matrix(eta_fef[ids], nrow = 1)
     ## Random-effects component of eta (linear predictor)
-    eta_ref = prior %*% Gamma %*% t(Z_k)
+    eta_ref = prior %*% t(Gam) %*% t(Z_k)
     ## Full eta - fixed + random effects component
     eta = eta_fef_k[rep(1, M),] + eta_ref
     
