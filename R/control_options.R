@@ -75,7 +75,7 @@ adaptControl = function(batch_length = 100, offset = 8000, burnin_batchnum = 100
 optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
                         nMC_start = 200, nMC_max = 10000, nMC_report = 5000,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
-                        covar = c("unstructured","independence"),
+                        covar = c("unstructured","independent"),
                         MwG_sampler = c("random_walk","independence"), gibbs = T, 
                         fit_type = 2){
   
