@@ -29,8 +29,8 @@ arma::vec linkfun(int link, arma::vec mu);
 arma::vec invlink(int link, arma::vec eta);
 arma::vec varfun(const char* family, arma::vec mu);
 
-// Complete log-lik calculation
-double ll_comp(const char* family, double yi, arma::vec mu);
+// Estimate of Q function
+double Qfun(const char* family, double yi, arma::vec mu);
 
 
 /* Fit a base model */
