@@ -187,6 +187,22 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
   // Random intercept coefficient will not be centered or scaled
   center(0) = 0.0;
   scale(0) = 1.0;
+  
+  // Suppose one or more columns of U are 0 because these effects were penalized out 
+  // in a previous EM iteration. In this case, some scale values will be 0.
+  // If try to scale A matrix to make A_std with at least one scale value equal to 0 or
+  // if back transform beta coefficients with these 0 values, will get NA/Inf values.
+  
+  // Algorithm set-up: if in past EM iteration a beta coefficient set to 0, will ignore
+  // this coefficient in furhter coefficient updates. Therefore, if we arbitrarily set
+  // the scale = 0 values to scale = 1.0 instead, this will in no way affect the main
+  // grouped coordinate descent fit algorithm except to avoid issues with dividing by 0
+  
+  for(j=0;j<H;j++){
+    if((scale(j) == 0) | (scale(j) < pow(10,-10))){
+      scale(j) = 1.0;
+    }
+  }
 
   //-------------------------------------------------------------------------------//
   // Initialize eta and residual matrices
