@@ -8,7 +8,7 @@ Minimization (MCECM)}
 select_tune(dat, offset = NULL, family, group_X = 0:(ncol(dat$X) - 1),
   penalty, lambda0_range, lambda1_range, alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3), returnMC = T,
-  trace = 0, ufull = NULL, coeffull = NULL,
+  trace = 0, u_init = NULL, coef_old = NULL,
   adapt_RW_options = adaptControl(), optim_options = optimControl())
 }
 \arguments{
@@ -43,7 +43,7 @@ Default is 4.0 for SCAD and 3.0 for MCP.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "independence"}
 
 \item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
 that specifies optimization parameters.}

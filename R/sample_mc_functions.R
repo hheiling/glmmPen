@@ -148,7 +148,7 @@ sample.mc2 = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, nZ, 
 
 #' @importFrom bigmemory big.matrix describe
 #' @export
-sample_mc2_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, nZ, okindex,
+sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, nZ, okindex,
                              gibbs = F , uold){
   
   # find tau for rejection sampler (Booth 1999) by first maximizing u
@@ -194,7 +194,8 @@ sample_mc2_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, 
       select = group == i
       index = seq(i, ncol(Z), by = d)
       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
+      # index = index[which(diag(cov) != 0)]
+      index = index[ranef_idx]
       if(length(index) == 0) next
       
       draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
@@ -219,7 +220,8 @@ sample_mc2_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, 
         select = group == i
         index = seq(i, ncol(Z), by = d)
         ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-        index = index[which(diag(cov) != 0)]
+        # index = index[which(diag(cov) != 0)]
+        index = index[ranef_idx]
         if(length(index) == 0) next
         
         gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
@@ -236,7 +238,8 @@ sample_mc2_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, 
       select = group == i
       index = seq(i, ncol(Z), by = d)
       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
+      # index = index[which(diag(cov) != 0)]
+      index = index[ranef_idx]
       if(length(index) == 0) next
       
       gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
@@ -428,7 +431,7 @@ sample_mc_adapt = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d,
 
 #' @importFrom bigmemory big.matrix describe
 #' @export
-sample_mc_adapt_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, okindex,
+sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, okindex,
                                   gibbs = F , uold, proposal_SD, batch, batch_length = 500, 
                                   offset = 5000, burnin_batchnum = 40){
   
@@ -478,7 +481,8 @@ sample_mc_adapt_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, gr
       select = group == i
       index = seq(i, ncol(Z), by = d)
       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
+      # index = index[which(diag(cov) != 0)]
+      index = ranef_idx
       if(length(index) == 0) next
       
       draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
@@ -503,9 +507,10 @@ sample_mc_adapt_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, gr
         select = group == i
         index = seq(i, ncol(Z), by = d)
         ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-        index = index[which(diag(cov) != 0)]
+        # index = index[which(diag(cov) != 0)]
+        index = index[ranef_idx]
         if(length(index) == 0) next
-        var_index = which(diag(cov) != 0)
+        var_index = ranef_idx
         
         gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                                 matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
@@ -528,9 +533,10 @@ sample_mc_adapt_BigMat = function(coef, cov, y, X, Z, nMC, trace = 0, family, gr
       select = group == i
       index = seq(i, ncol(Z), by = d)
       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
+      # index = index[which(diag(cov) != 0)]
+      index = index[ranef_idx]
       if(length(index) == 0) next
-      var_index = which(diag(cov) != 0)
+      var_index = ranef_idx
       
       gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  

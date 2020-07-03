@@ -41,6 +41,9 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 #' 
 #' Constructs control structure for the adaptive random walk Metropolis-within-Gibbs sampling procedure.
 #' 
+#' @param nMC_burnin positive integer specifying teh number of posterior draws to use as
+#' burnin for each E step in the EM algorithm. Default 200. Function will not allow \code{nMC_burnin}
+#' to be less than 100.
 #' @param batch_length positive integer specifying the number of posterior draws to collect
 #' before the proposal variance is adjusted based on the acceptance rate of the last 
 #' \code{batch_length} posterior draws
@@ -56,8 +59,25 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 #' containing parameter specifications for the adaptive random walk sampling procedure.
 #' 
 #' @export
-adaptControl = function(batch_length = 100, offset = 8000, burnin_batchnum = 1000){
-  structure(list(batch_length = batch_length, offset = offset, burnin_batchnum = burnin_batchnum), 
+adaptControl = function(nMC_burnin = 200, batch_length = 100, offset = 0, burnin_batchnum = 1000){
+  # Checks
+  if(nMC_burnin < 100){
+    warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
+    nMC_burnin = 100
+  }
+  if(batch_length < 10){
+    stop("batch_length must be at least 10")
+  }
+  if(burnin_batchnum < 0){
+    stop("burnin_batchnum cannot be negative")
+  }
+  x = c(nMC_burnin, batch_length, burnin_batchnum)
+  if(!all(floor(x)==x)){ # if any of the above values not integers
+    stop("nMC_burnin, batch_length, and burnin_batchnum must be integers")
+  }
+  
+  structure(list(nMC_burnin = nMC_burnin, batch_length = batch_length, offset = offset, 
+                 burnin_batchnum = burnin_batchnum), 
             class = "adaptControl")
 }
 
@@ -73,11 +93,11 @@ adaptControl = function(batch_length = 100, offset = 8000, burnin_batchnum = 100
 #' 
 #' @export
 optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
-                        nMC_start = 200, nMC_max = 10000, nMC_report = 5000,
+                        nMC_start = 5000, nMC_max = 20000, nMC_report = 5000,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
                         covar = c("unstructured","independent"),
-                        MwG_sampler = c("random_walk","independence"), gibbs = T, 
-                        fit_type = 2){
+                        sampler = c("random_walk","independence","stan"), gibbs = T, 
+                        var_start = 3.0, fit_type = 2){
   
   # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
   if(sum(c(nMC_start, nMC_max, maxitEM) %% 1) > 0 | sum(c(nMC_start, nMC_max, maxitEM) <= 0) > 0){
@@ -86,11 +106,15 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   if(nMC_max < nMC_start){
     stop("nMC_max should not be smaller than nMC_start \n")
   }
+  if(var_start <= 0){
+    stop("var_start must be a positive number")
+  }
   
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, maxitEM = maxitEM, 
                  maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
-                 MwG_sampler = MwG_sampler[1], gibbs = gibbs, fit_type = fit_type[1]),
+                 MwG_sampler = MwG_sampler[1], gibbs = gibbs, var_start = var_start,
+                 fit_type = fit_type[1]),
             class = "optimControl")
 }
 

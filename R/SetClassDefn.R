@@ -69,12 +69,24 @@ pglmmObj = setRefClass("pglmmObj",
                 # nonzervarRE <<- sum(rowSums(covar) != 0)
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
-                posterior_draws <<- x$u 
+                  U = x$u
+                  if(det(sigma) < 10^-10){
+                    Gam = t(chol(sigma + diag(10^-7)))
+                  }else{
+                    Gam = t(chol(sigma))
+                  }
+                q = ncol(Z) / d # Number random variables
+                  post_U = matrix(0, nrow = nrow(U), ncol = ncol(U))
+                  for(g in 1:d){
+                    idx = seq(from = g, to = (d*q), by = d)
+                    U[,idx] = post_U[,idx] %*% t(Gam)
+                  }
+                posterior_draws <<- post_U
                 colnames(posterior_draws) <<- colnames(Z)
                 
                 # Random effects coefficients
                 rand = colMeans(posterior_draws) 
-                q = ncol(Z) / d # Number random variables
+                
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
                 rownames(ref) = levs

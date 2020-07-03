@@ -111,7 +111,7 @@ invlink <- function(link, eta) {
     .Call('_glmmPen_invlink', PACKAGE = 'glmmPen', link, eta)
 }
 
-ll_comp <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link) {
-    .Call('_glmmPen_ll_comp', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link)
+Qfun <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link) {
+    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link)
 }
 

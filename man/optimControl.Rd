@@ -6,11 +6,11 @@
 
 Constructs the control structure for penalized mixed model fitting.}
 \usage{
-optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_start = 200,
-  nMC_max = 10000, nMC_report = 5000, maxitEM = 100,
+optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_start = 5000,
+  nMC_max = 20000, nMC_report = 5000, maxitEM = 100,
   maxit_CD = 250, M = 10000, t = 2, covar = c("unstructured",
-  "independent"), MwG_sampler = c("random_walk", "independence"),
-  gibbs = T, fit_type = 2)
+  "independent"), sampler = c("random_walk", "independence", "stan"),
+  gibbs = T, var_start = 3, fit_type = 2)
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
@@ -47,7 +47,7 @@ Default is "unstructured", but if the number of random effects (including the in
 greater than 7 (i.e. high dimensional), then the algorithm automatically assumes an 
 independent covariance structure (covar switched to "independent").}
 
-\item{MwG_sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
+\item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
 should incorporate an adaptive random walk sampler (default, "random_walk") or an
 independence sampler ("independence").}
 

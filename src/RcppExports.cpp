@@ -2,6 +2,7 @@
 // Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 #include <RcppArmadillo.h>
+#include <RcppEigen.h>
 #include <Rcpp.h>
 
 using namespace Rcpp;
@@ -390,9 +391,9 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// ll_comp
-double ll_comp(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, const arma::vec& group, const arma::sp_mat& J_q, const arma::vec& beta, const arma::vec offset, arma::vec dims, const char* family, int link);
-RcppExport SEXP _glmmPen_ll_comp(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP pBigMatSEXP, SEXP groupSEXP, SEXP J_qSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP dimsSEXP, SEXP familySEXP, SEXP linkSEXP) {
+// Qfun
+double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, const arma::vec& group, const arma::sp_mat& J_q, const arma::vec& beta, const arma::vec offset, arma::vec dims, const char* family, int link);
+RcppExport SEXP _glmmPen_Qfun(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP pBigMatSEXP, SEXP groupSEXP, SEXP J_qSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP dimsSEXP, SEXP familySEXP, SEXP linkSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -407,10 +408,12 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
     Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
     Rcpp::traits::input_parameter< int >::type link(linkSEXP);
-    rcpp_result_gen = Rcpp::wrap(ll_comp(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link));
+    rcpp_result_gen = Rcpp::wrap(Qfun(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link));
     return rcpp_result_gen;
 END_RCPP
 }
+
+RcppExport SEXP _rcpp_module_boot_stan_fit4binomial_logit_model_mod();
 
 static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_IRLS", (DL_FUNC) &_glmmPen_IRLS, 6},
@@ -434,7 +437,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_Znew_gen2", (DL_FUNC) &_glmmPen_Znew_gen2, 9},
     {"_glmmPen_orthog_inner", (DL_FUNC) &_glmmPen_orthog_inner, 5},
     {"_glmmPen_invlink", (DL_FUNC) &_glmmPen_invlink, 2},
-    {"_glmmPen_ll_comp", (DL_FUNC) &_glmmPen_ll_comp, 11},
+    {"_glmmPen_Qfun", (DL_FUNC) &_glmmPen_Qfun, 11},
+    {"_rcpp_module_boot_stan_fit4binomial_logit_model_mod", (DL_FUNC) &_rcpp_module_boot_stan_fit4binomial_logit_model_mod, 0},
     {NULL, NULL, 0}
 };
 

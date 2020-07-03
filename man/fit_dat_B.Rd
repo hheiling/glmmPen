@@ -9,12 +9,12 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
   conv_CD = 1e-04, family = "binomial", offset_fit = NULL,
   trace = 0, penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
-  group_X = 0:(ncol(dat$X) - 1), nMC = 1000, nMC_max = 10000,
-  t = 2, returnMC = T, nMC_report = 5000, ufull = NULL,
-  coeffull = NULL, ufullinit = NULL, maxitEM = 100, maxit_CD = 250,
-  M = 10^4, gibbs = T, MwG_sampler = c("random_walk",
-  "independence"), adapt_RW_options = adaptControl(),
-  covar = c("unstructured", "independent"), fit_type = 1)
+  group_X = 0:(ncol(dat$X) - 1), nMC = 5000, nMC_max = 20000,
+  t = 2, returnMC = T, nMC_report = 5000, u_init = NULL,
+  coef_old = NULL, maxitEM = 100, maxit_CD = 250, M = 10^4,
+  gibbs = T, sampler = c("random_walk", "independence", "stan"),
+  adapt_RW_options = adaptControl(), covar = c("unstructured",
+  "independent"), var_start = 3, fit_type = 1)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
@@ -83,13 +83,13 @@ Pajor log-likelihood calculation}
 (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})? 
 Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects}
 
-\item{MwG_sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
+\item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
 should incorporate an adaptive random walk sampler (default, "random_walk") or an
 independence sampler ("independence").}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "independence"}
 
 \item{covar}{character value specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").

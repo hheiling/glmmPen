@@ -22,7 +22,7 @@
 select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                       returnMC = T, trace = 0, ufull = NULL, coeffull = NULL, 
+                       returnMC = T, trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),
                        optim_options = optimControl()){
   
@@ -47,8 +47,9 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   M = optim_options$M
   t = optim_options$t
   covar = optim_options$covar
-  MwG_sampler = optim_options$MwG_sampler
+  sampler = optim_options$sampler
   gibbs = optim_options$gibbs
+  var_start = optim_options$var_start
   fit_type = optim_options$fit_type
   
   covar = covar[1]
@@ -56,16 +57,16 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
   }
   
-  # Calculate loglik for null model (mu set to y; n parameters, one per observation)
+  # Calculate loglik for saturated model (mu set to y; n parameters, one per observation)
   if(fam == "binomial"){
-    null_ll = 0
+    sat_ll = 0
   }else if(fam == "poisson"){
     stop("poisson family not yet operational \n")
-    null_ll = 0
+    sat_ll = 0
     y = dat$y
     for(i in 1:length(y)){
       if(y[i] > 0){
-        null_ll = null_ll + dpois(x = y[i], lambda = y[i], log = T)
+        sat_ll = sat_ll + dpois(x = y[i], lambda = y[i], log = T)
       }
     }
   }else if(fam == "gaussian"){
@@ -83,26 +84,29 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   BIChold = BICh = Inf
   res = matrix(0, n1*n2, 8)
   coef = NULL
+  coef_oldj0 = NULL
+  uj0 = NULL
   outl = list()
   
   saturated = FALSE
   fout = list()
   
-  for(j in 1:n2){
-    for(i in 1:n1){
-      if(i == 1 & j == 1){
-        # start from the full model values
-        coeffull0 = coeffull
-        ufullinit = ufull
-      }else if(i != 1 & j == 1){
-        # take the previous i value for j = 1
-        coeffull0 = coeffulli0
-        ufullinit = ui0
+  for(j in 1:n2){ # random effects
+    for(i in 1:n1){ # fixed effects
+      if((i == 1) & (j == 1)){
+        # start from the initial values input (or NULL values)
+        coef_old0 = coef_old
+        uold = u_init
+      }else if((i == 1) & (j != 1)){ # changed from if(i != 1 & j == 1)
+        # if re-starting fixed effects penalty loop but moving on to next random effects
+        # penalty parameter, take the previous j result for i = 1
+        coef_old0 = coef_oldj0
+        uold = uj0
         rm(out)
       }else{
-        # take the previous j values
-        coeffull0 = out$coef
-        ufullinit = out$u
+        # take the previous values
+        coef_old0 = out$coef
+        uold = out$u
         rm(out)
       }
       
@@ -114,19 +118,19 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                           nMC = nMC, family = family, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD, nMC_max = nMC_max, 
-                          ufull = ufull, coeffull = coeffull0, 
+                          coef_old = coef_old0, u_init = uold,
                           gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
-                          returnMC = returnMC, ufullinit = ufullinit, t = t,
-                          M = M, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, fit_type = fit_type))
+                          returnMC = returnMC, t = t,
+                          M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
+                          covar = covar, var_start = var_start, fit_type = fit_type))
       
       
       if(is.character(out)) next
       
-      # for restarting the next i for j = 1
-      if(j == 1){
-        coeffulli0 = out$coef
-        ui0 = out$u 
+      # for restarting the next j for i = 1
+      if(i == 1){
+        coef_oldj0 = out$coef
+        uj0 = out$u 
       }
       
       BICh = out$BICh
@@ -168,11 +172,11 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       # Check for model saturation
       ## set null deviance as deviance for model with fixed and random intercepts only
       if((i==1) & (j==1)){
-        nullDev = 2*(null_ll - out$ll)
+        nullDev = 2*(sat_ll - out$ll)
       }
       ## Calculate deviance
-      Dev = 2*(null_ll - out$ll)
-      if(Dev / nullDev < 0.01){
+      Dev = 2*(sat_ll - out$ll)
+      if(Dev / nullDev < 0.05){ # changed from Dev / nullDev < 0.01
         print("Reached model saturation")
         saturated = TRUE
         break

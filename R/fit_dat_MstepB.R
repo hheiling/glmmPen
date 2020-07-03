@@ -50,12 +50,12 @@
 #' @param gibbs logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
 #' (if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})? 
 #' Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects
-#' @param MwG_sampler character value specifying whether the Metropolis-within-Gibbs procedure 
+#' @param sampler character value specifying whether the Metropolis-within-Gibbs procedure 
 #' should incorporate an adaptive random walk sampler (default, "random_walk") or an
 #' independence sampler ("independence"). 
 #' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
 #' containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-#' Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"
+#' Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "independence"
 #' @param covar character value specifying whether the covariance matrix should be unstructured
 #' ("unstructured") or diagonal with no covariances between variables ("independent").
 #' Default is "unstructured", but if the number of random effects (including the intercept) is 
@@ -101,20 +101,21 @@
 #' Output only if started initially with Rejection sampling}
 #'  
 #' 
-#' @importFrom bigmemory attach.big.matrix describe
+#' @importFrom bigmemory attach.big.matrix describe big.matrix
 #' @importFrom ncvreg ncvreg
+#' @importFrom rstan sampling extract
 #' @export
 fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
                      family = "binomial", offset_fit = NULL,
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
-                     nMC = 1000, nMC_max = 10000, t = 2,
-                     returnMC = T, nMC_report = 5000, ufull = NULL, coeffull = NULL, ufullinit = NULL, 
+                     nMC = 5000, nMC_max = 20000, t = 2,
+                     returnMC = T, nMC_report = 5000, u_init = NULL, coef_old = NULL, 
                      maxitEM = 100, maxit_CD = 250,
-                     M = 10^4, gibbs = T, MwG_sampler = c("random_walk","independence"),
+                     M = 10^4, gibbs = T, sampler = c("random_walk","independence","stan"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     fit_type = 1){
+                     var_start = 3.0, fit_type = 1){
   
   
   penalty = penalty[1]
@@ -179,6 +180,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     covar = "independent"
   }
   
+  if(gibbs == FALSE){
+    warning("Rejection sampling option has been discontinued", immediate. = T)
+    # Reset gibbs to TRUE
+    gibbs == TRUE
+  }
+  
   #initial fit
   if(family == "binomial"){
     nTotal = rep(1, length(y))
@@ -188,9 +195,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   
   initial_gibbs = gibbs
   
-  MwG_sampler = MwG_sampler[1] # Default of random walk
-  if(!(MwG_sampler %in% c("independence", "random_walk"))){
-    stop("MwG_sampler must be specified as either 'independence' or 'random_walk'")
+  sampler = sampler[1] # Default of random walk
+  if(!(sampler %in% c("independence", "random_walk","stan"))){
+    stop("sampler must be specified as either 'independence' or 'random_walk' or 'stan'")
   }
   
   # Create J matrix (from t(alpha_k kronecker z_ki) * J from paper) and 
@@ -230,14 +237,28 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   # Initialize cov and coef for start of EM algorithm
-  if(!is.null(ufull) & !is.null(coeffull)){
+  if(!is.null(coef_old)){
     
-    print("using coef from full model to intialize")
-    gamma = matrix(J%*%matrix(coeffull[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
+    print("using coef from past model to intialize")
+    gamma = matrix(J%*%matrix(coef_old[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     
-    ok = which(diag(var) > 0)# & coef[1:ncol(X)] != 0)
-    if(length(ok) == 0) ok = 1 # at least include the random intercept
+    # If the random effect for a variable penalized out in a past model, still possible for that
+    # variable to not be penalized out this next model. Therefore, initialize the variance of
+    # these penalized-out random effects to have a non-zero variance (specified by var_start)
+    ok = which(diag(var) > 0)
+    if(length(ok) != length(diag(var))){
+      ranef0 = which(diag(var) == 0)
+      for(j in ranef0){
+        var[j,j] = var_start
+      }
+      
+      # Re-define cov and gamma with new variances
+      cov = var
+      gamma = t(chol(cov))
+    }
+    
+    ok = which(diag(var) > 0)
     okindex = NULL
     for(i in 1:(ncol(Z)/d)){
       if(i %in% ok){
@@ -245,16 +266,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       }
     }
     
-    coef = coeffull[1:ncol(X)]
+    coef = coef_old[1:ncol(X)]
     
   }else{
     
     # Coordinate descent ignoring random effects: naive fit
-    # int_only = glm(y ~ 1, family = fam_fun, offset = offset_fit)
-    # coef_init = c(int_only$coefficients, rep(0, times = ncol(X)-1))
-    # coef = M_step(y, X, fam_fun, coef_init, offset_fit, group_X = group_X,
-    #               maxit = 200, maxit_CD = 200, conv = conv_IRLS, fit_type = 2, # 3 if allow grouped fixed effects
-    #               penalty = penalty, lambda = lambda0, gamma = gamma_penalty, alpha = alpha)
     
     penalty_factor = numeric(ncol(X)-1)
     penalty_factor[which(group_X[-1] == 0)] = 0
@@ -264,23 +280,21 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                        alpha = alpha, lambda = lambda0, penalty.factor = penalty_factor)
     
     coef = as.numeric(fit_naive$beta)
-    print("initial coef:")
-    print(coef)
     
     if(trace == 1) print(coef)
     
+    # Initialize covariance matrix (cov)
     if(ncol(Z)/d > 1){
-      vars = rep(10^-10, ncol(Z)/d)
+      vars = rep(var_start, ncol(Z)/d)
       cov = var = diag(vars)
-      gamma = t(chol(var)) # chol outputs upper triangular, so transposing here
+      gamma = t(chol(var)) # chol outputs upper triangular, so transposing here to get lower triangular
     }else{
-      vars = 10^-10
+      vars = var_start
       cov = var = matrix(vars, ncol = 1)
       gamma = var
     }
     
-    
-    ok = which(vars > 0)# & coef[1:ncol(X)] != 0)
+    ok = which(vars > 0) 
     if(length(ok) == 0) ok = 1 # at least include the random intercept
     okindex = NULL
     for(i in 1:(ncol(Z)/d)){
@@ -300,8 +314,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     if(!any(is.na(Znew2))) finish = 1
   }
   
-  # intitialize switch-from-rejection-sampling-to-gibbs-sampling counter
-  rej_to_gibbs = 0
+  # intitialize switch-from-rejection-sampling-to-gibbs-sampling counter if using 
+  # 'independent' covariance structure
+  # rej_to_gibbs = 0
   
   # initialize adaptive Metropolis-within-Gibbs random walk parameters
   # ignored if use rejection sampling (gibbs = F), but use if gibbs = T or
@@ -314,95 +329,297 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   ## initialize batch number to 0
   batch = 0.0
   ## initialize other paramters from adaptControl()
+  nMC_burnin = adapt_RW_options$nMC_burnin
   batch_length = adapt_RW_options$batch_length
   offset_increment = adapt_RW_options$offset
   burnin_batchnum = adapt_RW_options$burnin_batchnum
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Z)/d)
   
-  if((!is.null(ufull) | !is.null(ufullinit)) & !is.null(coeffull)){
-    if(!is.null(ufullinit)){
-      print("using u from previous model to intialize")
+  # At start of EM algorithm, acquire posterior draws from all random effect variables
+  ranef_idx = 1:length(diag(cov))
+  
+  if(!is.null(u_init)){
+    print("using u from previous model to initialize")
+    
+    if(is.matrix(u_init)){
+      uold = as.numeric(u_init[nrow(u_init),])
+    }else if(is.vector(u_init)){
+      uold = u_init
     }else{
-      print("using u from full model to intialize")
-      ufullinit = ufull
+      stop("u_init must be either a matrix of posterior draws or a vector of a single set of posterior draws")
     }
     
-    if(MwG_sampler == "independence"){
-      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
-                                       d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = as.numeric(ufullinit[nrow(ufullinit),]))
-    }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
-                                            d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = as.numeric(ufullinit[nrow(ufullinit),]),
-                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                            offset = offset_increment, burnin_batchnum = burnin_batchnum)
-    }
-    
-    u0 = attach.big.matrix(samplemc_out$u0)
-    
-    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-    if(gibbs | samplemc_out$switch){
-      # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
-      if(samplemc_out$switch){ 
-        rej_to_gibbs = rej_to_gibbs + 1
-        cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
-      }
+    if((sampler == "independence")){
+      # No burnin adjustments used
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+                                       d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = uold)
+      u0 = attach.big.matrix(samplemc_out$u0)
       
-      if(MwG_sampler == "random_walk"){
-        gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-        batch = samplemc_out$updated_batch
-        proposal_SD = samplemc_out$proposal_SD
-        
+    }else if(sampler == "random_walk"){ 
+      # First adapt the proposal variance during an initial burnin period
+      samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC_burnin, family = family, group = group,
+                                               d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = uold,
+                                               proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                               offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      
+      # Extract updated info from burnin period
+      batch = samplemc_burnin$updated_batch
+      proposal_SD = samplemc_burnin$proposal_SD
+      
+      u0 = attach.big.matrix(samplemc_burnin$u0)
+      
+      if(trace >= 1){
         print("Updated proposal_SD:")
         print(proposal_SD)
       }
       
-    }
+      # Run the official first E step with no adaptation
+      uold = as.numeric(u0[nrow(u0),])
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                            d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = uold,
+                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                            offset = offset_increment, burnin_batchnum = 0)
+      
+      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+      u0 = attach.big.matrix(samplemc_out$u0)
+      
+    }else if(sampler == "stan"){
+      
+      # stop("Stan not yet fully integrated")
+      
+      u0 = big.matrix(nrow = nMC, ncol = ncol(Z)) # use ', init = 0' for sampling within EM algorithm
+      
+      if(family == "binomial" & link == "logit"){
+        stan_file = stanmodels$binomial_logit_model
+      }
+      
+      # For each group, sample from posterior distribution (sample the alpha values)
+      for(k in 1:d){
+        idx_k = which(group == k)
+        cols_k = seq(from = k, to = ncol(Z), by = d)
+        y_k = y[idx_k]
+        X_k = X[idx_k,]
+        Z_k = Znew2[idx_k, cols_k]
+        
+        dat_list = list(N = length(idx_k), # Number individuals in group k
+                        q = length(ranef_idx), # number random effects
+                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                        y = y_k, # outcomes for group k
+                        Z = Z_k) # portion of Z matrix corresonding to group k
+        
+        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
+                                   warmup = nMC_burnin, show_messages = F, refresh = 0)
+        list_of_draws = extract(stan_fit)
+        u0[,cols_k] = list_of_draws$alpha
+        
+      } # End k for loop
+      
+    } # End if-else sampler
+   
     
+  }else{ # u_init is null, initialize posterior with random draw from N(0,1)
     
-    
-  }else{
-    
-    if(MwG_sampler == "independence"){
-      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+    if(sampler == "independence"){
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
                                        d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
                                        uold = rnorm(n = ncol(Z)))
-    }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
-                                            d = d, okindex = okindex, trace = trace, gibbs = gibbs,
-                                            uold = rnorm(n = ncol(Z)),
-                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
-                                            offset = offset_increment, burnin_batchnum = burnin_batchnum)
-    }
-    
-    u0 = attach.big.matrix(samplemc_out$u0)
-    
-    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-    if(gibbs | samplemc_out$switch){
-      # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
-      if(samplemc_out$switch){ 
-        rej_to_gibbs = rej_to_gibbs + 1
-        cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
-      }
       
-      if(MwG_sampler == "random_walk"){
-        gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-        batch = samplemc_out$updated_batch
-        proposal_SD = samplemc_out$proposal_SD
-        
+      u0 = attach.big.matrix(samplemc_out$u0)
+      
+    }else if(sampler == "random_walk"){ 
+      # First adapt the proposal variance during an initial burnin period
+      samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC_burnin, family = family, group = group,
+                                               d = d, okindex = okindex, trace = trace, gibbs = gibbs,
+                                               uold = rnorm(n = ncol(Z)),
+                                               proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                               offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      
+      # Extract updated proposal_SD info from burnin period
+      batch = samplemc_burnin$updated_batch
+      proposal_SD = samplemc_burnin$proposal_SD
+      
+      u0 = attach.big.matrix(samplemc_burnin$u0)
+      
+      if(trace >= 1){
         print("Updated proposal_SD:")
         print(proposal_SD)
       }
       
-    }
+      # Run official first E step with no adaptation
+      uold = as.numeric(u0[nrow(u0),])
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+                                            d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = uold,
+                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+                                            offset = offset_increment, burnin_batchnum = 0)
+      
+      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+      
+      u0 = attach.big.matrix(samplemc_out$u0)
+      
+    }else if(sampler == "stan"){
+      
+      # stop("Stan not yet fully integrated")
+      
+      u0 = big.matrix(nrow = nMC, ncol = ncol(Z)) # use ', init = 0' for sampling within EM algorithm
+      
+      if(family == "binomial" & link == "logit"){
+        stan_file = stanmodels$binomial_logit_model
+      }
+      
+      # For each group, sample from posterior distribution (sample the alpha values)
+      for(k in 1:d){
+        idx_k = which(group == k)
+        cols_k = seq(from = k, to = ncol(Z), by = d)
+        y_k = y[idx_k]
+        X_k = X[idx_k,]
+        Z_k = Znew2[idx_k, cols_k]
+        
+        dat_list = list(N = length(idx_k), # Number individuals in group k
+                        q = length(ranef_idx), # number random effects
+                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                        y = y_k, # outcomes for group k
+                        Z = Z_k) # portion of Z matrix corresonding to group k
+        
+        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
+                                   warmup = nMC_burnin, show_messages = F, refresh = 0)
+        list_of_draws = extract(stan_fit)
+        u0[,cols_k] = list_of_draws$alpha
+        
+      } # End k for loop
+      
+    } # End if-else sampler
     
-  }
+  } # end if-else is.null(u_init)
   
-  nMC2 = nrow(u0)  
-  etae = matrix(X %*% coef[1:ncol(X)], nrow = nrow(X), ncol = nrow(u0)) + Znew2%*%t(u0[,])
-  mu = matrix(0, nrow = length(y), ncol = ncol(etae))
-  for(i in 1:nrow(etae)){
-    mu[i,] = invlink(link_int, matrix(etae[i,], ncol=1))
-  }
+  # if((!is.null(ufull) | !is.null(ufullinit)) & !is.null(coef_old)){
+  #   if(!is.null(ufullinit)){
+  #     print("using u from previous model to intialize")
+  #   }else{
+  #     print("using u from full model to intialize")
+  #     ufullinit = ufull
+  #   }
+  #   
+  #   if((MwG_sampler == "independence")){
+  #     # No burnin adjustments used
+  #     samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+  #                                      d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = as.numeric(ufullinit[nrow(ufullinit),]))
+  #   }else{ # MwG_sampler == "random_walk"
+  #     # First adapt the proposal variance during an initial burnin period
+  #     samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_burnin, family = family, group = group,
+  #                                           d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = as.numeric(ufullinit[nrow(ufullinit),]),
+  #                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+  #                                           offset = offset_increment, burnin_batchnum = burnin_batchnum)
+  #     
+  #     # Extract updated info from burnin period
+  #     batch = samplemc_burnin$updated_batch
+  #     proposal_SD = samplemc_burnin$proposal_SD
+  #     
+  #     u0 = attach.big.matrix(samplemc_burnin$u0)
+  #     
+  #     if(trace >= 1){
+  #       print("Updated proposal_SD:")
+  #       print(proposal_SD)
+  #     }
+  #     
+  #     # Run the official first E step with no adaptation
+  #     uold = as.numeric(u0[nrow(u0),])
+  #     samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+  #                                           d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = uold,
+  #                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+  #                                           offset = offset_increment, burnin_batchnum = 0)
+  #     
+  #     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+  #   }
+  #   
+  #   u0 = attach.big.matrix(samplemc_out$u0)
+  #   
+  #   # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+  #   # if(gibbs | samplemc_out$switch){
+  #   #   # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+  #   #   if(samplemc_out$switch){ 
+  #   #     rej_to_gibbs = rej_to_gibbs + 1
+  #   #     cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+  #   #   }
+  #   #   
+  #   #   if(MwG_sampler == "random_walk"){
+  #   #     # Extract relevant information from burnin period
+  #   #     batch = samplemc_burnin$updated_batch
+  #   #     # proposal_SD = samplemc_burnin$proposal_SD
+  #   #     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+  #   #     
+  #   #     if(trace >= 1){
+  #   #       print("Updated proposal_SD:")
+  #   #       print(proposal_SD)
+  #   #     }
+  #   #   }
+  #   #   
+  #   # }
+  #   
+  #   
+  # }else{
+  #   
+  #   if(MwG_sampler == "independence"){
+  #     samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group, 
+  #                                      d = d, okindex = okindex, trace = trace, gibbs = gibbs, 
+  #                                      uold = rnorm(n = ncol(Z)))
+  #   }else{ # MwG_sampler == "random_walk"
+  #     # First adapt the proposal variance during an initial burnin period
+  #     samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_burnin, family = family, group = group,
+  #                                           d = d, okindex = okindex, trace = trace, gibbs = gibbs,
+  #                                           uold = rnorm(n = ncol(Z)),
+  #                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+  #                                           offset = offset_increment, burnin_batchnum = burnin_batchnum)
+  #     
+  #     # Extract updated proposal_SD info from burnin period
+  #     batch = samplemc_burnin$updated_batch
+  #     proposal_SD = samplemc_burnin$proposal_SD
+  #     
+  #     u0 = attach.big.matrix(samplemc_burnin$u0)
+  #     
+  #     if(trace >= 1){
+  #       print("Updated proposal_SD:")
+  #       print(proposal_SD)
+  #     }
+  #     
+  #     # Run official first E step with no adaptation
+  #     uold = as.numeric(u0[nrow(u0),])
+  #     samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, family = family, group = group,
+  #                                              d = d, okindex = okindex, trace = trace, gibbs = gibbs, uold = uold,
+  #                                              proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
+  #                                              offset = offset_increment, burnin_batchnum = 0)
+  #     
+  #     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+  #     
+  #   }
+  #   
+  #   u0 = attach.big.matrix(samplemc_out$u0)
+  #   
+  #   # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+  #   # if(gibbs | samplemc_out$switch){
+  #   #   # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+  #   #   if(samplemc_out$switch){ 
+  #   #     rej_to_gibbs = rej_to_gibbs + 1
+  #   #     cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+  #   #   }
+  #   #   
+  #   #   if(MwG_sampler == "random_walk"){
+  #   #     # Update gibbs acceptance rates and batch number
+  #   #     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+  #   #     batch = samplemc_burnin$updated_batch
+  #   #     # proposal_SD = samplemc_burnin$proposal_SD
+  #   #     
+  #   #     if(trace >= 1){
+  #   #       print("Updated proposal_SD:")
+  #   #       print(proposal_SD)
+  #   #     }
+  #   #     
+  #   #   }
+  #   #   
+  #   # }
+  #   
+  # }
+  
+  nMC2 = nrow(u0)
   
   if(nrow(cov) == 1){ # Single random intercept
     cov_record = rep(NA, maxitEM)
@@ -413,29 +630,23 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   diff = rep(NA, maxitEM)
   stopcount = 0
   
-  if(family == "poisson"){
-    ll0 = sum(rowMeans(dpois(matrix(y, nrow = length(y), ncol = ncol(etae)), lambda = mu, log = T)))
-  }else if(family == "binomial"){
-    ll0 = sum(rowMeans(dbinom(matrix(y, nrow = length(y), ncol = ncol(etae)), size = 1, prob = mu, log = T)))
-  } 
-  
   # Record last t coef vectors (each row = coef vector for a past EM iteration)
   # Initialize with initial coef vector
   coef = c(coef, rep(0, length(covgroup)))
   coef_record = matrix(coef, nrow = t, ncol = length(coef), byrow = T)
   # coef_record_all = matrix(NA, nrow = maxitEM, ncol = length(coef), byrow = T)
   
-  # Start EM Algorithm (M step first)
+  problem = FALSE # Determining if issue with EM algorithm results
+  
+  # Start EM Algorithm
   
   for(i in 1:maxitEM){
     
-    if(rej_to_gibbs == 3){
-      gibbs = T
-      cat("permanently switched from rejection sampling to gibbs sampling \n")
-      rej_to_gibbs = rej_to_gibbs + 1
-    }
-    
-    oldll = ll0
+    # if(rej_to_gibbs == 3){
+    #   gibbs = T
+    #   cat("permanently switched from rejection sampling to gibbs sampling \n")
+    #   rej_to_gibbs = rej_to_gibbs + 1
+    # }
     
     if(family == "binomial"){
       nTotal = rep(1, length(y[rep(1:nrow(X), each = nrow(u0))]))
@@ -451,33 +662,47 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     print("Updated coef:")
     print(coef)
     
-    problem = F
-    if(any(is.na(coef))){
-      problem = T
-      ll = Inf
-    }
-    
     u2 = matrix(0, nMC2, ncol(Z))
     for(ii in 1:d){
       u2[,seq(ii, ncol(Z), by = d)] = rmvnorm(n = nMC2,sigma=var)
     }
     
-    # Complete log-likelihoood
-    ll0 = ll_comp(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
+    # Q-function estimate
+    ll0 = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int)
     
-    if(!is.finite(ll0)){
+    if(!is.finite(ll0) | any(is.na(coef))){
       problem = T
       ll0 = Inf
       print(coef)
     }
     
     if(problem == T){
-      stop("Error in M step")
-      out = list(coef = coef, sigma = cov, lambda0 = lambda0, lambda1 = lambda1, 
-                 covgroup = covgroup, J = J)
-      if(returnMC == T) out$u = describe(u0)
+      warning("Error in M step", immediate. = T)
+      out = list(coef = coef, sigma = cov,  
+                 lambda0 = lambda0, lambda1 = lambda1, 
+                 covgroup = covgroup, J = J, ll = -Inf, BIC = Inf, BICh = Inf,
+                 extra = list(okindex = okindex, Znew2 = Znew2),
+                 gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
+      
+      if(returnMC == T){
+        
+        if(nrow(u0) >= nMC_report){
+          # Take last nMC_report rows
+          r_start = nrow(u0) - nMC_report + 1
+          r_end = nrow(u0)
+          u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
+        }else{
+          # Use all available u0 entries
+          u0_out = bigmemory::as.matrix(u0)
+        }
+        out$u = u0_out
+        
+      }else{
+        out$u = matrix(NA, nrow = 1, ncol = 1)
+      } # End if-else returnMC == T
+      
       return(out)
-    }
+    } # End problem == T
     
     if(trace == 1) print(coef)
     
@@ -517,14 +742,14 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     if( sum(diff[i:max(i-2, 1)] < conv_EM) >=3 ) break
     
-    # if current q is within 95% emp CI of old q, increase nMC
-    if(diff[i] > 10^-10){
-      nMC = max(round(nMC + min(.15*0.001*nMC/(abs(ll0 - oldll)/abs(ll0)), 250)), 2)+1
-    }else{
-      nMC = max(round(nMC + .25*0.001*nMC), 5)+1
+    # Increase nMC in nMC below nMC_max
+    if(nMC < nMC_max){
+      # Set f at constant 1.05
+      nMC = nMC * 1.05
     }
-    
+    # If after update nMC exceeds nMC_max, reduce to nMC_max value
     if(nMC > nMC_max) nMC = nMC_max
+    
     # now update limits  
     print(c(i, nMC , diff[i], sum(coef!=0)))
     
@@ -544,38 +769,94 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     uold = as.numeric(u0[nrow(u0),])
     
-    if(MwG_sampler == "independence"){
-      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+    if(sampler == "independence"){
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                        d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = uold)
-    }else{ # MwG_sampler == "random_walk"
-      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
-                                           d = d, okindex = okindex, gibbs = gibbs, uold = uold,
-                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                           offset = offset_increment, burnin_batchnum = burnin_batchnum)
-    }
-    
-    u0 = attach.big.matrix(samplemc_out$u0)
-    
-    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-    if(gibbs | samplemc_out$switch){
-      # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
-      if(samplemc_out$switch){ 
-        rej_to_gibbs = rej_to_gibbs + 1
-        cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
-      }
+      u0 = attach.big.matrix(samplemc_out$u0)
       
-      if(MwG_sampler == "random_walk"){
-        gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-        batch = samplemc_out$updated_batch
-        proposal_SD = samplemc_out$proposal_SD
-        
+    }else if(sampler == "random_walk"){
+      
+     # First adapt the proposal variance during an initial burnin period
+      samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC_burnin, trace = trace, family = family, group = group, 
+                                            d = d, okindex = okindex, gibbs = gibbs, uold = uold,
+                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                            offset = offset_increment, burnin_batchnum = burnin_batchnum)
+      
+      # Extract updated proposal_SD info from burnin period
+      batch = samplemc_burnin$updated_batch
+      proposal_SD = samplemc_burnin$proposal_SD
+      
+      u0 = attach.big.matrix(samplemc_burnin$u0)
+      
+      if(trace >= 1){
         print("Updated proposal_SD:")
         print(proposal_SD)
-        print("Updated batch:")
-        print(batch)
+        cat("Updated batch number: ", batch, "\n")
       }
       
-    }
+      # Run official E step with no adaptation
+      uold = as.numeric(u0[nrow(u0),])
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+                                           d = d, okindex = okindex, gibbs = gibbs, uold = uold,
+                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                           offset = offset_increment, burnin_batchnum = 0)
+      
+      gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+      u0 = attach.big.matrix(samplemc_out$u0)
+      
+    }else if(sampler == "stan"){
+      
+      u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
+      ranef_idx=which(diag(cov) > 0)
+      
+      if(family == "binomial" & link == "logit"){
+        stan_file = stanmodels$binomial_logit_model
+      }
+      
+      # For each group, sample from posterior distribution (sample the alpha values)
+      for(k in 1:d){
+        idx_k = which(group == k)
+        cols_k = seq(from = k, to = ncol(Z), by = d)
+        cols_k = cols_k[ranef_idx]
+        y_k = y[idx_k]
+        X_k = X[idx_k,]
+        Z_k = Znew2[idx_k, cols_k]
+        
+        dat_list = list(N = length(idx_k), # Number individuals in group k
+                        q = length(ranef_idx), # number random effects
+                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                        y = y_k, # outcomes for group k
+                        Z = Z_k) # portion of Z matrix corresonding to group k
+        
+        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
+                                   warmup = nMC_burnin, show_messages = F, refresh = 0)
+        list_of_draws = extract(stan_fit)
+        u0[,cols_k] = list_of_draws$alpha
+        
+      } # End k for loop
+      
+    } # End if-else sampler
+    
+    # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+    # if(gibbs | samplemc_out$switch){
+    #   # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+    #   if(samplemc_out$switch){ 
+    #     rej_to_gibbs = rej_to_gibbs + 1
+    #     cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+    #   }
+    #   
+    #   if(MwG_sampler == "random_walk"){
+    #     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+    #     batch = samplemc_out$updated_batch
+    #     proposal_SD = samplemc_out$proposal_SD
+    #     
+    #     print("Updated proposal_SD:")
+    #     print(proposal_SD)
+    #     print("Updated batch:")
+    #     print(batch)
+    #   }
+    #   
+    # }
     
     nMC2 = nrow(u0)
     
@@ -583,34 +864,63 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     gc()
   }
   
-  print(sqrt(diag(cov)))
-  returnMC
-  
   # Another E step for loglik calculation (number draws = M)
-  if(MwG_sampler == "independence"){
-    samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+  if(sampler == "independence"){
+    samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                      d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
-  }else{ # MwG_sampler == "random_walk"
-    samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+    u0 = attach.big.matrix(samplemc_out$u0)
+  }else if(sampler == "random_walk"){ 
+    # No adaptation at convergence point
+    samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                           d = d, okindex = okindex, gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]),
                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                          offset = offset_increment, burnin_batchnum = burnin_batchnum)
-  }
-  
-  u0 = attach.big.matrix(samplemc_out$u0)
-  
-  # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
-  if(gibbs | samplemc_out$switch){
-    # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
-    if(samplemc_out$switch){ 
-      rej_to_gibbs = rej_to_gibbs + 1
-      cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+                                          offset = offset_increment, burnin_batchnum = 0)
+    u0 = attach.big.matrix(samplemc_out$u0)
+  }else if(sampler == "stan"){
+    
+    u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
+    ranef_idx=which(diag(cov) > 0)
+    
+    if(family == "binomial" & link == "logit"){
+      stan_file = stanmodels$binomial_logit_model
     }
     
-    gibbs_accept_rate = samplemc_out$gibbs_accept_rate
-    batch = samplemc_out$updated_batch
-    proposal_SD = samplemc_out$proposal_SD
-  }
+    # For each group, sample from posterior distribution (sample the alpha values)
+    for(k in 1:d){
+      idx_k = which(group == k)
+      cols_k = seq(from = k, to = ncol(Z), by = d)
+      cols_k = cols_k[ranef_idx]
+      y_k = y[idx_k]
+      X_k = X[idx_k,]
+      Z_k = Znew2[idx_k, cols_k]
+      
+      dat_list = list(N = length(idx_k), # Number individuals in group k
+                      q = length(ranef_idx), # number random effects
+                      eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                      y = y_k, # outcomes for group k
+                      Z = Z_k) # portion of Z matrix corresonding to group k
+      
+      stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
+                                 warmup = nMC_burnin, show_messages = F, refresh = 0)
+      list_of_draws = extract(stan_fit)
+      u0[,cols_k] = list_of_draws$alpha
+      
+    } # End k for loop
+    
+  } # End if-else sampler
+  
+  # If specified gibbs = T or if specified gibbs = F but switched to gibbs due to low acceptance rates
+  # if(gibbs | samplemc_out$switch){
+  #   # If rejection sampling and switched to gibbs sampling due to low acceptance rate:
+  #   if(samplemc_out$switch){ 
+  #     rej_to_gibbs = rej_to_gibbs + 1
+  #     cat("rej_to_gibbs count: ", rej_to_gibbs, "\n")
+  #   }
+  #   
+  #   gibbs_accept_rate = samplemc_out$gibbs_accept_rate
+  #   batch = samplemc_out$updated_batch
+  #   proposal_SD = samplemc_out$proposal_SD
+  # }
   
   print("Updated proposal_SD:")
   print(proposal_SD)
@@ -640,17 +950,18 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   # Usual BIC
   BIC = -2*ll + sum(coef != 0)*log(nrow(X))
   
-  if(gibbs){
+  if(sampler %in% c("random_walk","independence")){
     out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
                extra = list(okindex = okindex, Znew2 = Znew2),
-               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
-  }else{
+               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
+               EM_iter = i)
+  }else if(sampler == "stan"){
     out = list(coef = coef, sigma = cov,  
                lambda0 = lambda0, lambda1 = lambda1, 
                covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC,
-               extra = list(okindex = okindex, Znew2 = Znew2))
+               extra = list(okindex = okindex, Znew2 = Znew2), EM_iter = i)
   }
   
   if(returnMC == T){
@@ -661,18 +972,55 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       r_end = nrow(u0)
       u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
     }else{
-      if(MwG_sampler == "independence"){
+      if(sampler == "independence"){
         samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
                                   d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, matrix(u0[nrow(u0),], nrow = 1))
-      }else{ # MwG_sampler == "random_walk"
+        u0_out = samplemc_out$u0
+        
+      }else if(sampler == "random_walk"){ 
+        # No adaptation at convergence point
         samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
                                        d = d, okindex = okindex, gibbs = gibbs, uold = matrix(u0[nrow(u0),], nrow = 1),
                                        proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                       offset = offset_increment, burnin_batchnum = burnin_batchnum)
-      }
-      
-      u0_out = samplemc_out$u0
-    }
+                                       offset = offset_increment, burnin_batchnum = 0)
+        u0_out = samplemc_out$u0
+        
+      }else if(sampler == "stan"){
+        
+        u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
+        ranef_idx=which(diag(cov) > 0)
+        
+        if(family == "binomial" & link == "logit"){
+          stan_file = stanmodels$binomial_logit_model
+        }
+        
+        # For each group, sample from posterior distribution (sample the alpha values)
+        for(k in 1:d){
+          idx_k = which(group == k)
+          cols_k = seq(from = k, to = ncol(Z), by = d)
+          cols_k = cols_k[ranef_idx]
+          y_k = y[idx_k]
+          X_k = X[idx_k,]
+          Z_k = Znew2[idx_k, cols_k]
+          
+          dat_list = list(N = length(idx_k), # Number individuals in group k
+                          q = length(ranef_idx), # number random effects
+                          eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                          y = y_k, # outcomes for group k
+                          Z = Z_k) # portion of Z matrix corresonding to group k
+          
+          stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
+                                     warmup = nMC_burnin, show_messages = F, refresh = 0)
+          list_of_draws = extract(stan_fit)
+          u0[,cols_k] = list_of_draws$alpha
+          
+          u0_out = u0
+          
+        } # End k for loop
+        
+      } # End if-else sampler
+    
+    } # End if-else nrow(u0)
     
     out$u = u0_out
     
@@ -680,18 +1028,18 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     out$u = matrix(NA, nrow = 1, ncol = 1)
   } 
   
-  if((initial_gibbs == F) && rej_to_gibbs > 0){
-    if(rej_to_gibbs <= 3){
-      cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs))
-    }else{
-      # To correct for additional rej_to_gibbs + 1 when rej_to_gibbs = 3
-      cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs-1))
-    }
-  }
-  
-  if(initial_gibbs == F){
-    out$rej_to_gibbs = rej_to_gibbs
-  }
+  # if((initial_gibbs == F) && rej_to_gibbs > 0){
+  #   if(rej_to_gibbs <= 3){
+  #     cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs))
+  #   }else{
+  #     # To correct for additional rej_to_gibbs + 1 when rej_to_gibbs = 3
+  #     cat(sprintf("ending rej_to_gibbs count: %i \n", rej_to_gibbs-1))
+  #   }
+  # }
+  # 
+  # if(initial_gibbs == F){
+  #   out$rej_to_gibbs = rej_to_gibbs
+  # }
   
  # out$coef_record_all = coef_record_all
   if(!is.null(cov_record)){
