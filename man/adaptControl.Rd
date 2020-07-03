@@ -6,10 +6,14 @@
 
 Constructs control structure for the adaptive random walk Metropolis-within-Gibbs sampling procedure.}
 \usage{
-adaptControl(batch_length = 100, offset = 8000,
+adaptControl(nMC_burnin = 200, batch_length = 100, offset = 0,
   burnin_batchnum = 1000)
 }
 \arguments{
+\item{nMC_burnin}{positive integer specifying teh number of posterior draws to use as
+burnin for each E step in the EM algorithm. Default 200. Function will not allow \code{nMC_burnin}
+to be less than 100.}
+
 \item{batch_length}{positive integer specifying the number of posterior draws to collect
 before the proposal variance is adjusted based on the acceptance rate of the last 
 \code{batch_length} posterior draws}
