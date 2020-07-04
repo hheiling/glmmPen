@@ -100,7 +100,7 @@
 #' to Metropolis-within-Gibbs sampling due to unacceptably small acceptance rates in the Rejection sampling?
 #' Output only if started initially with Rejection sampling}
 #'  
-#' 
+#' @useDynLib glmmPen
 #' @importFrom bigmemory attach.big.matrix describe big.matrix
 #' @importFrom ncvreg ncvreg
 #' @importFrom rstan sampling extract
