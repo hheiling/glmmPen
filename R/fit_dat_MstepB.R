@@ -113,7 +113,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      nMC = 5000, nMC_max = 20000, t = 2,
                      returnMC = T, nMC_report = 5000, u_init = NULL, coef_old = NULL, 
                      maxitEM = 100, maxit_CD = 250,
-                     M = 10^4, gibbs = T, sampler = c("random_walk","independence","stan"),
+                     M = 10^4, gibbs = T, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
                      var_start = 3.0, fit_type = 1){
   
@@ -385,8 +385,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       
     }else if(sampler == "stan"){
       
-      # stop("Stan not yet fully integrated")
-      
       u0 = big.matrix(nrow = nMC, ncol = ncol(Z)) # use ', init = 0' for sampling within EM algorithm
       
       if(family == "binomial" & link == "logit"){
@@ -399,7 +397,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         cols_k = seq(from = k, to = ncol(Z), by = d)
         y_k = y[idx_k]
         X_k = X[idx_k,]
-        Z_k = Znew2[idx_k, cols_k]
+        if(length(cols_k) == 1){
+          Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
+        }else{ # length(cols_k) > 1
+          Z_k = Znew2[idx_k, cols_k]
+        }
         
         dat_list = list(N = length(idx_k), # Number individuals in group k
                         q = length(ranef_idx), # number random effects
@@ -472,7 +474,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         cols_k = seq(from = k, to = ncol(Z), by = d)
         y_k = y[idx_k]
         X_k = X[idx_k,]
-        Z_k = Znew2[idx_k, cols_k]
+        if(length(cols_k) == 1){
+          Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
+        }else{ # length(cols_k) > 1
+          Z_k = Znew2[idx_k, cols_k]
+        }
         
         dat_list = list(N = length(idx_k), # Number individuals in group k
                         q = length(ranef_idx), # number random effects
@@ -820,7 +826,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         cols_k = cols_k[ranef_idx]
         y_k = y[idx_k]
         X_k = X[idx_k,]
-        Z_k = Znew2[idx_k, cols_k]
+        if(length(cols_k) == 1){
+          Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
+        }else{ # length(cols_k) > 1
+          Z_k = Znew2[idx_k, cols_k]
+        }
         
         dat_list = list(N = length(idx_k), # Number individuals in group k
                         q = length(ranef_idx), # number random effects
@@ -892,7 +902,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       cols_k = cols_k[ranef_idx]
       y_k = y[idx_k]
       X_k = X[idx_k,]
-      Z_k = Znew2[idx_k, cols_k]
+      if(length(cols_k) == 1){
+        Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
+      }else{ # length(cols_k) > 1
+        Z_k = Znew2[idx_k, cols_k]
+      }
       
       dat_list = list(N = length(idx_k), # Number individuals in group k
                       q = length(ranef_idx), # number random effects
@@ -987,7 +1001,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         
       }else if(sampler == "stan"){
         
-        u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
+        u0 = matrix(0, nrow = nMC_report, ncol = ncol(Z))
         ranef_idx=which(diag(cov) > 0)
         
         if(family == "binomial" & link == "logit"){
@@ -1001,7 +1015,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
           cols_k = cols_k[ranef_idx]
           y_k = y[idx_k]
           X_k = X[idx_k,]
-          Z_k = Znew2[idx_k, cols_k]
+          if(length(cols_k) == 1){
+            Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
+          }else{ # length(cols_k) > 1
+            Z_k = Znew2[idx_k, cols_k]
+          }
           
           dat_list = list(N = length(idx_k), # Number individuals in group k
                           q = length(ranef_idx), # number random effects
@@ -1009,7 +1027,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                           y = y_k, # outcomes for group k
                           Z = Z_k) # portion of Z matrix corresonding to group k
           
-          stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
+          stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC_report + nMC_burnin,
                                      warmup = nMC_burnin, show_messages = F, refresh = 0)
           list_of_draws = extract(stan_fit)
           u0[,cols_k] = list_of_draws$alpha

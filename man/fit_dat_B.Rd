@@ -12,7 +12,7 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
   group_X = 0:(ncol(dat$X) - 1), nMC = 5000, nMC_max = 20000,
   t = 2, returnMC = T, nMC_report = 5000, u_init = NULL,
   coef_old = NULL, maxitEM = 100, maxit_CD = 250, M = 10^4,
-  gibbs = T, sampler = c("random_walk", "independence", "stan"),
+  gibbs = T, sampler = c("stan", "random_walk", "independence"),
   adapt_RW_options = adaptControl(), covar = c("unstructured",
   "independent"), var_start = 3, fit_type = 1)
 }

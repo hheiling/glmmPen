@@ -96,7 +96,7 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
                         nMC_start = 5000, nMC_max = 20000, nMC_report = 5000,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
                         covar = c("unstructured","independent"),
-                        sampler = c("random_walk","independence","stan"), gibbs = T, 
+                        sampler = c("stan","random_walk","independence"), gibbs = T, 
                         var_start = 3.0, fit_type = 2){
   
   # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
@@ -113,7 +113,7 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, maxitEM = maxitEM, 
                  maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
-                 MwG_sampler = MwG_sampler[1], gibbs = gibbs, var_start = var_start,
+                 sampler = sampler[1], gibbs = gibbs, var_start = var_start,
                  fit_type = fit_type[1]),
             class = "optimControl")
 }

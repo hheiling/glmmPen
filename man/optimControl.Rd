@@ -9,7 +9,7 @@ Constructs the control structure for penalized mixed model fitting.}
 optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_start = 5000,
   nMC_max = 20000, nMC_report = 5000, maxitEM = 100,
   maxit_CD = 250, M = 10000, t = 2, covar = c("unstructured",
-  "independent"), sampler = c("random_walk", "independence", "stan"),
+  "independent"), sampler = c("stan", "random_walk", "independence"),
   gibbs = T, var_start = 3, fit_type = 2)
 }
 \arguments{
