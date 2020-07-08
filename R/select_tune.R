@@ -51,6 +51,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   gibbs = optim_options$gibbs
   var_start = optim_options$var_start
   fit_type = optim_options$fit_type
+  max_cores = optim_options$max_cores
   
   covar = covar[1]
   if(!(covar %in% c("unstructured","independent"))){
@@ -113,6 +114,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       gc()
       print("------------------------------------------------------------------")
       print(sprintf("lambda0 %f lambda1 %f", lambda0_range[i], lambda1_range[j]))
+      print(sprintf("lambda0 i %i lambda1 j %i", i, j))
       print("------------------------------------------------------------------")
       out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
                           nMC = nMC, family = family, offset_fit = offset, group_X = group_X,
@@ -122,7 +124,8 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                           gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
                           returnMC = returnMC, t = t,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start, fit_type = fit_type))
+                          covar = covar, var_start = var_start, fit_type = fit_type,
+                          max_cores = max_cores))
       
       
       if(is.character(out)) next

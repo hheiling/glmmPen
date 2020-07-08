@@ -115,8 +115,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      maxitEM = 100, maxit_CD = 250,
                      M = 10^4, gibbs = T, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 3.0, fit_type = 1){
+                     var_start = 3.0, fit_type = 1, max_cores = 1){
   
+  # options(mc.cores = parallel::detectCores())
   
   penalty = penalty[1]
   if(!(penalty %in% c("lasso","MCP","SCAD"))){
@@ -128,7 +129,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   if(lambda1 <=10^-6) lambda1 = 0
   
   y = dat$y
-  X = as.matrix(dat$X)
+  X = base::as.matrix(dat$X)
   # Convert sparse Z to dense Z
   Z = Matrix::as.matrix(dat$Z)
   group = dat$group
@@ -335,6 +336,14 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   burnin_batchnum = adapt_RW_options$burnin_batchnum
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Z)/d)
   
+  # Determine initial number of cores to use
+  if(nMC < 2000){
+    num_cores = 1
+  }else{
+    num_cores = 2 + (nMC - 2000) %/% 1000
+    if(num_cores > max_cores) num_cores = max_cores
+  }
+  
   # At start of EM algorithm, acquire posterior draws from all random effect variables
   ranef_idx = 1:length(diag(cov))
   
@@ -409,10 +418,29 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                         y = y_k, # outcomes for group k
                         Z = Z_k) # portion of Z matrix corresonding to group k
         
-        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
-                                   warmup = nMC_burnin, show_messages = F, refresh = 0)
-        list_of_draws = extract(stan_fit)
-        u0[,cols_k] = list_of_draws$alpha
+        # initialize posterior random draws
+        init_lst = list()
+        for(cr in 1:num_cores){
+          init_lst[[cr]] = list(alpha = uold[cols_k])
+        }
+        
+        stan_fit = rstan::sampling(stan_file, data = dat_list, init = init_lst, 
+                                   iter = ceiling(nMC/num_cores) + nMC_burnin,
+                                   warmup = nMC_burnin, show_messages = F, refresh = 0,
+                                   chains = num_cores, cores = num_cores)
+        
+        stan_out = as.matrix(stan_fit)
+        # Exclude lp__ column of output (log density up to a constant)
+        draws_mat = stan_out[,1:length(ranef_idx)]
+        
+        if(nrow(draws_mat) == nMC){
+          u0[,cols_k] = draws_mat
+        }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
+          start_row = nrow(draws_mat) - nMC + 1
+          rows_seq = start_row:nrow(draws_mat)
+          u0[,cols_k] = draws_mat[rows_seq,]
+        }
+        
         
       } # End k for loop
       
@@ -486,16 +514,36 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                         y = y_k, # outcomes for group k
                         Z = Z_k) # portion of Z matrix corresonding to group k
         
-        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
-                                   warmup = nMC_burnin, show_messages = F, refresh = 0)
-        list_of_draws = extract(stan_fit)
-        u0[,cols_k] = list_of_draws$alpha
+        # initialize posterior random draws
+        init_lst = list()
+        for(cr in 1:num_cores){
+          init_lst[[cr]] = list(alpha = rnorm(length(ranef_idx), 0, 1))
+        }
+        
+        # options(mc.cores = parallel::detectCores())
+        stan_fit = rstan::sampling(stan_file, data = dat_list, iter = ceiling(nMC/num_cores) + nMC_burnin,
+                                   warmup = nMC_burnin, show_messages = F, refresh = 0,
+                                   init = init_lst, chains = num_cores, cores = num_cores)
+        
+        stan_out = as.matrix(stan_fit)
+        # Exclude lp__ column of output
+        draws_mat = stan_out[,1:length(ranef_idx)]
+        
+        if(nrow(draws_mat) == nMC){
+          u0[,cols_k] = draws_mat
+        }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
+          start_row = nrow(draws_mat) - nMC + 1
+          rows_seq = start_row:nrow(draws_mat)
+          u0[,cols_k] = draws_mat[rows_seq,]
+        }
         
       } # End k for loop
       
     } # End if-else sampler
     
   } # end if-else is.null(u_init)
+  
+  print("End first E step")
   
   # if((!is.null(ufull) | !is.null(ufullinit)) & !is.null(coef_old)){
   #   if(!is.null(ufullinit)){
@@ -812,6 +860,14 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       
     }else if(sampler == "stan"){
       
+      # Determine number of cores to use
+      if(nMC < 2000){
+        num_cores = 1
+      }else{
+        num_cores = 2 + (nMC - 2000) %/% 1000
+        if(num_cores > max_cores) num_cores = max_cores
+      }
+      
       u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
       ranef_idx=which(diag(cov) > 0)
       
@@ -838,10 +894,27 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                         y = y_k, # outcomes for group k
                         Z = Z_k) # portion of Z matrix corresonding to group k
         
-        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
-                                   warmup = nMC_burnin, show_messages = F, refresh = 0)
-        list_of_draws = extract(stan_fit)
-        u0[,cols_k] = list_of_draws$alpha
+        # initialize posterior random draws
+        init_lst = list()
+        for(cr in 1:num_cores){
+          init_lst[[cr]] = list(alpha = uold[cols_k])
+        }
+        
+        stan_fit = rstan::sampling(stan_file, data = dat_list, iter = ceiling(nMC/num_cores) + nMC_burnin,
+                                   warmup = nMC_burnin, show_messages = F, refresh = 0,
+                                   init = init_lst, chains = num_cores, cores = num_cores)
+        
+        stan_out = as.matrix(stan_fit)
+        # Exclude lp__ column of output
+        draws_mat = stan_out[,1:length(ranef_idx)]
+        
+        if(nrow(draws_mat) == nMC){
+          u0[,cols_k] = draws_mat
+        }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
+          start_row = nrow(draws_mat) - nMC + 1
+          rows_seq = start_row:nrow(draws_mat)
+          u0[,cols_k] = draws_mat[rows_seq,]
+        }
         
       } # End k for loop
       
@@ -888,8 +961,17 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     u0 = attach.big.matrix(samplemc_out$u0)
   }else if(sampler == "stan"){
     
+    # Determine number of cores to use
+    if(nMC < 2000){
+      num_cores = 1
+    }else{
+      num_cores = 2 + (nMC - 2000) %/% 1000
+      if(num_cores > max_cores) num_cores = max_cores
+    }
+    
     u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
     ranef_idx=which(diag(cov) > 0)
+    uold = as.numeric(u0[nrow(u0),])
     
     if(family == "binomial" & link == "logit"){
       stan_file = stanmodels$binomial_logit_model
@@ -914,10 +996,27 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                       y = y_k, # outcomes for group k
                       Z = Z_k) # portion of Z matrix corresonding to group k
       
-      stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC + nMC_burnin,
-                                 warmup = nMC_burnin, show_messages = F, refresh = 0)
-      list_of_draws = extract(stan_fit)
-      u0[,cols_k] = list_of_draws$alpha
+      # initialize posterior random draws
+      init_lst = list()
+      for(cr in 1:num_cores){
+        init_lst[[cr]] = list(alpha = uold[cols_k])
+      }
+      
+      stan_fit = rstan::sampling(stan_file, data = dat_list, iter = ceiling(nMC/num_cores) + nMC_burnin,
+                                 warmup = nMC_burnin, show_messages = F, refresh = 0,
+                                 init = init_lst, chains = num_cores, cores = num_cores)
+      
+      stan_out = as.matrix(stan_fit)
+      # Exclude lp__ column of output
+      draws_mat = stan_out[,1:length(ranef_idx)]
+      
+      if(nrow(draws_mat) == nMC){
+        u0[,cols_k] = draws_mat
+      }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
+        start_row = nrow(draws_mat) - nMC + 1
+        rows_seq = start_row:nrow(draws_mat)
+        u0[,cols_k] = draws_mat[rows_seq,]
+      }
       
     } # End k for loop
     
@@ -1001,8 +1100,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         
       }else if(sampler == "stan"){
         
+        # Note: only use one chain here so that trace plots are an accurate representation 
+        # of a single chain
+        
         u0 = matrix(0, nrow = nMC_report, ncol = ncol(Z))
         ranef_idx=which(diag(cov) > 0)
+        uold = as.numeric(u0[nrow(u0),])
         
         if(family == "binomial" & link == "logit"){
           stan_file = stanmodels$binomial_logit_model
@@ -1027,8 +1130,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                           y = y_k, # outcomes for group k
                           Z = Z_k) # portion of Z matrix corresonding to group k
           
-          stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, iter = nMC_report + nMC_burnin,
-                                     warmup = nMC_burnin, show_messages = F, refresh = 0)
+          # initialize posterior random draws
+          init_lst = list()
+          init_lst[[1]] = list(alpha = uold[cols_k])
+          
+          stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, init = init_lst,
+                                     iter = nMC_report + nMC_burnin, warmup = nMC_burnin, 
+                                     show_messages = F, refresh = 0)
           list_of_draws = extract(stan_fit)
           u0[,cols_k] = list_of_draws$alpha
           

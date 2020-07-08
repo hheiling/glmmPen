@@ -132,9 +132,10 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     M = optim_options$M
     t = optim_options$t
     covar = optim_options$covar
-    MwG_sampler = optim_options$MwG_sampler
+    sampler = optim_options$sampler
     gibbs = optim_options$gibbs
     fit_type = optim_options$fit_type
+    max_cores = optim_options$max_cores
     
     # Call fit_dat function
     # fit_dat function found in "/R/fit_dat.R" file
@@ -143,8 +144,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                     family = family, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                     nMC = nMC, nMC_max = nMC_max, t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
-                    M = M, gibbs = gibbs, MwG_sampler = MwG_sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, fit_type = fit_type, returnMC = returnMC)
+                    M = M, gibbs = gibbs, sampler = sampler, adapt_RW_options = adapt_RW_options,
+                    covar = covar, fit_type = fit_type, returnMC = returnMC, max_cores = max_cores)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     optim_results = matrix(NA, nrow = 1, ncol = 1)

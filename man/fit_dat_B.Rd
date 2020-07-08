@@ -14,7 +14,7 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
   coef_old = NULL, maxitEM = 100, maxit_CD = 250, M = 10^4,
   gibbs = T, sampler = c("stan", "random_walk", "independence"),
   adapt_RW_options = adaptControl(), covar = c("unstructured",
-  "independent"), var_start = 3, fit_type = 1)
+  "independent"), var_start = 3, fit_type = 1, max_cores = 1)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
