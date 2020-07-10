@@ -6,11 +6,12 @@
 
 Constructs the control structure for penalized mixed model fitting.}
 \usage{
-optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_start = 5000,
-  nMC_max = 20000, nMC_report = 5000, maxitEM = 100,
-  maxit_CD = 250, M = 10000, t = 2, covar = c("unstructured",
-  "independent"), sampler = c("stan", "random_walk", "independence"),
-  gibbs = T, var_start = 3, fit_type = 2, max_cores = 1)
+optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_burnin = 500,
+  nMC_start = 5000, nMC_max = 20000, nMC_report = 5000,
+  maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
+  covar = c("unstructured", "independent"), sampler = c("stan",
+  "random_walk", "independence"), gibbs = T, var_start = 3,
+  fit_type = 2, max_cores = 1)
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 

@@ -110,14 +110,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
-                     nMC = 5000, nMC_max = 20000, t = 2,
+                     nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2,
                      returnMC = T, nMC_report = 5000, u_init = NULL, coef_old = NULL, 
                      maxitEM = 100, maxit_CD = 250,
                      M = 10^4, gibbs = T, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 3.0, fit_type = 1, max_cores = 1){
-  
-  # options(mc.cores = parallel::detectCores())
+                     var_start = 3.0, fit_type = 2, max_cores = 1){
   
   penalty = penalty[1]
   if(!(penalty %in% c("lasso","MCP","SCAD"))){
@@ -330,7 +328,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   ## initialize batch number to 0
   batch = 0.0
   ## initialize other paramters from adaptControl()
-  nMC_burnin = adapt_RW_options$nMC_burnin
   batch_length = adapt_RW_options$batch_length
   offset_increment = adapt_RW_options$offset
   burnin_batchnum = adapt_RW_options$burnin_batchnum
@@ -400,6 +397,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         stan_file = stanmodels$binomial_logit_model
       }
       
+      # Number draws to extract in each chain (after burn-in)
+      nMC_chain = ceiling(nMC/num_cores)
+      
+      # Record last elements of each chain for initialization of next E step
+      last_draws = matrix(0, nrow = num_cores, ncol = ncol(Z)) 
+      
       # For each group, sample from posterior distribution (sample the alpha values)
       for(k in 1:d){
         idx_k = which(group == k)
@@ -425,13 +428,18 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         }
         
         stan_fit = rstan::sampling(stan_file, data = dat_list, init = init_lst, 
-                                   iter = ceiling(nMC/num_cores) + nMC_burnin,
+                                   iter = nMC_chain + nMC_burnin,
                                    warmup = nMC_burnin, show_messages = F, refresh = 0,
                                    chains = num_cores, cores = num_cores)
         
         stan_out = as.matrix(stan_fit)
         # Exclude lp__ column of output (log density up to a constant)
         draws_mat = stan_out[,1:length(ranef_idx)]
+        
+        # Find last elements for each chain for initialization of next E step
+        for(m in 1:num_cores){
+          last_draws[m,cols_k] = draws_mat[nMC_chain*m,]
+        }
         
         if(nrow(draws_mat) == nMC){
           u0[,cols_k] = draws_mat
@@ -496,6 +504,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         stan_file = stanmodels$binomial_logit_model
       }
       
+      # Number draws to extract in each chain (after burn-in)
+      nMC_chain = ceiling(nMC/num_cores)
+      
+      # Record last elements for each chain for initialization of next E step
+      last_draws = matrix(0, nrow = num_cores, ncol = ncol(Z))
+      
       # For each group, sample from posterior distribution (sample the alpha values)
       for(k in 1:d){
         idx_k = which(group == k)
@@ -520,14 +534,19 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
           init_lst[[cr]] = list(alpha = rnorm(length(ranef_idx), 0, 1))
         }
         
-        # options(mc.cores = parallel::detectCores())
-        stan_fit = rstan::sampling(stan_file, data = dat_list, iter = ceiling(nMC/num_cores) + nMC_burnin,
+        stan_fit = rstan::sampling(stan_file, data = dat_list, iter = nMC_chain + nMC_burnin,
                                    warmup = nMC_burnin, show_messages = F, refresh = 0,
                                    init = init_lst, chains = num_cores, cores = num_cores)
         
+        # Extract all chains for use in M step
         stan_out = as.matrix(stan_fit)
         # Exclude lp__ column of output
         draws_mat = stan_out[,1:length(ranef_idx)]
+        
+        # Find last elements for each chain for initialization of next E step
+        for(m in 1:num_cores){
+          last_draws[m,cols_k] = draws_mat[nMC_chain*m,]
+        }
         
         if(nrow(draws_mat) == nMC){
           u0[,cols_k] = draws_mat
@@ -542,8 +561,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     } # End if-else sampler
     
   } # end if-else is.null(u_init)
-  
-  print("End first E step")
   
   # if((!is.null(ufull) | !is.null(ufullinit)) & !is.null(coef_old)){
   #   if(!is.null(ufullinit)){
@@ -861,11 +878,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     }else if(sampler == "stan"){
       
       # Determine number of cores to use
-      if(nMC < 2000){
-        num_cores = 1
-      }else{
-        num_cores = 2 + (nMC - 2000) %/% 1000
-        if(num_cores > max_cores) num_cores = max_cores
+      if(num_cores < max_cores){
+        if(nMC < 2000){
+          num_cores = 1
+        }else{
+          num_cores = 2 + (nMC - 2000) %/% 1000
+          if(num_cores > max_cores) num_cores = max_cores
+        }
       }
       
       u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
@@ -874,6 +893,14 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       if(family == "binomial" & link == "logit"){
         stan_file = stanmodels$binomial_logit_model
       }
+      
+      # Number draws to extract in each chain (after burn-in)
+      nMC_chain = ceiling(nMC/num_cores)
+      
+      # Re-name last_draws matrix so it can be over-written in upcoming E step
+      init_draws = last_draws
+      # Record last elements for each chain for initialization of next E step
+      last_draws = matrix(0, nrow = num_cores, ncol = ncol(Z))
       
       # For each group, sample from posterior distribution (sample the alpha values)
       for(k in 1:d){
@@ -894,19 +921,35 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                         y = y_k, # outcomes for group k
                         Z = Z_k) # portion of Z matrix corresonding to group k
         
-        # initialize posterior random draws
+        # initialize posterior random draws from last E step
         init_lst = list()
-        for(cr in 1:num_cores){
-          init_lst[[cr]] = list(alpha = uold[cols_k])
+        if(nrow(init_draws) == num_cores){
+          for(m in 1:num_cores){
+            init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+          }
+        }else{ # nrow(init_draws) < num_cores
+          for(m in 1:nrow(init_draws)){
+            init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+          }
+          # If current number of cores exceeds previously used number of cores,
+          # recycle initial points from first chain
+          for(m in (nrow(init_draws)+1):num_cores){
+            init_lst[[m]] = list(alpha = as.numeric(init_draws[1,cols_k]))
+          }
         }
         
-        stan_fit = rstan::sampling(stan_file, data = dat_list, iter = ceiling(nMC/num_cores) + nMC_burnin,
+        stan_fit = rstan::sampling(stan_file, data = dat_list, iter = nMC_chain + nMC_burnin,
                                    warmup = nMC_burnin, show_messages = F, refresh = 0,
                                    init = init_lst, chains = num_cores, cores = num_cores)
         
         stan_out = as.matrix(stan_fit)
         # Exclude lp__ column of output
         draws_mat = stan_out[,1:length(ranef_idx)]
+        
+        # Find last elements for each chain for initialization of next E step
+        for(m in 1:num_cores){
+          last_draws[m,cols_k] = draws_mat[nMC_chain*m,]
+        }
         
         if(nrow(draws_mat) == nMC){
           u0[,cols_k] = draws_mat
@@ -962,11 +1005,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }else if(sampler == "stan"){
     
     # Determine number of cores to use
-    if(nMC < 2000){
-      num_cores = 1
-    }else{
-      num_cores = 2 + (nMC - 2000) %/% 1000
-      if(num_cores > max_cores) num_cores = max_cores
+    if(num_cores < max_cores){
+      if(nMC < 2000){
+        num_cores = 1
+      }else{
+        num_cores = 2 + (nMC - 2000) %/% 1000
+        if(num_cores > max_cores) num_cores = max_cores
+      }
     }
     
     u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
@@ -976,6 +1021,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     if(family == "binomial" & link == "logit"){
       stan_file = stanmodels$binomial_logit_model
     }
+    
+    # Number draws to extract in each chain (after burn-in)
+    nMC_chain = ceiling(nMC/num_cores)
+    
+    # Re-name last_draws matrix so it can be over-written in upcoming E step
+    init_draws = last_draws
     
     # For each group, sample from posterior distribution (sample the alpha values)
     for(k in 1:d){
@@ -996,13 +1047,24 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                       y = y_k, # outcomes for group k
                       Z = Z_k) # portion of Z matrix corresonding to group k
       
-      # initialize posterior random draws
+      # initialize posterior random draws from last E step
       init_lst = list()
-      for(cr in 1:num_cores){
-        init_lst[[cr]] = list(alpha = uold[cols_k])
+      if(nrow(init_draws) == num_cores){
+        for(m in 1:num_cores){
+          init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+        }
+      }else{ # nrow(init_draws) < num_cores
+        for(m in 1:nrow(init_draws)){
+          init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+        }
+        # If current number of cores exceeds previously used number of cores,
+        # recycle initial points from first chain
+        for(m in (nrow(init_draws)+1):num_cores){
+          init_lst[[m]] = list(alpha = as.numeric(init_draws[1,cols_k]))
+        }
       }
       
-      stan_fit = rstan::sampling(stan_file, data = dat_list, iter = ceiling(nMC/num_cores) + nMC_burnin,
+      stan_fit = rstan::sampling(stan_file, data = dat_list, iter = nMC_chain + nMC_burnin,
                                  warmup = nMC_burnin, show_messages = F, refresh = 0,
                                  init = init_lst, chains = num_cores, cores = num_cores)
       

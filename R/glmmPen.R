@@ -125,8 +125,10 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # Extract variables from optimControl
     conv_EM = optim_options$conv_EM
     conv_CD = optim_options$conv_CD
+    nMC_burnin = optim_options$nMC_burnin
     nMC = optim_options$nMC
     nMC_max = optim_options$nMC_max
+    nMC_report = optim_options$nMC_report
     maxitEM = optim_options$maxitEM
     maxit_CD = optim_options$maxit_CD
     M = optim_options$M
@@ -143,7 +145,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                     conv_EM = conv_EM, conv_CD = conv_CD,
                     family = family, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                    nMC = nMC, nMC_max = nMC_max, t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
+                    nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
+                    t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, gibbs = gibbs, sampler = sampler, adapt_RW_options = adapt_RW_options,
                     covar = covar, fit_type = fit_type, returnMC = returnMC, max_cores = max_cores)
     

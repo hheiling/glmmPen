@@ -40,8 +40,10 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   # Extract variables from optimControl
   conv_EM = optim_options$conv_EM
   conv_CD = optim_options$conv_CD
+  nMC_burnin = optim_options$nMC_burnin
   nMC = optim_options$nMC
   nMC_max = optim_options$nMC_max
+  nMC_report = optim_options$nMC_report
   maxitEM = optim_options$maxitEM
   maxit_CD = optim_options$maxit_CD
   M = optim_options$M
@@ -117,9 +119,10 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       print(sprintf("lambda0 i %i lambda1 j %i", i, j))
       print("------------------------------------------------------------------")
       out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
-                          nMC = nMC, family = family, offset_fit = offset, group_X = group_X,
+                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
+                          family = family, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                          trace = trace, conv_EM = conv_EM, conv_CD = conv_CD, nMC_max = nMC_max, 
+                          trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_old0, u_init = uold,
                           gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
                           returnMC = returnMC, t = t,

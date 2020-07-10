@@ -59,24 +59,20 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 #' containing parameter specifications for the adaptive random walk sampling procedure.
 #' 
 #' @export
-adaptControl = function(nMC_burnin = 200, batch_length = 100, offset = 0, burnin_batchnum = 1000){
-  # Checks
-  if(nMC_burnin < 100){
-    warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
-    nMC_burnin = 100
-  }
+adaptControl = function(batch_length = 100, offset = 0, burnin_batchnum = 1000){
+  
   if(batch_length < 10){
     stop("batch_length must be at least 10")
   }
   if(burnin_batchnum < 0){
     stop("burnin_batchnum cannot be negative")
   }
-  x = c(nMC_burnin, batch_length, burnin_batchnum)
+  x = c(batch_length, burnin_batchnum)
   if(!all(floor(x)==x)){ # if any of the above values not integers
-    stop("nMC_burnin, batch_length, and burnin_batchnum must be integers")
+    stop("batch_length and burnin_batchnum must be integers")
   }
   
-  structure(list(nMC_burnin = nMC_burnin, batch_length = batch_length, offset = offset, 
+  structure(list(batch_length = batch_length, offset = offset, 
                  burnin_batchnum = burnin_batchnum), 
             class = "adaptControl")
 }
@@ -93,7 +89,7 @@ adaptControl = function(nMC_burnin = 200, batch_length = 100, offset = 0, burnin
 #' 
 #' @export
 optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
-                        nMC_start = 5000, nMC_max = 20000, nMC_report = 5000,
+                        nMC_burnin = 500, nMC_start = 5000, nMC_max = 20000, nMC_report = 5000,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
                         covar = c("unstructured","independent"),
                         sampler = c("stan","random_walk","independence"), gibbs = T, 
@@ -103,8 +99,17 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   if(sum(c(nMC_start, nMC_max, maxitEM) %% 1) > 0 | sum(c(nMC_start, nMC_max, maxitEM) <= 0) > 0){
     stop("nMC_start, nMC_max, and maxitEM must be positive integers")
   }
+  # Checks
+  if(nMC_burnin < 100){
+    warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
+    nMC_burnin = 100
+  }
   if(nMC_max < nMC_start){
     stop("nMC_max should not be smaller than nMC_start \n")
+  }
+  x = c(nMC_burnin, nMC_start, nMC_max, nMC_report)
+  if(!all(floor(x)==x)){ # if any of the above values not integers
+    stop("all nMC arguments must be integers")
   }
   if(var_start <= 0){
     stop("var_start must be a positive number")
@@ -114,8 +119,8 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   }
   
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
-                 nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, maxitEM = maxitEM, 
-                 maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
+                 nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, 
+                 maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, covar = covar[1],
                  sampler = sampler[1], gibbs = gibbs, var_start = var_start,
                  fit_type = fit_type[1], max_cores = max_cores),
             class = "optimControl")
