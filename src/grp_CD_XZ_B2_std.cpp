@@ -442,7 +442,7 @@ arma::vec grp_CD_XZ_B2_std(const arma::vec& y, const arma::mat& X, const arma::m
           // Update residuals
           resid.submat(m0,ids) -= shift;
           // Calculate zetaj
-          Xj = A.cols(idxj - p);
+          Xj = A_std.cols(idxj - p);
           zetaj = zetaj + Xj.t() * trans(resid.submat(m0,ids));
           
         } // End m for loop
