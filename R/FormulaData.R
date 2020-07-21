@@ -29,6 +29,7 @@
 #' 
 #' @importFrom lme4 mkReTrms nobars subbars findbars
 #' @importFrom Matrix Matrix
+#' @importFrom stringr str_c
 #' @export
 formulaData = function(formula, data = NULL, na.action = na.omit){
   # Note: need to deal with potential offsets and weights
@@ -150,6 +151,8 @@ formulaData = function(formula, data = NULL, na.action = na.omit){
   if(sum(!(cnms %in% colnames(mm))) > 0){
     stop("random effects must be a subset of fixed effects")
   }
+  
+  colnames(Z) = str_c(rep(cnms, each = d), ":", levels(group))
   
   return(list(y = Y, X = mm, Z = Z, group = group, cnms = cnms, 
               group_name = group_name, flist = reTrms$flist, frame = frame_full))

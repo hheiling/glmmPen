@@ -31,6 +31,7 @@
 #' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
 #' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 #' Default is 4.0 for SCAD and 3.0 for MCP.
+#' @param group_X vector ...
 #' @param nMC a positive integer for the initial number of Monte Carlo draws
 #' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws
 #' @param t the convergence criteria is based on the average Euclidean distance between 
@@ -62,11 +63,10 @@
 #' greater than 7 (i.e. high dimensional), then the algorithm automatically assumes an 
 #' independent covariance structure (covar switched to "independent").
 #' @param fit_type integer specifying the verion of the grouped coordinate descent algorithm to use.
-#' Default equals 2, the 'naive fit', assuming that the random effects covariates do not need any
+#' Default equals 1, the 'naive fit', assuming that the random effects covariates do not need any
 #' additional standardization or adjustments to account for absence of orthogonalization.
-#' For the time being, this version is recommended. Version 4 adds standardization of the random
-#' effects covariates compared to version 2. Version 1 adds an adjustment to account for absence
-#' of orthogonalization, and version 3 adds standardization compared to version 1.
+#' For the time being, this version is recommended. Version 2 adds standardization of the random
+#' effects covariates compared to version 1. 
 #' 
 #' @section Details: 
 #' Accepted families: binomial, poisson, gaussian. Currently, the algorithm is only equipted to handle
@@ -104,6 +104,7 @@
 #' @importFrom bigmemory attach.big.matrix describe big.matrix
 #' @importFrom ncvreg ncvreg
 #' @importFrom rstan sampling extract
+#' @importFrom stringr str_split_fixed
 #' @export
 fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
                      family = "binomial", offset_fit = NULL,
@@ -115,7 +116,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      maxitEM = 100, maxit_CD = 250,
                      M = 10^4, gibbs = T, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 3.0, fit_type = 2, max_cores = 1){
+                     var_start = 3.0, fit_type = 1, max_cores = 1){
   
   penalty = penalty[1]
   if(!(penalty %in% c("lasso","MCP","SCAD"))){
@@ -131,6 +132,20 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   # Convert sparse Z to dense Z
   Z = Matrix::as.matrix(dat$Z)
   group = dat$group
+  d = nlevels(factor(group))
+  
+  # if(is.null(XZ_map)){
+  #   # Organization of Z: First d columns correspond to all group levels within Variable 1
+  #   ## In similar fashion, sequential batches of d columns correspond to a particular variable
+  #   # column names of Z: Variable:Group
+  #   Z_names = str_split_fixed(colnames(Z), pattern = ":", n = 2)
+  #   Z_vars = Z_names[seq(from = 1, to = ncol(Z), by = d), 1]
+  #   X_vars = colnames(X)
+  #   XZ_map = numeric(ncol(X))
+  #   for(j in 1:ncol(X)){
+  #     XZ_map[j] = ifelse(X_vars[j] %in% Z_vars, which(Z_vars == X_vars[j]), 0)
+  #   }
+  # }
   
   if(is.character(family)){
     family = get(family, mode = "function", envir = parent.frame())
@@ -166,8 +181,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   if(is.null(offset_fit)){
     offset_fit = rep(0.0, length(y))
   }
-  
-  d = nlevels(factor(group))
   
   covar = covar[1]
   if(!(covar %in% c("unstructured","independent"))){
@@ -541,7 +554,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         # Extract all chains for use in M step
         stan_out = as.matrix(stan_fit)
         # Exclude lp__ column of output
-        draws_mat = stan_out[,1:length(ranef_idx)]
+        draws_mat = as.matrix(stan_out[,1:length(ranef_idx)])
         
         # Find last elements for each chain for initialization of next E step
         for(m in 1:num_cores){
@@ -733,6 +746,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     print("Updated coef:")
     print(coef)
     
+    # If fixed effects penalized to 0, make sure associated random effects also penalized to 0
+    
     u2 = matrix(0, nMC2, ncol(Z))
     for(ii in 1:d){
       u2[,seq(ii, ncol(Z), by = d)] = rmvnorm(n = nMC2,sigma=var)
@@ -832,23 +847,24 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     # E Step 
     
-    # if(i %% 5 == 0){
-    #   uold = rnorm(n = ncol(u0), mean = 0, sd = 1)
-    # }else{
-    #   uold = as.numeric(u0[nrow(u0),])
-    # }
-    
+    # Initial points for Metropolis within Gibbs E step algorithms
     uold = as.numeric(u0[nrow(u0),])
     
+    # ranef_keep = which(diag(cov) > 0)
+    # fixef_keep = XZ_map[which(coef[1:ncol(X)] != 0)]
+    # ranef_idx = intersect(ranef_keep, fixef_keep)
+    # if(!(any(ranef_idx == 1))) ranef_idx = c(1, ranef_idx)
+    ranef_idx = which(diag(cov) > 0)
+    
     if(sampler == "independence"){
-      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+      samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                        d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = uold)
       u0 = attach.big.matrix(samplemc_out$u0)
       
     }else if(sampler == "random_walk"){
       
      # First adapt the proposal variance during an initial burnin period
-      samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC_burnin, trace = trace, family = family, group = group, 
+      samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC_burnin, trace = trace, family = family, group = group, 
                                             d = d, okindex = okindex, gibbs = gibbs, uold = uold,
                                             proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
                                             offset = offset_increment, burnin_batchnum = burnin_batchnum)
@@ -867,7 +883,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       
       # Run official E step with no adaptation
       uold = as.numeric(u0[nrow(u0),])
-      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
+      samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                            d = d, okindex = okindex, gibbs = gibbs, uold = uold,
                                            proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
                                            offset = offset_increment, burnin_batchnum = 0)
@@ -888,7 +904,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       }
       
       u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init=0)
-      ranef_idx=which(diag(cov) > 0)
       
       if(family == "binomial" & link == "logit"){
         stan_file = stanmodels$binomial_logit_model
@@ -922,19 +937,22 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                         Z = Z_k) # portion of Z matrix corresonding to group k
         
         # initialize posterior random draws from last E step
+        # Note: If number of random effects to sample = 1, need to set the initial values to an array
+        ## Stan interprets initial value as a scalar otherwise, when we need it to be a vector of length 1
+        
         init_lst = list()
         if(nrow(init_draws) == num_cores){
           for(m in 1:num_cores){
-            init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+            init_lst[[m]] = list(alpha = as.array(init_draws[m,cols_k]))
           }
         }else{ # nrow(init_draws) < num_cores
           for(m in 1:nrow(init_draws)){
-            init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+            init_lst[[m]] = list(alpha = as.array(init_draws[m,cols_k]))
           }
           # If current number of cores exceeds previously used number of cores,
           # recycle initial points from first chain
           for(m in (nrow(init_draws)+1):num_cores){
-            init_lst[[m]] = list(alpha = as.numeric(init_draws[1,cols_k]))
+            init_lst[[m]] = list(alpha = as.array(init_draws[1,cols_k]))
           }
         }
         
@@ -944,7 +962,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         
         stan_out = as.matrix(stan_fit)
         # Exclude lp__ column of output
-        draws_mat = stan_out[,1:length(ranef_idx)]
+        draws_mat = as.matrix(stan_out[,1:length(ranef_idx)])
         
         # Find last elements for each chain for initialization of next E step
         for(m in 1:num_cores){
@@ -991,6 +1009,14 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   # Another E step for loglik calculation (number draws = M)
+  
+  # Note: Assume that at end of EM algorithm, which(diag(cov) > 0) corresponds with the
+  # sampling restrictions specified within EM algorithm:
+    # Restrict sampling such that variables are NOT sampled if:
+    ## random effect for the variable was penalized to zero in a previous M step
+    ## fixed effect for the variable was penalized to zero in a prevoius M step
+    ## Make sure to always keep random intercept
+  
   if(sampler == "independence"){
     samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=which(diag(cov) > 0), y=y, X=X, Z=Znew2, nMC=nMC, trace = trace, family = family, group = group, 
                                      d = d, okindex = okindex, nZ = ncol(Z), gibbs = gibbs, uold = as.numeric(u0[nrow(u0),]))
@@ -1051,16 +1077,16 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       init_lst = list()
       if(nrow(init_draws) == num_cores){
         for(m in 1:num_cores){
-          init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+          init_lst[[m]] = list(alpha = as.array(init_draws[m,cols_k]))
         }
       }else{ # nrow(init_draws) < num_cores
         for(m in 1:nrow(init_draws)){
-          init_lst[[m]] = list(alpha = as.numeric(init_draws[m,cols_k]))
+          init_lst[[m]] = list(alpha = as.array(init_draws[m,cols_k]))
         }
         # If current number of cores exceeds previously used number of cores,
         # recycle initial points from first chain
         for(m in (nrow(init_draws)+1):num_cores){
-          init_lst[[m]] = list(alpha = as.numeric(init_draws[1,cols_k]))
+          init_lst[[m]] = list(alpha = as.array(init_draws[1,cols_k]))
         }
       }
       
@@ -1070,7 +1096,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       
       stan_out = as.matrix(stan_fit)
       # Exclude lp__ column of output
-      draws_mat = stan_out[,1:length(ranef_idx)]
+      draws_mat = as.matrix(stan_out[,1:length(ranef_idx)])
       
       if(nrow(draws_mat) == nMC){
         u0[,cols_k] = draws_mat
@@ -1194,7 +1220,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
           
           # initialize posterior random draws
           init_lst = list()
-          init_lst[[1]] = list(alpha = uold[cols_k])
+          init_lst[[1]] = list(alpha = as.array(uold[cols_k]))
           
           stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, init = init_lst,
                                      iter = nMC_report + nMC_burnin, warmup = nMC_burnin, 

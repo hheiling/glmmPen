@@ -25,6 +25,8 @@ number of cases. Currently, the formula does not allow specification of an offse
 For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 See \code{family} options in the Details section.}
 
+\item{group_X}{vector ...}
+
 \item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 

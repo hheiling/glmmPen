@@ -271,6 +271,9 @@ XZ_std = function(fD_out, group_num){
     }
   }
   
+  colnames(X_std) = colnames(X)
+  colnames(Z_std) = colnames(fD_out$Z)
+  
   return(list(X_std = X_std, Z_std = Z_std, X_center = X_center, X_scale = X_scale,
               Z_center = Z_center, Z_scale = Z_scale))
 }
@@ -278,7 +281,7 @@ XZ_std = function(fD_out, group_num){
 
 #' @importFrom ncvreg setupLambda
 #' @export
-LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 20,
+LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
                        penalty.factor = NULL){
   # Borrowed elements from `ncvreg` function
   n = nrow(X)
