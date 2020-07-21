@@ -15,7 +15,7 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
   M = 10^4, gibbs = T, sampler = c("stan", "random_walk",
   "independence"), adapt_RW_options = adaptControl(),
   covar = c("unstructured", "independent"), var_start = 3,
-  fit_type = 2, max_cores = 1)
+  fit_type = 1, max_cores = 1)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
@@ -55,6 +55,8 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
+
+\item{group_X}{vector ...}
 
 \item{nMC}{a positive integer for the initial number of Monte Carlo draws}
 
@@ -99,11 +101,10 @@ greater than 7 (i.e. high dimensional), then the algorithm automatically assumes
 independent covariance structure (covar switched to "independent").}
 
 \item{fit_type}{integer specifying the verion of the grouped coordinate descent algorithm to use.
-Default equals 2, the 'naive fit', assuming that the random effects covariates do not need any
+Default equals 1, the 'naive fit', assuming that the random effects covariates do not need any
 additional standardization or adjustments to account for absence of orthogonalization.
-For the time being, this version is recommended. Version 4 adds standardization of the random
-effects covariates compared to version 2. Version 1 adds an adjustment to account for absence
-of orthogonalization, and version 3 adds standardization compared to version 1.}
+For the time being, this version is recommended. Version 2 adds standardization of the random
+effects covariates compared to version 1.}
 }
 \value{
 a list with the following elements:

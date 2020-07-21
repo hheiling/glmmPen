@@ -240,13 +240,13 @@ M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
   dims = c(p, N, d, q, M, J_XZ, conv_CD, maxit_CD)
   
   if(fit_type == 1){
-    coef_new = grp_CD_XZ_B1(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 2){
     coef_new = grp_CD_XZ_B2(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 3){
-    coef_new = grp_CD_XZ_B1_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 4){
+  }else if(fit_type == 2){
     coef_new = grp_CD_XZ_B2_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+  }else if(fit_type == 3){
+    coef_new = grp_CD_XZ_D2(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
+  }else if(fit_type == 4){
+    coef_new = grp_CD_XZ_D2_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
   }else{
     stop("fit_type", fit_type, "not available \n")
   }

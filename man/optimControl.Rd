@@ -11,7 +11,7 @@ optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_burnin = 500,
   maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
   covar = c("unstructured", "independent"), sampler = c("stan",
   "random_walk", "independence"), gibbs = T, var_start = 3,
-  fit_type = 2, max_cores = 1)
+  fit_type = 1, max_cores = 1)
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
@@ -57,11 +57,10 @@ independence sampler ("independence").}
 Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects}
 
 \item{fit_type}{integer specifying the verion of the grouped coordinate descent algorithm to use.
-Default equals 2, the 'naive fit', assuming that the random effects covariates do not need any
+Default equals 1, the 'naive fit', assuming that the random effects covariates do not need any
 additional standardization or adjustments to account for absence of orthogonalization.
-For the time being, this version is recommended. Version 4 adds standardization of the random
-effects covariates compared to version 2. Version 1 adds an adjustment to account for absence
-of orthogonalization, and version 3 adds standardization compared to version 1.}
+For the time being, this version is recommended. Version 2 adds standardization of the random
+effects covariates compared to version 1.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{optimControl}") 

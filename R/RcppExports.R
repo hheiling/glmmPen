@@ -47,6 +47,14 @@ grp_CD_XZ_B2_std <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, f
     .Call('_glmmPen_grp_CD_XZ_B2_std', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
 }
 
+grp_CD_XZ_D2 <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_D2', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
+grp_CD_XZ_D2_std <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params) {
+    .Call('_glmmPen_grp_CD_XZ_D2_std', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, XZ_group, K, penalty, params)
+}
+
 #' Obtaining Rejection Sampling Monte Carlo Draws
 #' 
 #' Description

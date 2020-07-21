@@ -93,7 +93,7 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
                         maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
                         covar = c("unstructured","independent"),
                         sampler = c("stan","random_walk","independence"), gibbs = T, 
-                        var_start = 3.0, fit_type = 2, max_cores = 1){
+                        var_start = 3.0, fit_type = 1, max_cores = 1){
   
   # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
   if(sum(c(nMC_start, nMC_max, maxitEM) %% 1) > 0 | sum(c(nMC_start, nMC_max, maxitEM) <= 0) > 0){
