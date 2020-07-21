@@ -196,7 +196,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     
   } # end j loop for lambda1_range
   
-  colnames(res) = c("lambda0","lambda1","BICh","BIC","LogLik","Non_0_fef","Non_0_ref", "Non_0_coef")
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
   return(list(results = res, out = fout, coef = coef))
