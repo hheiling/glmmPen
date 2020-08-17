@@ -17,7 +17,7 @@ using namespace arma;
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
 
 // [[Rcpp::export]]
-arma::vec grp_CD_XZ_D2(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
+arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
                       const arma::vec& group,
                       SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
                       arma::vec beta, const arma::vec& offset,
