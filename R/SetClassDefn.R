@@ -23,8 +23,8 @@ pglmmObj = setRefClass("pglmmObj",
               Z = "dgCMatrix",
               frame = "data.frame",
               sampling = "character",
-              selection_FullResults = "matrix",
-              optim_results = "matrix",
+              results_all = "matrix",
+              results_optim = "matrix",
               extra = "list"
             ),
             methods = list(
@@ -100,8 +100,8 @@ pglmmObj = setRefClass("pglmmObj",
                 # BIC_ICQ <<- x$BIC
                 # penalty <<- x$penalty
                 sampling <<- x$sampling
-                selection_FullResults <<- x$selection_results
-                optim_results <<- x$optim_results
+                results_full <<- x$selection_results
+                results_optim <<- x$optim_results
                 
                 extra <<- list(okindex = x$extra$okindex, 
                                Znew2 = x$extra$Znew2, coef = x$coef)
