@@ -18,11 +18,13 @@
 #' Rows correspond with the rows of the results matrix.}
 #'  
 #' @importFrom stringr str_c
+#' @importFrom bigmemory as.big.matrix describe
 #' @export
 select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                       returnMC = T, trace = 0, u_init = NULL, coef_old = NULL, 
+                       trace = 0, u_init = NULL, coef_old = NULL, 
+                       full_model = T,
                        adapt_RW_options = adaptControl(),
                        optim_options = optimControl()){
   
@@ -52,7 +54,6 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   sampler = optim_options$sampler
   gibbs = optim_options$gibbs
   var_start = optim_options$var_start
-  fit_type = optim_options$fit_type
   max_cores = optim_options$max_cores
   
   covar = covar[1]
@@ -81,11 +82,54 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   # Set null deviance arbitrarily to 1 for the moment
   nullDev = 1.0
   
+  if(is.null(offset)){
+    offset = rep(0, length(dat$y))
+  }
+  
+  # If need to calculate full model for BICq calculation
+  ## Use minimum lambda in range of lambda
+  if(full_model == T){
+    # Find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
+    lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = fam, nlambda = 2)
+    lam_min = lam_MaxMin[2]
+    # Fit 'full' model
+    out = try(fit_dat_B(dat, lambda0 = lam_min, lambda1 = lam_min, 
+                        nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = 10^4,
+                        family = family, offset_fit = offset, group_X = group_X,
+                        penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                        trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
+                        coef_old = NULL, u_init = NULL, ufull_describe = NULL,
+                        gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
+                        M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
+                        covar = covar, var_start = var_start,
+                        max_cores = max_cores))
+    
+    
+    if(is.character(out)){
+      print("Issue with full model fit, no BICq calculation will be completed")
+      ufull_describe = NULL
+    }else{
+      ufull = out$u
+      if(any(is.na(ufull))){
+        print("Issue with full model fit, no BICq calculation will be completed")
+        ufull_describe = NULL 
+      }else{
+        ufull_big = bigmemory::as.big.matrix(ufull)
+        ufull_describe = bigmemory::describe(ufull_big)
+      }
+      ufull = NULL
+    }
+    
+    
+  }
+  
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
-  BICold = BIC = BIC2old2 = BIC2= Inf
+  BICold = BIC = Inf
   BIChold = BICh = Inf
-  res = matrix(0, n1*n2, 8)
+  BICqold = BICq = Inf
+  
+  res = matrix(0, n1*n2, 9)
   coef = NULL
   coef_oldj0 = NULL
   uj0 = NULL
@@ -123,11 +167,11 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                           family = family, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
-                          coef_old = coef_old0, u_init = uold,
+                          coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
                           gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
-                          returnMC = returnMC, t = t,
+                          returnMC = T, t = t,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start, fit_type = fit_type,
+                          covar = covar, var_start = var_start,
                           max_cores = max_cores))
       
       
@@ -159,15 +203,27 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
         BICold = BIC
       }
       
+      BICq = out$BICq
+      if(!is.na(BICq)){
+        if(!is.numeric(BICq)) BICq = Inf
+        if(length(BICq) != 1) BICq = Inf
+        
+        if(BICq < BICqold){
+          fout[["BICq"]] = out
+          BICqold = BICq
+        }
+      }
+      
       res[(j-1)*n1+i,1] = lambda0_range[i]
       res[(j-1)*n1+i,2] = lambda1_range[j]
       res[(j-1)*n1+i,3] = BICh
       res[(j-1)*n1+i,4] = BIC
+      res[(j-1)*n1+i,5] = BICq
       # res[(j-1)*n1+i,4] = out$llb
-      res[(j-1)*n1+i,5] = out$ll
-      res[(j-1)*n1+i,6] = sum(out$coef[2:ncol(dat$X)] !=0)
-      res[(j-1)*n1+i,7] = sum(diag(out$sigma) !=0)
-      res[(j-1)*n1+i,8] = sum(out$coef !=0)
+      res[(j-1)*n1+i,6] = out$ll
+      res[(j-1)*n1+i,7] = sum(out$coef[2:ncol(dat$X)] !=0)
+      res[(j-1)*n1+i,8] = sum(diag(out$sigma) !=0)
+      res[(j-1)*n1+i,9] = sum(out$coef !=0)
       # if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
       # if(maxitEM > 1) res[(j-1)*n1+i,8] = out$ll
       # res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
@@ -182,7 +238,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       }
       ## Calculate deviance
       Dev = 2*(sat_ll - out$ll)
-      if(Dev / nullDev < 0.05){ # changed from Dev / nullDev < 0.01
+      if(Dev / nullDev < 0.01){
         print("Reached model saturation")
         saturated = TRUE
         break
@@ -196,7 +252,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     
   } # end j loop for lambda1_range
   
-  colnames(res) = c("lambda0","lambda1","BICh","BIC","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
   return(list(results = res, out = fout, coef = coef))

@@ -1,461 +1,130 @@
  
 
 
-#' Calculate Monte Carlo draws
+
+############################################################################
+# Updated for adaptive random walk metropolis w/in gibbs with random scan
+# Adapt proposal SD only during burn-in period
+# Output a big.matrix for the posterior draws 
+############################################################################
+
+#' @name sample_mc_adapt_BigMat
+#' @aliases sample_mc2_BigMat
 #' 
-#' \code{sample.mc2} calculates the Monte Carlo draws by either Rejection sampling or 
-#' Metropolis-within-Gibbs sampling needed for Monte Carlo Expectation Conditional Minimization (MCECM)
-#'
+#' @title Calculate Monte Carlo draws using Metropolis-within-Gibbs
+#' 
+#' @description Samples draws from the posterior distribution of the random effects using 
+#' Metropolis-within-Gibbs. \code{sample_mc_adapt_BigMat} samples using adaptive 
+#' random walk and \code{sample_mc2_BigMat} samples using independence sampling. See
+#' \code{\link{adaptControl}} for possible adaptive random walk adjustments. Draws are automatically
+#' thinned to only record every fifth sample.
+#' 
 #' @inheritParams fit_dat_B
-#' @param cov the random effects covariance matrix estimated from the last M step of the EM algorithm
+#' @param coef a numeric vector of the fixed effects coefficients (from the latest EM iteration or
+#' the final model of interest)
+#' @param ranef_idx a vector of integers describing which random effects are non-zero (i.e. which
+#' diagonal elements of the sigma matrix are non-zero)
 #' @param y a numeric vector of the response variable
 #' @param X a model matrix of the fixed effects covariates
-#' @param Z a sparse model matrix of the random effects
+#' @param Z a sparse model matrix of the random effects multiplied by the lower triangular cholesky
+#' decomposition of the sigma matrix (from the latest EM iteration or the final model of interest)
 #' @param group a factor vector of the grouping variable, converted to a factor of 
 #' consecutive numeric integers
 #' @param d integer, the number of groups present (number factors of the group vector)
 #' @param okindex ?
-#' @param uold a matrix of the Monte Carlo draws from the last E step of the EM algorithm
+#' @param uold a matrix with a single row comprised of the last Monte Carlo draw from either the 
+#' most recent E step of the EM algorithm or the final model
+#' @param proposal_SD a matrix of dimension (number of groups)x(number of random effects) that
+#' gives the proposal standard deviation for the adaptive random walk. The \code{glmmPen} MCEM 
+#' algorithm initializes the proposal standard deviation as 1.0 for all variables and groups
+#' and is updated at the start of every E step when the Metropolis-within-Gibbs adaptive random walk
+#' algorithm is used. 
+#' @param batch integer specifying how many batches of posterior draws has already been sampled in
+#' the MCEM algorithm. As the batch number increases, the proposal standard deviation for the adaptive 
+#' random walk algorithm is adjusted by a smaller amount.
+#' @param batch_length an integer specifying the number of posterior draws (ignoring thinning) used
+#' to evaluate the acceptance rate of the random walk algorithm. This acceptance rate is then used
+#' to adjust the proposal standard deviation if necessary.
+#' @param offset
+#' @param burnin_batchnum an integer specifying the number of batches of (unthinned) posterior draws
+#' to allow adjustments to the proposal standard deviation. For the MCEM algorithm, it is recommended
+#' to allow for the adjustment of the proposal standard deviation at the beginning of each E step.
 #' 
 #' @return a list made of the following components:
-#' \item{u0}{a matrix of the Monte Carlo draws (from Rejection sampling if gibbs = F, or 
-#' from Metropolis-within-Gibbs sampling if gibbs = T). Number rows = nMC, number columns = 
-#' (number random effects)x(number groups). Organization of columns: first by random effect variable,
-#' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
-#' \item{switch}{logical, did the sampling scheme switch from Rejection sampling to 
-#' Metropolis-within-Gibbs sampling?}
-#'
-#' @export
-sample.mc2 = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, nZ, okindex,
-                      gibbs = F , uold){
-  
-  # find tau for rejection sampler (Booth 1999) by first maximizing u
-  if(length(okindex) > 0 & gibbs == F){
-    fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% matrix(coef, ncol=1)), family = f)
-    uhat = fitu$coef
-    uhat[is.na(uhat)] = 0
-    eta = X %*% matrix(coef, ncol=1) + Z[,okindex] %*% uhat
-  }else{
-    uhat  = rep(0, ncol(Z))
-    eta = X %*% matrix(coef, ncol=1) 
-  }
-  
-  #if(trace == 1) print(uhat)
-  # calculate tau
-  
-  if(family == "binomial" & gibbs == F){
-    tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-  }else if(family == "poisson" & gibbs == F){
-    tau = dpois(y, lambda = exp(eta), log = T)
-  }
-  
-  #if(any(tau == 0)) tau = tau - 10^-20
-  # matrix to hold accepted samples
-  u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-  #u0 = Matrix(0 , nMC, ncol(Z), sparse = T)
-  
-  # fitted
-  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1))
-  #generate samples for each i
-  
-  error_out = F
-  q = ncol(Z) / d
-  gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-  
-  if(gibbs == F){ # Rejection sampling
-    
-    for(i in 1:d){
-      
-      if(error_out){
-        next
-      }
-      
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
-      if(length(index) == 0) next
-      
-      draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-                              y[select], tau[select], nMC, trace)
-      
-      # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-      if(nrow(draws) == nMC){
-        u0[,index] = draws
-      }else{ # If too small an acceptance rate
-        cat("switched to gibbs sampling (single round) \n")
-        error_out = T
-        next
-      }
-      
-    }
-    
-    # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-    # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-    if(error_out){
-      for(i in 1:d){
-        select = group == i
-        index = seq(i, ncol(Z), by = d)
-        ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-        index = index[which(diag(cov) != 0)]
-        if(length(index) == 0) next
-        
-        gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                           matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                           y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])),
-                                           trace)
-        u0[,index] = gibbs_list$u
-        gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-      }
-    }
-    
-  }else{ # Gibbs sampling
-    for(i in 1:d){
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
-      if(length(index) == 0) next
-      
-      gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                         matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                         y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                         trace)
-      u0[,index] = gibbs_list$u
-      gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-    }
-  }
-  # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-  
-  if(gibbs == F){
-    cat("switch: ", error_out, "\n")
-  }
-  
-  # return(u0)
-  # switch: variable indicating if switched from rejection sampling to gibbs sampling
-  if(trace == 2 && !anyNA(gibbs_accept_rate)){
-    return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, switch = error_out))
-  }else{
-    return(list(u0 = u0, switch = error_out))
-  }
-  
-}
-
-############################################################################
-# Updated to output big.matrix (for use in fit_dat_MstepB() function)
-############################################################################
-
-#' @importFrom bigmemory big.matrix describe
-#' @export
-sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, nZ, okindex,
-                             gibbs = F , uold){
-  
-  # find tau for rejection sampler (Booth 1999) by first maximizing u
-  if(length(okindex) > 0 & gibbs == F){
-    fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% matrix(coef, ncol=1)), family = f)
-    uhat = fitu$coef
-    uhat[is.na(uhat)] = 0
-    eta = X %*% matrix(coef, ncol=1) + Z[,okindex] %*% uhat
-  }else{
-    uhat  = rep(0, ncol(Z))
-    eta = X %*% matrix(coef, ncol=1) 
-  }
-  
-  if(family == "binomial" & gibbs == F){
-    tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-  }else if(family == "poisson" & gibbs == F){
-    tau = dpois(y, lambda = exp(eta), log = T)
-  }else if(family == "gaussian" & gibbs == F){
-    s2 = sum((y-eta)*(y-eta)) / (length(y) - length(coef))
-    tau = dnorm(y, mean = eta, sd = sqrt(s2), log = T)
-  }
-  
-  # matrix to hold accepted samples
-  u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init = 0)
-  # u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-  
-  # fitted
-  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1))
-  #generate samples for each i
-  
-  error_out = F
-  q = ncol(Z) / d
-  gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-  
-  if(gibbs == F){ # Rejection sampling
-    
-    for(i in 1:d){
-      
-      if(error_out){
-        next
-      }
-      
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      # index = index[which(diag(cov) != 0)]
-      index = index[ranef_idx]
-      if(length(index) == 0) next
-      
-      draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-                              y[select], tau[select], nMC, trace)
-      
-      # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-      if(nrow(draws) == nMC){
-        u0[,index] = draws
-      }else{ # If too small an acceptance rate
-        cat("switched to gibbs sampling (single round) \n")
-        error_out = T
-        next
-      }
-      
-    }
-    
-    # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-    # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-    if(error_out){
-      for(i in 1:d){
-        select = group == i
-        index = seq(i, ncol(Z), by = d)
-        ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-        # index = index[which(diag(cov) != 0)]
-        index = index[ranef_idx]
-        if(length(index) == 0) next
-        
-        gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                           matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                           y[select], uhat[index], nMC, uold[index],
-                                           trace)
-        u0[,index] = gibbs_list$u
-        gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-      }
-    }
-    
-  }else{ # Gibbs sampling
-    for(i in 1:d){
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      # index = index[which(diag(cov) != 0)]
-      index = index[ranef_idx]
-      if(length(index) == 0) next
-      
-      gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                         matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                         y[select], uhat[index], nMC, uold[index], 
-                                         trace)
-      u0[,index] = gibbs_list$u
-      gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
-    }
-  }
-  # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-  
-  if(gibbs == F){
-    cat("switch: ", error_out, "\n")
-  }
-  
-  # return(u0)
-  # switch: variable indicating if switched from rejection sampling to gibbs sampling
-  if(trace == 2 && !anyNA(gibbs_accept_rate)){
-    return(list(u0 = describe(u0), gibbs_accept_rate = gibbs_accept_rate, switch = error_out))
-  }else{
-    return(list(u0 = describe(u0), switch = error_out))
-  }
-  
-}
-
-############################################################################
-# Updated for adaptive random walk metropolis w/in gibbs with random scan
-# Adapt proposal SD only during burn-in period
-############################################################################
-
-#' @export
-sample_mc_adapt = function(coef, cov, y, X, Z, nMC, trace = 0, family, group, d, okindex,
-                           gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000,
-                           burnin_batchnum = 40){
-  
-  f = get(family, mode = "function", envir = parent.frame())
-  
-  # find tau for rejection sampler (Booth 1999) by first maximizing u
-  if(length(okindex) > 0 & gibbs == F){
-    fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% matrix(coef, ncol=1)), family = f)
-    uhat = fitu$coef
-    uhat[is.na(uhat)] = 0
-    eta = X %*% matrix(coef, ncol=1) + Z[,okindex] %*% uhat
-  }else{
-    uhat  = rep(0, ncol(Z))
-    eta = X %*% matrix(coef, ncol=1) 
-  }
-  
-  #if(trace == 1) print(uhat)
-  # calculate tau
-  
-  if(family == "binomial" & gibbs == F){
-    tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-  }else if(family == "poisson" & gibbs == F){
-    tau = dpois(y, lambda = exp(eta), log = T)
-  }
-  
-  #if(any(tau == 0)) tau = tau - 10^-20
-  # matrix to hold accepted samples
-  u0 = matrix(0, nrow = nMC, ncol = ncol(Z))
-  # u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-  #u0 = Matrix(0 , nMC, ncol(Z), sparse = T)
-  
-  # fitted
-  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1))
-  #generate samples for each i
-  
-  error_out = F
-  q = ncol(Z) / d
-  gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-  gibbs_output = NULL
-  
-  if(gibbs == F){ # Rejection sampling
-    
-    for(i in 1:d){
-      
-      if(error_out){
-        next
-      }
-      
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
-      if(length(index) == 0) next
-      
-      draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-                              y[select], tau[select], nMC, trace)
-      
-      # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-      if(nrow(draws) == nMC){
-        u0[,index] = draws
-      }else{ # If too small an acceptance rate
-        cat("switched to gibbs sampling (single round) \n")
-        error_out = T
-        next
-      }
-      
-    }
-    
-    # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-    # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-    if(error_out){
-      for(i in 1:d){
-        select = group == i
-        index = seq(i, ncol(Z), by = d)
-        ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-        index = index[which(diag(cov) != 0)]
-        if(length(index) == 0) next
-        var_index = which(diag(cov) != 0)
-        
-        gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                                matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                                y[select], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                                matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                                batch_length, offset, burnin_batchnum, trace)
-        
-        u0[,index] = gibbs_output[1:nMC,]
-        gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-        proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      }
-      if(!is.null(gibbs_output)){
-        batch = gibbs_output[(nMC+3),1]
-      }
-    }
-    
-  }else{ # Gibbs sampling
-    for(i in 1:d){
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      index = index[which(diag(cov) != 0)]
-      if(length(index) == 0) next
-      var_index = which(diag(cov) != 0)
-      
-      gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                              y[select], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-                                              matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                              batch_length, offset, burnin_batchnum, trace)
-      
-      u0[,index] = gibbs_output[1:nMC,]
-      gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-      proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      
-    }
-    if(!is.null(gibbs_output)){
-      batch = gibbs_output[(nMC+3),1]
-    }
-    
-  }
-  # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-  
-  if(gibbs == F){
-    cat("switch from rejection to gibbs: ", error_out, "\n")
-  }
-  
-  # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
-  # if(!anyNA(gibbs_accept_rate)){
-  #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-  #               switch = error_out, proposal_SD = proposal_SD))
-  # }else{
-  #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
-  # }
-  
-  if(error_out == T | gibbs == T){
-    return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-                switch = error_out, updated_batch = batch,
-                proposal_SD = proposal_SD))
-  }else{
-    return(list(u0 = u0, switch = error_out))
-  }
-  
-}
-
-############################################################################
-# Updated for adaptive random walk metropolis w/in gibbs with random scan
-# Adapt proposal SD only during burn-in period
-# Output a sparse big.matrix for the posterior draws 
-############################################################################
-
-# Note: Only need to output sparse big.matrix of posterior draws when
-# number of variables (q) is large. If q large, would not specify 
-# rejection sampling in fit_dat algorithm.
-# Therefore, only need to specify sparse big.matrix when initial input
-# is gibbs = T
-
+#' \item{u0}{list of the information needed to attached to a big.matrix object. Use 
+#' \code{bigmemory::attach.big.matrix(u0)} to extract a big.matrix of the Monte Carlo draws of
+#' the random effect posterior distribution. Number rows = nMC, number columns = 
+#' (number random effects)*(number groups) = ncol(Z). Organization of columns: first by random effect 
+#' variable, then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
+#' \item{gibbs_accept_rate}{matrix of dimension (number groups)x(number random effects). Each entry
+#' gives the proportion of accepted draws for the particular random effect variable in group k 
+#' either in the entire \code{nMC} draws (for \code{sample_mc2_BigMat}) or for the last 
+#' \code{batch_length} draws.}
+#' \item{proposal_SD}{a matrix of dimension (number of groups)x(number of random effects) that is
+#' only output from \code{sample_mc_adapt_BigMat}. It records the updated proposal standard deviation
+#' for the particular random effect variable in group k.}
+#' \item{updated_batch}{integer specifying the updated number of batches of posterior draws that 
+#' have been sampled.}
+#' 
 #' @importFrom bigmemory big.matrix describe
 #' @export
 sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, okindex,
-                                  gibbs = F , uold, proposal_SD, batch, batch_length = 500, 
-                                  offset = 5000, burnin_batchnum = 40){
+                                  uold, proposal_SD, batch, batch_length = 100, 
+                                  offset = 0, burnin_batchnum = 500){
   
   f = get(family, mode = "function", envir = parent.frame())
   
-  # find tau for rejection sampler (Booth 1999) by first maximizing u
-  if(length(okindex) > 0 & gibbs == F){
-    fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% matrix(coef, ncol=1)), family = f)
-    uhat = fitu$coef
-    uhat[is.na(uhat)] = 0
-    eta = X %*% matrix(coef, ncol=1) + Z[,okindex] %*% uhat
-  }else{
-    uhat  = rep(0, ncol(Z))
-    eta = X %*% matrix(coef, ncol=1) 
+  uhat  = rep(0, ncol(Z))
+  eta = X %*% matrix(coef, ncol=1) 
+  
+  # matrix to hold accepted samples
+  u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init = 0)
+  # u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
+  
+  # fitted
+  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1))
+  #generate samples for each i
+  
+  q = ncol(Z) / d
+  gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
+  gibbs_output = NULL
+
+  for(i in 1:d){
+    select = group == i
+    index = seq(i, ncol(Z), by = d)
+    ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
+    # index = index[which(diag(cov) != 0)]
+    index = index[ranef_idx]
+    if(length(index) == 0) next
+    var_index = ranef_idx
+    
+    gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
+                                            y[select], nMC, uold[index], 
+                                            matrix(proposal_SD[i,var_index], nrow = 1), batch, 
+                                            batch_length, offset, burnin_batchnum, trace)
+    
+    u0[,index] = gibbs_output[1:nMC,]
+    gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
+    proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
+    
   }
   
-  if(family == "binomial" & gibbs == F){
-    tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-  }else if(family == "poisson" & gibbs == F){
-    tau = dpois(y, lambda = exp(eta), log = T)
-  }else if(family == "gaussian" & gibbs == F){
-    s2 = sum((y-eta)*(y-eta)) / (length(y) - length(coef))
-    tau = dnorm(y, mean = eta, sd = sqrt(s2), log = T)
-  }
+  
+  return(list(u0 = describe(u0), gibbs_accept_rate = gibbs_accept_rate, 
+              proposal_SD = proposal_SD, updated_batch = batch))
+  
+} # End sample_mc_adapt_BigMat()
+
+#' @rdname sample_mc_adapt_BigMat
+#'
+#' @importFrom bigmemory big.matrix describe
+#' @export
+sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, okindex,
+                             uold){
+  
+  uhat  = rep(0, ncol(Z))
+  eta = X %*% matrix(coef, ncol=1) 
   
   # matrix to hold accepted samples
   u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init = 0)
@@ -468,676 +137,38 @@ sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, fami
   error_out = F
   q = ncol(Z) / d
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-  gibbs_output = NULL
   
-  if(gibbs == F){ # Rejection sampling
+  
+  for(i in 1:d){
+    select = group == i
+    index = seq(i, ncol(Z), by = d)
+    ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
+    # index = index[which(diag(cov) != 0)]
+    index = index[ranef_idx]
+    if(length(index) == 0) next
     
-    for(i in 1:d){
-      
-      if(error_out){
-        next
-      }
-      
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      # index = index[which(diag(cov) != 0)]
-      index = ranef_idx
-      if(length(index) == 0) next
-      
-      draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-                              y[select], tau[select], nMC, trace)
-      
-      # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-      if(nrow(draws) == nMC){
-        u0[,index] = draws
-      }else{ # If too small an acceptance rate
-        cat("switched to gibbs sampling (single round) \n")
-        error_out = T
-        next
-      }
-      
-    }
-    
-    # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-    # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-    if(error_out){
-      for(i in 1:d){
-        select = group == i
-        index = seq(i, ncol(Z), by = d)
-        ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-        # index = index[which(diag(cov) != 0)]
-        index = index[ranef_idx]
-        if(length(index) == 0) next
-        var_index = ranef_idx
-        
-        gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                                matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                                y[select], nMC, uold[index], 
-                                                matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                                batch_length, offset, burnin_batchnum, trace)
-        
-        u0[,index] = gibbs_output[1:nMC,]
-        gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-        proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      }
-      if(!is.null(gibbs_output)){
-        batch = gibbs_output[(nMC+3),1]
-      }
-    }
-    
-  }else{ # Gibbs sampling
-    
-    for(i in 1:d){
-      select = group == i
-      index = seq(i, ncol(Z), by = d)
-      ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-      # index = index[which(diag(cov) != 0)]
-      index = index[ranef_idx]
-      if(length(index) == 0) next
-      var_index = ranef_idx
-      
-      gibbs_output = sample_mc_gibbs_adapt_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-                                              matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                              y[select], nMC, uold[index], 
-                                              matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                              batch_length, offset, burnin_batchnum, trace)
-      
-      u0[,index] = gibbs_output[1:nMC,]
-      gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-      proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-      
-    }
-    if(!is.null(gibbs_output)){
-      batch = gibbs_output[(nMC+3),1]
-    }
-    
+    gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
+                                       matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
+                                       y[select], uhat[index], nMC, uold[index], 
+                                       trace)
+    u0[,index] = gibbs_list$u
+    gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
   }
   
-  if(gibbs == F){
-    cat("switch from rejection to gibbs: ", error_out, "\n")
-  }
+  return(list(u0 = describe(u0), gibbs_accept_rate = gibbs_accept_rate))
   
-  if(error_out == T | gibbs == T){
-    return(list(u0 = describe(u0), gibbs_accept_rate = gibbs_accept_rate, 
-                switch = error_out, updated_batch = batch,
-                proposal_SD = proposal_SD))
-  }else{
-    return(list(u0 = describe(u0), switch = error_out))
-  }
   
-}
+} # End sample_mc2_BigMat
 
-
-##################################################################
-# Updated for adaptive metropolis w/in gibbs
-##################################################################
-
-# sample.mc3 = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-#                       gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000,
-#                       burnin_batchnum = 40){
-#   
-#   f = get(family, mode = "function", envir = parent.frame())
-#   
-#   # find tau for rejection sampler (Booth 1999) by first maximizing u
-#   if(length(okindex) > 0 & gibbs == F){
-#     fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% fit$coef[1:ncol(X)]), family = f)
-#     uhat = fitu$coef
-#     uhat[is.na(uhat)] = 0
-#     eta = X %*% fit$coef[1:ncol(X)] + Z[,okindex] %*% uhat
-#   }else{
-#     uhat  = rep(0, ncol(Z))
-#     eta = X %*% fit$coef[1:ncol(X)] 
-#   }
-#   
-#   #if(trace == 1) print(uhat)
-#   # calculate tau
-#   
-#   if(family == "binomial" & gibbs == F){
-#     tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-#   }else if(family == "poisson" & gibbs == F){
-#     tau = dpois(y, lambda = exp(eta), log = T)
-#   }
-#   
-#   #if(any(tau == 0)) tau = tau - 10^-20
-#   # matrix to hold accepted samples
-#   u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-#   #u0 = Matrix(0 , nMC, ncol(Z), sparse = T)
-#   
-#   # fitted
-#   fitted_mat = as.matrix(X %*% fit$coef[1:ncol(X)])
-#   #generate samples for each i
-#   
-#   error_out = F
-#   q = ncol(Z) / d
-#   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-#   
-#   if(gibbs == F){ # Rejection sampling
-#     
-#     for(i in 1:d){
-#       
-#       if(error_out){
-#         next
-#       }
-#       
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       
-#       draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-#                               y[select], tau[select], nMC, trace)
-#       
-#       # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-#       if(nrow(draws) == nMC){
-#         u0[,index] = draws
-#       }else{ # If too small an acceptance rate
-#         cat("switched to gibbs sampling (single round) \n")
-#         error_out = T
-#         next
-#       }
-#       
-#     }
-#     
-#     # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-#     # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-#     if(error_out){
-#       for(i in 1:d){
-#         select = group == i
-#         index = seq(i, ncol(Z), by = d)
-#         ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#         index = index[which(diag(cov) != 0)]
-#         if(length(index) == 0) next
-#         var_index = which(diag(cov) != 0)
-#         
-#         gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                            matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                            y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                            matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-#                                            batch_length, offset, burnin_batchnum, trace)
-#         
-#         u0[,index] = gibbs_output[1:nMC,]
-#         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#         
-#       }
-#       batch = gibbs_output[(nMC+3),1]
-#     }
-#     
-#   }else{ # Gibbs sampling
-#     for(i in 1:d){
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       var_index = which(diag(cov) != 0)
-#       
-#       gibbs_output = sample_mc_inner_gibbs2(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                          matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                          y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                          matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-#                                          batch_length, offset, burnin_batchnum, trace)
-#       
-#       u0[,index] = gibbs_output[1:nMC,]
-#       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#       
-#     }
-#     batch = gibbs_output[(nMC+3),1]
-#   }
-#   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-#   
-#   if(gibbs == F){
-#     cat("switch from rejection to gibbs: ", error_out, "\n")
-#   }
-#   
-#   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
-#   # if(!anyNA(gibbs_accept_rate)){
-#   #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#   #               switch = error_out, proposal_SD = proposal_SD))
-#   # }else{
-#   #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
-#   # }
-#   
-#   if(error_out == T | gibbs == T){
-#     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#                 switch = error_out, updated_batch = batch,
-#                 proposal_SD = proposal_SD))
-#   }else{
-#     return(list(u0 = u0, switch = error_out))
-#   }
-#   
-# }
-
-##################################################################
-# Updated to test manual update of proporal variance
-##################################################################
-
-# sample.mc_test = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-#                       gibbs = F , uold, proposal_SD){
-#   
-#   f = get(family, mode = "function", envir = parent.frame())
-#   
-#   # find tau for rejection sampler (Booth 1999) by first maximizing u
-#   if(length(okindex) > 0 & gibbs == F){
-#     fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% fit$coef[1:ncol(X)]), family = f)
-#     uhat = fitu$coef
-#     uhat[is.na(uhat)] = 0
-#     eta = X %*% fit$coef[1:ncol(X)] + Z[,okindex] %*% uhat
-#   }else{
-#     uhat  = rep(0, ncol(Z))
-#     eta = X %*% fit$coef[1:ncol(X)] 
-#   }
-#   
-#   #if(trace == 1) print(uhat)
-#   # calculate tau
-#   
-#   if(family == "binomial" & gibbs == F){
-#     tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-#   }else if(family == "poisson" & gibbs == F){
-#     tau = dpois(y, lambda = exp(eta), log = T)
-#   }
-#   
-#   #if(any(tau == 0)) tau = tau - 10^-20
-#   # matrix to hold accepted samples
-#   u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-#   #u0 = Matrix(0 , nMC, ncol(Z), sparse = T)
-#   
-#   # fitted
-#   fitted_mat = as.matrix(X %*% fit$coef[1:ncol(X)])
-#   #generate samples for each i
-#   
-#   error_out = F
-#   q = ncol(Z) / d
-#   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-#   
-#   if(gibbs == F){ # Rejection sampling
-#     
-#     for(i in 1:d){
-#       
-#       if(error_out){
-#         next
-#       }
-#       
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       
-#       draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-#                               y[select], tau[select], nMC, trace)
-#       
-#       # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-#       if(nrow(draws) == nMC){
-#         u0[,index] = draws
-#       }else{ # If too small an acceptance rate
-#         cat("switched to gibbs sampling (single round) \n")
-#         error_out = T
-#         next
-#       }
-#       
-#     }
-#     
-#     # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-#     # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-#     if(error_out){
-#       for(i in 1:d){
-#         select = group == i
-#         index = seq(i, ncol(Z), by = d)
-#         ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#         index = index[which(diag(cov) != 0)]
-#         if(length(index) == 0) next
-#         var_index = which(diag(cov) != 0)
-#         
-#         gibbs_output = sample_mc_inner_gibbs_test(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                               y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                               matrix(proposal_SD[i,var_index], nrow = 1), trace)
-#         
-#         u0[,index] = gibbs_output[1:nMC,]
-#         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#         
-#       }
-#     }
-#     
-#   }else{ # Gibbs sampling
-#     for(i in 1:d){
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       var_index = which(diag(cov) != 0)
-#       
-#       gibbs_output = sample_mc_inner_gibbs_test(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                             matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                             y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                             matrix(proposal_SD[i,var_index], nrow = 1), trace)
-#       
-#       u0[,index] = gibbs_output[1:nMC,]
-#       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#       
-#     }
-#   }
-#   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-#   
-#   if(gibbs == F){
-#     cat("switch from rejection to gibbs: ", error_out, "\n")
-#   }
-#   
-#   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
-#   # if(!anyNA(gibbs_accept_rate)){
-#   #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#   #               switch = error_out, proposal_SD = proposal_SD))
-#   # }else{
-#   #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
-#   # }
-#   
-#   if(error_out == T | gibbs == T){
-#     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#                 switch = error_out, proposal_SD = proposal_SD))
-#   }else{
-#     return(list(u0 = u0, switch = error_out))
-#   }
-#   
-# }
-
-##################################################################
-# Updated for adaptive random walk metropolis w/in gibbs
-##################################################################
-
-# sample_mc_rw = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-#                       gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000){
-#   
-#   f = get(family, mode = "function", envir = parent.frame())
-#   
-#   # find tau for rejection sampler (Booth 1999) by first maximizing u
-#   if(length(okindex) > 0 & gibbs == F){
-#     fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% fit$coef[1:ncol(X)]), family = f)
-#     uhat = fitu$coef
-#     uhat[is.na(uhat)] = 0
-#     eta = X %*% fit$coef[1:ncol(X)] + Z[,okindex] %*% uhat
-#   }else{
-#     uhat  = rep(0, ncol(Z))
-#     eta = X %*% fit$coef[1:ncol(X)] 
-#   }
-#   
-#   #if(trace == 1) print(uhat)
-#   # calculate tau
-#   
-#   if(family == "binomial" & gibbs == F){
-#     tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-#   }else if(family == "poisson" & gibbs == F){
-#     tau = dpois(y, lambda = exp(eta), log = T)
-#   }
-#   
-#   #if(any(tau == 0)) tau = tau - 10^-20
-#   # matrix to hold accepted samples
-#   u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-#   #u0 = Matrix(0 , nMC, ncol(Z), sparse = T)
-#   
-#   # fitted
-#   fitted_mat = as.matrix(X %*% fit$coef[1:ncol(X)])
-#   #generate samples for each i
-#   
-#   error_out = F
-#   q = ncol(Z) / d
-#   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-#   
-#   if(gibbs == F){ # Rejection sampling
-#     
-#     for(i in 1:d){
-#       
-#       if(error_out){
-#         next
-#       }
-#       
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       
-#       draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-#                               y[select], tau[select], nMC, trace)
-#       
-#       # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-#       if(nrow(draws) == nMC){
-#         u0[,index] = draws
-#       }else{ # If too small an acceptance rate
-#         cat("switched to gibbs sampling (single round) \n")
-#         error_out = T
-#         next
-#       }
-#       
-#     }
-#     
-#     # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-#     # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-#     if(error_out){
-#       for(i in 1:d){
-#         select = group == i
-#         index = seq(i, ncol(Z), by = d)
-#         ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#         index = index[which(diag(cov) != 0)]
-#         if(length(index) == 0) next
-#         var_index = which(diag(cov) != 0)
-#         
-#         gibbs_output = sample_mc_gibbs_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                               y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                               matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-#                                           batch_length, offset, trace)
-#         
-#         u0[,index] = gibbs_output[1:nMC,]
-#         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#         
-#       }
-#       batch = batch + nMC %/% 100
-#     }
-#     
-#   }else{ # Gibbs sampling
-#     for(i in 1:d){
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       var_index = which(diag(cov) != 0)
-#       
-#       gibbs_output = sample_mc_gibbs_rw(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                             matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                             y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                             matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-#                                         batch_length, offset, trace)
-#       
-#       u0[,index] = gibbs_output[1:nMC,]
-#       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#       
-#     }
-#     batch = batch + nMC %/% 100
-#   }
-#   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-#   
-#   if(gibbs == F){
-#     cat("switch from rejection to gibbs: ", error_out, "\n")
-#   }
-#   
-#   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
-#   # if(!anyNA(gibbs_accept_rate)){
-#   #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#   #               switch = error_out, proposal_SD = proposal_SD))
-#   # }else{
-#   #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
-#   # }
-#   
-#   if(error_out == T | gibbs == T){
-#     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#                 switch = error_out, updated_batch = batch,
-#                 proposal_SD = proposal_SD))
-#   }else{
-#     return(list(u0 = u0, switch = error_out))
-#   }
-#   
+# tau calculate for rejection sampling - discontinued
+# if(family == "binomial" & gibbs == F){
+#   tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
+# }else if(family == "poisson" & gibbs == F){
+#   tau = dpois(y, lambda = exp(eta), log = T)
+# }else if(family == "gaussian" & gibbs == F){
+#   s2 = sum((y-eta)*(y-eta)) / (length(y) - length(coef))
+#   tau = dnorm(y, mean = eta, sd = sqrt(s2), log = T)
 # }
 
 
-############################################################################
-# Updated for adaptive random walk metropolis w/in gibbs with random scan
-############################################################################
-
-# sample_mc_rw_rs = function(fit, cov, y, X, Z, nMC, trace = 0, family = family, group, d, nZ, okindex,
-#                         gibbs = F , uold, proposal_SD, batch, batch_length = 500, offset = 5000){
-#   
-#   f = get(family, mode = "function", envir = parent.frame())
-#   
-#   # find tau for rejection sampler (Booth 1999) by first maximizing u
-#   if(length(okindex) > 0 & gibbs == F){
-#     fitu = glm(y ~ Z[,okindex]-1, offset = (X %*% fit$coef[1:ncol(X)]), family = f)
-#     uhat = fitu$coef
-#     uhat[is.na(uhat)] = 0
-#     eta = X %*% fit$coef[1:ncol(X)] + Z[,okindex] %*% uhat
-#   }else{
-#     uhat  = rep(0, ncol(Z))
-#     eta = X %*% fit$coef[1:ncol(X)] 
-#   }
-#   
-#   #if(trace == 1) print(uhat)
-#   # calculate tau
-#   
-#   if(family == "binomial" & gibbs == F){
-#     tau = dbinom(y, size = 1, prob = exp(eta)/(1+exp(eta)), log = T)
-#   }else if(family == "poisson" & gibbs == F){
-#     tau = dpois(y, lambda = exp(eta), log = T)
-#   }
-#   
-#   #if(any(tau == 0)) tau = tau - 10^-20
-#   # matrix to hold accepted samples
-#   u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
-#   #u0 = Matrix(0 , nMC, ncol(Z), sparse = T)
-#   
-#   # fitted
-#   fitted_mat = as.matrix(X %*% fit$coef[1:ncol(X)])
-#   #generate samples for each i
-#   
-#   error_out = F
-#   q = ncol(Z) / d
-#   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
-#   
-#   if(gibbs == F){ # Rejection sampling
-#     
-#     for(i in 1:d){
-#       
-#       if(error_out){
-#         next
-#       }
-#       
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       
-#       draws = sample_mc_inner(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                               matrix(Z[select,index],ncol = length(index), nrow = sum(select)), 
-#                               y[select], tau[select], nMC, trace)
-#       
-#       # If sample_mc_inner did not error out (i.e. have too small an acceptance rate), then continue
-#       if(nrow(draws) == nMC){
-#         u0[,index] = draws
-#       }else{ # If too small an acceptance rate
-#         cat("switched to gibbs sampling (single round) \n")
-#         error_out = T
-#         next
-#       }
-#       
-#     }
-#     
-#     # If at any point the sample_mc_inner errored out due to too low of acceptance rate, then 
-#     # switch to gibbs sampling (redo entire u matrix as gibbs sampling)
-#     if(error_out){
-#       for(i in 1:d){
-#         select = group == i
-#         index = seq(i, ncol(Z), by = d)
-#         ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#         index = index[which(diag(cov) != 0)]
-#         if(length(index) == 0) next
-#         var_index = which(diag(cov) != 0)
-#         
-#         gibbs_output = sample_mc_gibbs_rw_rs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                           matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                           y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                           matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-#                                           batch_length, offset, trace)
-#         
-#         u0[,index] = gibbs_output[1:nMC,]
-#         gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#         proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#         
-#       }
-#       batch = batch + nMC %/% 100
-#     }
-#     
-#   }else{ # Gibbs sampling
-#     for(i in 1:d){
-#       select = group == i
-#       index = seq(i, ncol(Z), by = d)
-#       ## new code to limit to non-zero z, skipping elements of q where diag(sigma) are 0
-#       index = index[which(diag(cov) != 0)]
-#       if(length(index) == 0) next
-#       var_index = which(diag(cov) != 0)
-#       
-#       gibbs_output = sample_mc_gibbs_rw_rs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
-#                                         matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-#                                         y[select], uhat[index], nMC, as.numeric((uold[nrow(uold),index, drop = FALSE])), 
-#                                         matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-#                                         batch_length, offset, trace)
-#       
-#       u0[,index] = gibbs_output[1:nMC,]
-#       gibbs_accept_rate[i,] = matrix(gibbs_output[(nMC+1),], nrow = 1)
-#       proposal_SD[i,var_index] = matrix(gibbs_output[(nMC+2),], nrow = 1)
-#       
-#     }
-#     batch = batch + nMC %/% 100
-#   }
-#   # for each i, rbind the nMC samples together to make n*nMC x d matrix (d = dim(Z))
-#   
-#   if(gibbs == F){
-#     cat("switch from rejection to gibbs: ", error_out, "\n")
-#   }
-#   
-#   # switch: variable indicating if switched from rejection sampling to Metropolis-within-Gibbs sampling
-#   # if(!anyNA(gibbs_accept_rate)){
-#   #   return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#   #               switch = error_out, proposal_SD = proposal_SD))
-#   # }else{
-#   #   return(list(u0 = u0, switch = error_out, proposal_SD = proposal_SD))
-#   # }
-#   
-#   if(error_out == T | gibbs == T){
-#     return(list(u0 = u0, gibbs_accept_rate = gibbs_accept_rate, 
-#                 switch = error_out, updated_batch = batch,
-#                 proposal_SD = proposal_SD))
-#   }else{
-#     return(list(u0 = u0, switch = error_out))
-#   }
-#   
-# }
-
-
-
-
-
-
-
+###################################################################################################

@@ -10,7 +10,7 @@ Constructs control structures for penalized mixed model fitting.}
 lambdaControl(lambda0 = 0, lambda1 = 0)
 
 selectControl(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
-  BIC_option = c("BICh", "BIC"))
+  BIC_option = c("BICh", "BIC", "BICq"))
 }
 \arguments{
 \item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
@@ -30,7 +30,9 @@ Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
 
 \item{BIC_option}{character value specifing the selection criteria used to select the 'best' model.
 Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
-The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number observations)}
+The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
+observations). The "BICq" option specifies the BIC ICQ criterion, which requires a fit of 
+a full model (a small penalty is used for the fixed and random effects).}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 

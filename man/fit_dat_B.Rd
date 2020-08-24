@@ -11,11 +11,11 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
   group_X = 0:(ncol(dat$X) - 1), nMC_burnin = 500, nMC = 5000,
   nMC_max = 20000, t = 2, returnMC = T, nMC_report = 5000,
-  u_init = NULL, coef_old = NULL, maxitEM = 100, maxit_CD = 250,
-  M = 10^4, gibbs = T, sampler = c("stan", "random_walk",
-  "independence"), adapt_RW_options = adaptControl(),
-  covar = c("unstructured", "independent"), var_start = 3,
-  fit_type = 1, max_cores = 1)
+  u_init = NULL, coef_old = NULL, ufull_describe = NULL,
+  maxitEM = 100, maxit_CD = 250, M = 10^4, sampler = c("stan",
+  "random_walk", "independence"), adapt_RW_options = adaptControl(),
+  covar = c("unstructured", "independent"), var_start = 0.5,
+  max_cores = 1)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
@@ -81,10 +81,6 @@ coordinate descent algorithms used within each EM iteration. Default equals 250.
 
 \item{M}{positive integer specifying the number of posterior draws to use within the 
 Pajor log-likelihood calculation}
-
-\item{gibbs}{logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
-(if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})? 
-Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects}
 
 \item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
 should incorporate an adaptive random walk sampler (default, "random_walk") or an

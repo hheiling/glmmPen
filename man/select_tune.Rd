@@ -7,8 +7,8 @@ Minimization (MCECM)}
 \usage{
 select_tune(dat, offset = NULL, family, group_X = 0:(ncol(dat$X) - 1),
   penalty, lambda0_range, lambda1_range, alpha = 1,
-  gamma_penalty = switch(penalty[1], SCAD = 4, 3), returnMC = T,
-  trace = 0, u_init = NULL, coef_old = NULL,
+  gamma_penalty = switch(penalty[1], SCAD = 4, 3), trace = 0,
+  u_init = NULL, coef_old = NULL, full_model = T,
   adapt_RW_options = adaptControl(), optim_options = optimControl())
 }
 \arguments{
@@ -37,8 +37,6 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
-
-\item{returnMC}{logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
 (details ...)}

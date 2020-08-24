@@ -6,7 +6,7 @@
 
 Constructs control structure for the adaptive random walk Metropolis-within-Gibbs sampling procedure.}
 \usage{
-adaptControl(batch_length = 100, offset = 0, burnin_batchnum = 1000)
+adaptControl(batch_length = 100, offset = 0, burnin_batchnum = 500)
 }
 \arguments{
 \item{batch_length}{positive integer specifying the number of posterior draws to collect

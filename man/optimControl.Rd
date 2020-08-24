@@ -7,11 +7,10 @@
 Constructs the control structure for penalized mixed model fitting.}
 \usage{
 optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_burnin = 500,
-  nMC_start = 5000, nMC_max = 20000, nMC_report = 5000,
-  maxitEM = 100, maxit_CD = 250, M = 10000, t = 2,
+  nMC_start = 5000, nMC_max = 10000, nMC_report = 5000,
+  maxitEM = 100, maxit_CD = 200, M = 10000, t = 2,
   covar = c("unstructured", "independent"), sampler = c("stan",
-  "random_walk", "independence"), gibbs = T, var_start = 3,
-  fit_type = 1, max_cores = 1)
+  "random_walk", "independence"), var_start = 0.5, max_cores = 1)
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
@@ -51,16 +50,6 @@ independent covariance structure (covar switched to "independent").}
 \item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
 should incorporate an adaptive random walk sampler (default, "random_walk") or an
 independence sampler ("independence").}
-
-\item{gibbs}{logical, should Metropolis-within-Gibbs sampling be used for the Monte Carlo draws 
-(if \code{TRUE}) or should Rejection sampling be used for the draws (if \code{FALSE})? 
-Default of gibbs = T. Gibbs = F not recommended if greater than 5 random effects}
-
-\item{fit_type}{integer specifying the verion of the grouped coordinate descent algorithm to use.
-Default equals 1, the 'naive fit', assuming that the random effects covariates do not need any
-additional standardization or adjustments to account for absence of orthogonalization.
-For the time being, this version is recommended. Version 2 adds standardization of the random
-effects covariates compared to version 1.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{optimControl}") 

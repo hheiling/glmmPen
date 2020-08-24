@@ -40,12 +40,10 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                    offset = NULL, fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
-                   returnMC = T, trace = 0, tuning_options = selectControl()){
+                   trace = 0, tuning_options = selectControl()){
   # Things to address / Questions to answer:
-  ## Add option for different penalties
   ## Specify what fit_dat output will be
   ## Provide option for offset, weights
-  ## gibbs T / F: internally specify T or F depending on X and Z dimensions
   
   # Input modification and restriction for family
   if(is.character(family)){
@@ -135,20 +133,32 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     t = optim_options$t
     covar = optim_options$covar
     sampler = optim_options$sampler
-    gibbs = optim_options$gibbs
-    fit_type = optim_options$fit_type
     max_cores = optim_options$max_cores
     
     # Call fit_dat function
-    # fit_dat function found in "/R/fit_dat.R" file
+    # fit_dat_B function found in "/R/fit_dat_MstepB.R" file
+    
+    #
+    # dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
+    # family = "binomial", offset_fit = NULL,
+    # trace = 0, penalty = c("MCP","SCAD","lasso"),
+    # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
+    # group_X = 0:(ncol(dat$X)-1),
+    # nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2,
+    # returnMC = T, nMC_report = 5000, u_init = NULL, coef_old = NULL, 
+    # ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
+    # M = 10^4, sampler = c("stan","random_walk","independence"),
+    # adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
+    # var_start = 0.5, max_cores = 1
+    
     fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
                     conv_EM = conv_EM, conv_CD = conv_CD,
                     family = family, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                     nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
                     t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
-                    M = M, gibbs = gibbs, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, fit_type = fit_type, returnMC = returnMC, max_cores = max_cores)
+                    M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
+                    covar = covar, returnMC = T, max_cores = max_cores)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     optim_results = matrix(NA, nrow = 1, ncol = 1)
@@ -172,10 +182,18 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       }
     }
     
+    # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
+    # penalty, lambda0_range, lambda1_range,
+    # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
+    # returnMC = T, trace = 0, u_init = NULL, coef_old = NULL, 
+    # full_model = T,
+    # adapt_RW_options = adaptControl(),
+    # optim_options = optimControl()
+    
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                             returnMC = returnMC, trace = trace,
+                             group_X = group_X, returnMC = T, trace = trace,
                              adapt_RW_options = adapt_RW_options, 
                              optim_options = optim_options)
     
@@ -208,15 +226,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   # Things that should be included in fit_dat:
   ## (fill in later)
   
-  if(optim_options$gibbs){
-    sampling = "Metropolis-within-Gibbs Sampling"
-  }else{
-    if(fit$rej_to_gibbs < 3){
-      sampling = "Rejection Sampling"
-    }else{
-      sampling = "Metropolis-within-Gibbs Sampling"
-    }
-  }
+  sampling = switch(optim_options$sampler, stan = "Stan", 
+                    random_walk = "Metropolis-within-Gibbs Adaptive Random Walk Sampler",
+                    independence = "Metropolis-within-Gibbs Independence Sampler")
   
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y,

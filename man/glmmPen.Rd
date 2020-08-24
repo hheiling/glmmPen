@@ -10,7 +10,7 @@ glmmPen(formula, data = NULL, family = "binomial",
   penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
   optim_options = optimControl(), adapt_RW_options = adaptControl(),
-  returnMC = T, trace = 0, tuning_options = selectControl())
+  trace = 0, tuning_options = selectControl())
 }
 \arguments{
 \item{formula}{a two-sided linear formula object describing both the fixed-effects and 
@@ -57,8 +57,6 @@ that specifies optimization parameters.}
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
 Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"}
-
-\item{returnMC}{logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0 
 (details ...)}
