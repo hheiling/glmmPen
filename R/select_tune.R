@@ -23,8 +23,7 @@
 select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                       trace = 0, u_init = NULL, coef_old = NULL, 
-                       full_model = T,
+                       trace = 0, u_init = NULL, coef_old = NULL, full_model = T,
                        adapt_RW_options = adaptControl(),
                        optim_options = optimControl()){
   
@@ -52,7 +51,6 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   t = optim_options$t
   covar = optim_options$covar
   sampler = optim_options$sampler
-  gibbs = optim_options$gibbs
   var_start = optim_options$var_start
   max_cores = optim_options$max_cores
   
@@ -88,6 +86,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   
   # If need to calculate full model for BICq calculation
   ## Use minimum lambda in range of lambda
+  ufull_describe = NULL
   if(full_model == T){
     # Find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
     lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = fam, nlambda = 2)
@@ -99,7 +98,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                         trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                         coef_old = NULL, u_init = NULL, ufull_describe = NULL,
-                        gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
+                        maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
                         M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                         covar = covar, var_start = var_start,
                         max_cores = max_cores))
@@ -168,13 +167,12 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
-                          gibbs = gibbs, maxitEM = maxitEM, maxit_CD = maxit_CD,
-                          returnMC = T, t = t,
+                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start,
                           max_cores = max_cores))
       
-      
+
       if(is.character(out)) next
       
       # for restarting the next j for i = 1

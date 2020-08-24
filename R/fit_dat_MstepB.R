@@ -37,7 +37,6 @@
 #' @param t the convergence criteria is based on the average Euclidean distance between 
 #' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 #' Positive integer, default equals 2.
-#' @param returnMC logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.
 #' @param nMC_report positive integer specifying number of Monte Carlo posterior draws to return
 #' when the function ends. Default 5,000. Warning: the returned draws are formatted in a regular
 #' matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
@@ -86,7 +85,6 @@
 #' \item{BIC}{Regular BIC estimate}
 #' \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 #' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
-#' Output if \code{returnMC} = \code{TRUE}}
 #' \item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
 #' and each group (rows)}
 #' \item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
@@ -110,7 +108,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
                      nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2,
-                     returnMC = T, nMC_report = 5000, u_init = NULL, coef_old = NULL, 
+                     nMC_report = 5000, u_init = NULL, coef_old = NULL, 
                      ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
@@ -281,12 +279,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     penalty_factor[which(group_X[-1] == 0)] = 0
     penalty_factor[which(group_X[-1] != 0)] = 1
     
-    fit_naive = ncvreg(X[,-1], y, family = family, penalty = penalty, gamma = gamma_penalty,
+    fit_naive = ncvreg(as.matrix(X[,-1]), y, family = family, penalty = penalty, gamma = gamma_penalty,
                        alpha = alpha, lambda = lambda0, penalty.factor = penalty_factor)
     
     coef = as.numeric(fit_naive$beta)
     
-    if(trace == 1) print(coef)
+    if(trace >= 1) print(coef)
     
     # Initialize covariance matrix (cov)
     if(ncol(Z)/d > 1){
@@ -627,27 +625,21 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                  extra = list(okindex = okindex, Znew2 = Znew2),
                  gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD)
       
-      if(returnMC == T){
-        
-        if(nrow(u0) >= nMC_report){
-          # Take last nMC_report rows
-          r_start = nrow(u0) - nMC_report + 1
-          r_end = nrow(u0)
-          u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
-        }else{
-          # Use all available u0 entries
-          u0_out = bigmemory::as.matrix(u0)
-        }
-        out$u = u0_out
-        
+      if(nrow(u0) >= nMC_report){
+        # Take last nMC_report rows
+        r_start = nrow(u0) - nMC_report + 1
+        r_end = nrow(u0)
+        u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
       }else{
-        out$u = matrix(NA, nrow = 1, ncol = 1)
-      } # End if-else returnMC == T
+        # Use all available u0 entries
+        u0_out = bigmemory::as.matrix(u0)
+      }
+      out$u = u0_out
       
       return(out)
     } # End problem == T
     
-    if(trace == 1) print(coef)
+    if(trace >= 1) print(coef)
     
     gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
@@ -694,10 +686,15 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     if(nMC > nMC_max) nMC = nMC_max
     
     # now update limits  
-    print(c(i, nMC , diff[i], sum(coef!=0)))
+    update_limits = c(i, nMC , diff[i], sum(coef!=0))
+    names(update_limits) = c("Iter","nMC","EM diff","Non0 Coef")
+    print(update_limits)
     
-    print("cov:")
-    print(cov)
+    if(trace >= 1){
+      print("cov:")
+      print(cov)
+    }
+    
     if(nrow(cov) == 1){
       cov_record[i] = cov
     }
@@ -840,7 +837,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     nMC2 = nrow(u0)
     
-    if(trace == 1) print(diag(cov))
+    if(trace >= 1) print(diag(cov))
     gc()
   }
   
@@ -947,11 +944,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   } # End if-else sampler
   
  
-  
-  print("Updated proposal_SD:")
-  print(proposal_SD)
-  print("Updated batch:")
-  print(batch)
+  if(sampler == "random_walk"){
+    print("Updated proposal_SD:")
+    print(proposal_SD)
+    print("Updated batch:")
+    print(batch)
+  }
   
   # Calculate loglik using Pajor method (see logLik_Pajor.R)
   if(sum(diag(cov) == 0) == nrow(cov)){
@@ -1008,82 +1006,77 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                extra = list(okindex = okindex, Znew2 = Znew2), EM_iter = i)
   }
   
-  if(returnMC == T){
-    
-    if(nrow(u0) >= nMC_report){
-      # Take last nMC_report rows
-      r_start = nrow(u0) - nMC_report + 1
-      r_end = nrow(u0)
-      u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
-    }else{
-      if(sampler == "independence"){
-        samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
-                                  d = d, okindex = okindex, matrix(u0[nrow(u0),], nrow = 1))
-        u0_out = samplemc_out$u0
-        
-      }else if(sampler == "random_walk"){ 
-        # No adaptation at convergence point
-        samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
-                                       d = d, okindex = okindex, uold = matrix(u0[nrow(u0),], nrow = 1),
-                                       proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
-                                       offset = offset_increment, burnin_batchnum = 0)
-        u0_out = samplemc_out$u0
-        
-      }else if(sampler == "stan"){
-        
-        # Note: only use one chain here so that trace plots are an accurate representation 
-        # of a single chain
-        
-        u0 = matrix(0, nrow = nMC_report, ncol = ncol(Z))
-        ranef_idx=which(diag(cov) > 0)
-        uold = as.numeric(u0[nrow(u0),])
-        
-        if(family == "binomial" & link == "logit"){
-          stan_file = stanmodels$binomial_logit_model
+  if(nrow(u0) >= nMC_report){
+    # Take last nMC_report rows
+    r_start = nrow(u0) - nMC_report + 1
+    r_end = nrow(u0)
+    u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
+  }else{
+    if(sampler == "independence"){
+      samplemc_out = sample_mc2(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
+                                d = d, okindex = okindex, matrix(u0[nrow(u0),], nrow = 1))
+      u0_out = samplemc_out$u0
+      
+    }else if(sampler == "random_walk"){ 
+      # No adaptation at convergence point
+      samplemc_out = sample_mc_adapt(coef=coef[1:ncol(X)], cov=cov, y=y, X=X, Z=Znew2, nMC=nMC_report, trace = trace, family = family, group = group, 
+                                     d = d, okindex = okindex, uold = matrix(u0[nrow(u0),], nrow = 1),
+                                     proposal_SD = proposal_SD, batch = batch, batch_length = batch_length, 
+                                     offset = offset_increment, burnin_batchnum = 0)
+      u0_out = samplemc_out$u0
+      
+    }else if(sampler == "stan"){
+      
+      # Note: only use one chain here so that trace plots are an accurate representation 
+      # of a single chain
+      
+      u0 = matrix(0, nrow = nMC_report, ncol = ncol(Z))
+      ranef_idx=which(diag(cov) > 0)
+      uold = as.numeric(u0[nrow(u0),])
+      
+      if(family == "binomial" & link == "logit"){
+        stan_file = stanmodels$binomial_logit_model
+      }
+      
+      # For each group, sample from posterior distribution (sample the alpha values)
+      for(k in 1:d){
+        idx_k = which(group == k)
+        cols_k = seq(from = k, to = ncol(Z), by = d)
+        cols_k = cols_k[ranef_idx]
+        y_k = y[idx_k]
+        X_k = X[idx_k,]
+        if(length(cols_k) == 1){
+          Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
+        }else{ # length(cols_k) > 1
+          Z_k = Znew2[idx_k, cols_k]
         }
         
-        # For each group, sample from posterior distribution (sample the alpha values)
-        for(k in 1:d){
-          idx_k = which(group == k)
-          cols_k = seq(from = k, to = ncol(Z), by = d)
-          cols_k = cols_k[ranef_idx]
-          y_k = y[idx_k]
-          X_k = X[idx_k,]
-          if(length(cols_k) == 1){
-            Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
-          }else{ # length(cols_k) > 1
-            Z_k = Znew2[idx_k, cols_k]
-          }
-          
-          dat_list = list(N = length(idx_k), # Number individuals in group k
-                          q = length(ranef_idx), # number random effects
-                          eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
-                          y = y_k, # outcomes for group k
-                          Z = Z_k) # portion of Z matrix corresonding to group k
-          
-          # initialize posterior random draws
-          init_lst = list()
-          init_lst[[1]] = list(alpha = as.array(uold[cols_k]))
-          
-          stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, init = init_lst,
-                                     iter = nMC_report + nMC_burnin, warmup = nMC_burnin, 
-                                     show_messages = F, refresh = 0)
-          list_of_draws = extract(stan_fit)
-          u0[,cols_k] = list_of_draws$alpha
-          
-          u0_out = u0
-          
-        } # End k for loop
+        dat_list = list(N = length(idx_k), # Number individuals in group k
+                        q = length(ranef_idx), # number random effects
+                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                        y = y_k, # outcomes for group k
+                        Z = Z_k) # portion of Z matrix corresonding to group k
         
-      } # End if-else sampler
+        # initialize posterior random draws
+        init_lst = list()
+        init_lst[[1]] = list(alpha = as.array(uold[cols_k]))
+        
+        stan_fit = rstan::sampling(stan_file, data = dat_list, chains = 1, init = init_lst,
+                                   iter = nMC_report + nMC_burnin, warmup = nMC_burnin, 
+                                   show_messages = F, refresh = 0)
+        list_of_draws = extract(stan_fit)
+        u0[,cols_k] = list_of_draws$alpha
+        
+        u0_out = u0
+        
+      } # End k for loop
+      
+    } # End if-else sampler
     
-    } # End if-else nrow(u0)
-    
-    out$u = u0_out
-    
-  }else{
-    out$u = matrix(NA, nrow = 1, ncol = 1)
-  } 
+  } # End if-else nrow(u0)
+  
+  out$u = u0_out
+  
   
  # out$coef_record_all = coef_record_all
   if(!is.null(cov_record)){

@@ -10,10 +10,10 @@ fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
   trace = 0, penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
   group_X = 0:(ncol(dat$X) - 1), nMC_burnin = 500, nMC = 5000,
-  nMC_max = 20000, t = 2, returnMC = T, nMC_report = 5000,
-  u_init = NULL, coef_old = NULL, ufull_describe = NULL,
-  maxitEM = 100, maxit_CD = 250, M = 10^4, sampler = c("stan",
-  "random_walk", "independence"), adapt_RW_options = adaptControl(),
+  nMC_max = 20000, t = 2, nMC_report = 5000, u_init = NULL,
+  coef_old = NULL, ufull_describe = NULL, maxitEM = 100,
+  maxit_CD = 250, M = 10^4, sampler = c("stan", "random_walk",
+  "independence"), adapt_RW_options = adaptControl(),
   covar = c("unstructured", "independent"), var_start = 0.5,
   max_cores = 1)
 }
@@ -66,8 +66,6 @@ Default is 4.0 for SCAD and 3.0 for MCP.}
 the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 Positive integer, default equals 2.}
 
-\item{returnMC}{logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.}
-
 \item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
 when the function ends. Default 5,000. Warning: the returned draws are formatted in a regular
 matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
@@ -101,34 +99,6 @@ Default equals 1, the 'naive fit', assuming that the random effects covariates d
 additional standardization or adjustments to account for absence of orthogonalization.
 For the time being, this version is recommended. Version 2 adds standardization of the random
 effects covariates compared to version 1.}
-}
-\value{
-a list with the following elements:
-\item{coef}{a numeric vector of coefficients of fixed effects estimates and 
-non-zero estimates of the lower-triangular cholesky decomposition of the random effects
-covariance matrix (in vector form)}
-\item{sigma}{random effects covariance matrix}
-\item{lambda0, lambda1}{the penalty parameters input into the function}
-\item{covgroup}{Organization of how random effects coefficients are grouped.}
-\item{J}{a sparse matrix that transforms the non-zero elements of the lower-triangular cholesky 
-decomposition of the random effects covariance matrix into a vector. For unstructured
-covariance matrices, dimension of dimension q^2 x (q(q+1)/2) (where q = number of random effects).
-For independent covariance matrices, q^2 x q.}
-\item{ll}{estimate of the log likelihood, calculated using the Pajor method}
-\item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
-\item{BIC}{Regular BIC estimate}
-\item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
-then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)
-Output if \code{returnMC} = \code{TRUE}}
-\item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
-and each group (rows)}
-\item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
-random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
-each group (rows)}
-\item{dev}{deviance value}
-\item{rej_to_gibbs}{logical, did the Monte Carlo sampling switch from Rejection sampling 
-to Metropolis-within-Gibbs sampling due to unacceptably small acceptance rates in the Rejection sampling?
-Output only if started initially with Rejection sampling}
 }
 \description{
 Description

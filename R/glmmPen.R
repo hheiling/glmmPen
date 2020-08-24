@@ -145,7 +145,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
     # group_X = 0:(ncol(dat$X)-1),
     # nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2,
-    # returnMC = T, nMC_report = 5000, u_init = NULL, coef_old = NULL, 
+    # nMC_report = 5000, u_init = NULL, coef_old = NULL, 
     # ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
     # M = 10^4, sampler = c("stan","random_walk","independence"),
     # adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
@@ -158,7 +158,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                     nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
                     t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, returnMC = T, max_cores = max_cores)
+                    covar = covar, max_cores = max_cores)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     optim_results = matrix(NA, nrow = 1, ncol = 1)
@@ -185,7 +185,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     # penalty, lambda0_range, lambda1_range,
     # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-    # returnMC = T, trace = 0, u_init = NULL, coef_old = NULL, 
+    # trace = 0, u_init = NULL, coef_old = NULL, 
     # full_model = T,
     # adapt_RW_options = adaptControl(),
     # optim_options = optimControl()
@@ -193,7 +193,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                             group_X = group_X, returnMC = T, trace = trace,
+                             group_X = group_X, trace = trace,
                              adapt_RW_options = adapt_RW_options, 
                              optim_options = optim_options)
     
