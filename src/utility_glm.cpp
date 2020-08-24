@@ -317,7 +317,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
     sig = sqrt(s2);
   }
   
-  // Calculate llQ
+  // Calculate llQ (The Q1 portion of the Q function specified in Section 4 of Rashid et al paper)
   
   
   llQ = 0.0;
