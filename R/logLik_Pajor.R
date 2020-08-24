@@ -17,6 +17,7 @@ indicator_2 = function(bounds, samples){
 }
 
 # Pajor IS CAME Method for logLik calcuations
+#' @importFrom mvtnorm rmvnorm dmvnorm
 #' @export
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
   
@@ -139,72 +140,71 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
 # Pajor regular CAME Method for logLik calculations
 
 # Sample from prior, no importance sampling
-#' @export
-CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
-  
-  # Define variables
-  d = nlevels(group)
-  num_var = ncol(Z) / d
-  Gam = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
-  eta_fef = X %*% coef[1:ncol(X)]
-  # post_mean = colMeans(posterior)
-  # post_cov = sigma
-  
-  # Calculate bounds of the posterior for each dimension
-  bounds = apply(posterior[,], 2, range)
-  
-  ll = 0
-  
-  for(k in 1:d){
-    # Define group-specific individuals
-    ids = (group == k)
-    y_k = y[ids]
-    n_k = sum(ids)
-    
-    # Identify columns corresponding to group k
-    cols_all = seq(from = k, by = d, length.out = num_var)
-    # Restrict above colums to those belonging to variables with non-zero random effect variance
-    cols = cols_all[which(diag(sigma) != 0)]
-    Z_k = Z[ids,cols]
-    
-    # Sample M samples from the prior function
-    zero = rep(0, num_var)
-    I = diag(x = 1, nrow = num_var)
-    prior = rmvnorm(M, zero, I) # Mean 0, sigma I
-    
-    # Calculate density given importance samples
-    
-    ## Fixed-effects component of eta (linear predictor)
-    eta_fef_k = matrix(eta_fef[ids], nrow = 1)
-    ## Random-effects component of eta (linear predictor)
-    eta_ref = prior %*% t(Gam) %*% t(Z_k)
-    ## Full eta - fixed + random effects component
-    eta = eta_fef_k[rep(1, M),] + eta_ref
-    
-    # Calculate indicator function
-    indic = indicator(bounds[,cols], prior)
-    cat("proportion of samples inside bounds:", mean(indic), "\n")
-    
-    dens_k = rep(1, times = M)
-    
-    if(family == "binomial"){
-      prob_mat = exp(eta) / (1+exp(eta))
-      # Columns of prob_mat correspond to individuals
-      
-      for(i in 1:n_k){
-        dens_i = dbinom(y_k[i], size = 1, prob = prob_mat[,i], log = F)
-        # Multiply together all elements belonging to same alpha_m
-        dens_k = dens_k * dens_i
-      } # End i loop
-    }else{
-      stop("specified family not currently available")
-    }
-    
-    lik_k = mean(dens_k*indic)
-    ll_k = log(lik_k)
-    ll = ll + ll_k
-    
-  } # End k loop
-  
-  return(ll)
-} # End CAME function
+# CAME = function(posterior, y, X, Z, group, coef, sigma, family, M){
+#   
+#   # Define variables
+#   d = nlevels(group)
+#   num_var = ncol(Z) / d
+#   Gam = t(chol(sigma[which(diag(sigma)!=0),which(diag(sigma)!=0)]))
+#   eta_fef = X %*% coef[1:ncol(X)]
+#   # post_mean = colMeans(posterior)
+#   # post_cov = sigma
+#   
+#   # Calculate bounds of the posterior for each dimension
+#   bounds = apply(posterior[,], 2, range)
+#   
+#   ll = 0
+#   
+#   for(k in 1:d){
+#     # Define group-specific individuals
+#     ids = (group == k)
+#     y_k = y[ids]
+#     n_k = sum(ids)
+#     
+#     # Identify columns corresponding to group k
+#     cols_all = seq(from = k, by = d, length.out = num_var)
+#     # Restrict above colums to those belonging to variables with non-zero random effect variance
+#     cols = cols_all[which(diag(sigma) != 0)]
+#     Z_k = Z[ids,cols]
+#     
+#     # Sample M samples from the prior function
+#     zero = rep(0, num_var)
+#     I = diag(x = 1, nrow = num_var)
+#     prior = rmvnorm(M, zero, I) # Mean 0, sigma I
+#     
+#     # Calculate density given importance samples
+#     
+#     ## Fixed-effects component of eta (linear predictor)
+#     eta_fef_k = matrix(eta_fef[ids], nrow = 1)
+#     ## Random-effects component of eta (linear predictor)
+#     eta_ref = prior %*% t(Gam) %*% t(Z_k)
+#     ## Full eta - fixed + random effects component
+#     eta = eta_fef_k[rep(1, M),] + eta_ref
+#     
+#     # Calculate indicator function
+#     indic = indicator(bounds[,cols], prior)
+#     cat("proportion of samples inside bounds:", mean(indic), "\n")
+#     
+#     dens_k = rep(1, times = M)
+#     
+#     if(family == "binomial"){
+#       prob_mat = exp(eta) / (1+exp(eta))
+#       # Columns of prob_mat correspond to individuals
+#       
+#       for(i in 1:n_k){
+#         dens_i = dbinom(y_k[i], size = 1, prob = prob_mat[,i], log = F)
+#         # Multiply together all elements belonging to same alpha_m
+#         dens_k = dens_k * dens_i
+#       } # End i loop
+#     }else{
+#       stop("specified family not currently available")
+#     }
+#     
+#     lik_k = mean(dens_k*indic)
+#     ll_k = log(lik_k)
+#     ll = ll + ll_k
+#     
+#   } # End k loop
+#   
+#   return(ll)
+# } # End CAME function
