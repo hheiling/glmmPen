@@ -5,7 +5,7 @@
 #include <RcppArmadillo.h>
 #include <bigmemory/BigMatrix.h>
 #include "utility_glm.h"
-#include "utility_grpCD.h"
+#include "utility_CD.h"
 
 using namespace Rcpp;
 using namespace arma;
@@ -18,13 +18,13 @@ using namespace arma;
 
 // [[Rcpp::export]]
 arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
-                      const arma::vec& group,
-                      SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
-                      arma::vec beta, const arma::vec& offset,
-                      const char* family, int link, int init,
-                      const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
-                      const char* penalty, arma::vec params) {
-
+                    const arma::vec& group, 
+                    SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
+                    arma::vec beta, const arma::vec& offset,
+                    const char* family, int link, int init, double phi,
+                    const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
+                    const char* penalty, arma::vec params, int trace) {
+  
   // y = response vector
   // X = fixed effecs covariate matrix
   // Z = random effects matrix
@@ -76,6 +76,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
   // definition of nu provided below
   const char* bin = "binomial";
   const char* gaus = "gaussian";
+  const char* negbin = "negbin";
   
   // penalty parameters (for lasso, MCP, SCAD, elastic net)
   double lambda0 = params(0);
@@ -114,7 +115,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
   lam.subvec(J_X,J_XZ-1) = lambda1 * sqrt(K_vec.subvec(J_X,J_XZ-1));
   
   
-  // Recall link coding (see "M_step.R" for logic):
+  // Recall link coding (see "fit_dat_MstepB.R" for logic):
   // 10: logit, 11: probit, 12: cloglog
   // 20: log, 30: identity, 40: inverse
   
@@ -138,7 +139,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
   // Initialize eta and residual matrices
   //-------------------------------------------------------------------------------//
   
-  // Update eta
+  // Initialize eta
   for(k=0;k<d;k++){
     
     // Rows of X and Z to use
@@ -162,12 +163,14 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
     
   } // End k for loop
   
-  // Update residuals, determine initial nu
+  // Calculate initial residuals, determine initial nu
   for(i=0;i<N;i++){
-    tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu);
+    tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu, phi);
     resid.col(i) = tmp_out.subvec(0,M-1);
     nu = tmp_out(M);
   }
+  
+  // Rcout << "initial nu: " << nu << std::endl;
   
   // Note: resid in the above calculation is (y - mu), but really want (y-mu)/nu
   // Therefore, divide entire residual matrix by nu
@@ -448,7 +451,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
     
     // Re-calculate residuals from updated eta, update nu 
     for(i=0;i<N;i++){
-      tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu);
+      tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu, phi);
       resid.col(i) = tmp_out.subvec(0,M-1);
       nu = tmp_out(M);
     }
@@ -469,10 +472,26 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
   } // End while loop
   
   Rprintf("Number iterations in grouped coord descent: %i \n", iter);
+  Rcout << "final nu: " << nu << std::endl;
   
-  if(converged == 0){
+  // If negative binomial family, update phi (dispersion) estimate
+  // negbin variance: mu + phi * mu^2
+  // double phi_ml(arma::vec y, arma::mat eta, int link, int limit, double eps, double phi);
+  if(std::strcmp(family, negbin) == 0){
+    phi = phi_ml(y, eta, link, 150, conv, phi);
+    Rcout << "phi: " << phi << std::endl;
+  }
+  
+  if((converged == 0) & (trace >= 1)){
     // warning("grouped coordinate descent algorithm did not converge \n");
     Rcout << "grouped coordinate descent algorithm did not converge" << std::endl;
+  }
+  
+  if(std::strcmp(family, negbin) == 0){
+    arma::vec beta_phi(p+H+1);
+    beta_phi.subvec(0,p+H-1) = beta;
+    beta_phi(p+H) = phi;
+    return beta_phi;
   }
   
   return beta;
