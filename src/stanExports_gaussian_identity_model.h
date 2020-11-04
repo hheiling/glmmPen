@@ -33,7 +33,7 @@ static int current_statement_begin__;
 stan::io::program_reader prog_reader__() {
     stan::io::program_reader reader;
     reader.add_event(0, 0, "start", "model_gaussian_identity_model");
-    reader.add_event(19, 17, "end", "model_gaussian_identity_model");
+    reader.add_event(20, 18, "end", "model_gaussian_identity_model");
     return reader;
 }
 #include <stan_meta_header.hpp>
@@ -209,7 +209,7 @@ public:
             // model body
             current_statement_begin__ = 15;
             lp_accum__.add(normal_log<propto__>(alpha, 0, 1));
-            current_statement_begin__ = 16;
+            current_statement_begin__ = 17;
             lp_accum__.add(normal_log<propto__>(y, add(eta_fef, multiply(Z, alpha)), sigma));
         } catch (const std::exception& e) {
             stan::lang::rethrow_located(e, current_statement_begin__, prog_reader__());
