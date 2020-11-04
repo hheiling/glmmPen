@@ -50,7 +50,7 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
     
   }else if(sampler == "stan"){
     
-    u0 = big.matrix(nrow = nMC, ncol = ncol(Znew2)) # use ', init = 0' for sampling within EM algorithm
+    u0 = big.matrix(nrow = nMC, ncol = ncol(Znew2), init=0) # use ', init = 0' for sampling within EM algorithm
     
     if(family == "binomial" & link == "logit"){ 
       stan_file = stanmodels$binomial_logit_model
@@ -74,10 +74,11 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       cols_k = seq(from = k, to = ncol(Znew2), by = d)
       y_k = y[idx_k]
       X_k = X[idx_k,]
-      if(length(cols_k) == 1){
-        Z_k = matrix(Znew2[idx_k, cols_k], nrow = length(idx_k), ncol = length(cols_k))
-      }else{ # length(cols_k) > 1
-        Z_k = Znew2[idx_k, cols_k]
+      cols_use = cols_k[ranef_idx]
+      if(length(cols_use) == 1){
+        Z_k = matrix(Znew2[idx_k, cols_use], nrow = length(idx_k), ncol = length(cols_use))
+      }else{ # length(cols_use) > 1
+        Z_k = Znew2[idx_k, cols_use]
       }
       
       dat_list = list(N = length(idx_k), # Number individuals in group k
@@ -99,10 +100,10 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       # initialize posterior random draws
       init_lst = list()
       for(cr in 1:num_cores){
-        if(length(cols_k) == 1){
-          init_lst[[cr]] = list(alpha = as.array(uold[cols_k]))
-        }else{ # length(cols_k) > 1
-          init_lst[[cr]] = list(alpha = uold[cols_k])
+        if(length(cols_use) == 1){
+          init_lst[[cr]] = list(alpha = as.array(uold[cols_use]))
+        }else{ # length(cols_use) > 1
+          init_lst[[cr]] = list(alpha = uold[cols_use])
         }
       }
       
@@ -123,21 +124,25 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       
       # Find last elements for each chain for initialization of next E step
       for(m in 1:num_cores){
-        last_draws[m,cols_k] = draws_mat[nMC_chain*m,]
+        last_draws[m,cols_use] = draws_mat[nMC_chain*m,]
       }
       
       if(nrow(draws_mat) == nMC){
-        u0[,cols_k] = draws_mat
+        u0[,cols_use] = draws_mat
       }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
         start_row = nrow(draws_mat) - nMC + 1
         rows_seq = start_row:nrow(draws_mat)
-        u0[,cols_k] = draws_mat[rows_seq,]
+        u0[,cols_use] = draws_mat[rows_seq,]
       }
       
       
     } # End k for loop
     
   } # End if-else sampler
+  
+  if(any(is.na(u0[,]))){
+    print(head(u0[,]))
+  }
   
   return(list(u0 = describe(u0), proposal_SD = proposal_SD, gibbs_accept_rate = gibbs_accept_rate,
               updated_batch = batch))
