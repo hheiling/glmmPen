@@ -3,21 +3,43 @@
 #' 
 #' @title Control of Penalization Parameters and Selection Criteria
 #' 
-#' Constructs control structures for penalized mixed model fitting.
+#' @description Constructs control structures for penalized mixed model fitting.
+#' 
+#' @details If unspecified, the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
+#' automatically calculated. For an initial
+#' grid search using \code{\link{glmmPen}}, the range will be calculated in the same manner as 
+#' \code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
+#' small portion of max, range is composed of \code{nlambda} values spread evenly on the log scale.
+#' For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
+#' from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
+#' finer grid search. The new range spreads between the two lambda values nearest the 'best' lambda.
+#' 
+#' If the \code{BIC_option} is specified to be 'BICq', a full model assuming a small
+#' valued lambda penalty will be fit. For models with large numbers of random effects, the fitting
+#' of this full model could take substantial time. In order to avoid repetitive calculations of
+#' this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
+#' posterior draws will be saved in a .txt file. If the file already exits, the big.matrix of 
+#' posterior draws will be read using \code{bigmemory::read.big.matrix}
+#' (\code{bigmemory::read.big.matrix(filename, sep = ' ', type = 'double')}) and used in the BIC-ICQ 
+#' calcuations (the full model will not be fit again). If the file does not exist or \code{NULL} is specified and
+#' the 'BICq' \code{BIC_option} is selected, the full model will be fit and the full model posterior
+#' draws will be saved at the specified file location (using \code{bigmemory::write.big.matrix})
+#' or the working directory with generic filename "BICq_Posterior_Draws.txt" if \code{NULL} is specified.
 #' 
 #' @inheritParams fit_dat_B
-#' @param lambda0_seq a range of non-negative numeric penalty parameter for the fixed 
-#' effects parameters. If \code{NULL}, then a range will be calculated as described by (...).
-#' @param lambda1_seq a range of non-negative numeric penalty parameter for the grouped random 
-#' effects covariance parameters. If \code{NULL}, then a range will be calculated as described 
-#' by (...).
+#' @param lambda0_seq,lambda1_seq a range of non-negative numeric penalty parameter for the fixed 
+#' and random effect parameters, respectively. If \code{NULL}, then a range will be automatically 
+#' calculated. See 'Details' section for more details on these default calculations.
 #' @param nlambda positive integer specifying number of lambda with which to fit a model.
 #' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
 #' @param BIC_option character value specifing the selection criteria used to select the 'best' model.
 #' Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-#' observations). The "BICq" option specifies the BIC ICQ criterion, which requires a fit of 
+#' observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
 #' a full model (a small penalty is used for the fixed and random effects). 
+#' @param BICq_posterior character expressing the path and file name of a text file that currently stores
+#' or will store a \code{big.matrix} of the posterior draws from the full model if 
+#' \code{BIC_option} = 'BICq' is selected. See 'Details' section for additional details.
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing penalization parameter values, presented either as an individual set or as a range of
@@ -31,14 +53,47 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 
 #' @rdname lambdaControl
 #' @export
-selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
-                         BIC_option = c("BICh","BIC","BICq")){
+selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
+                         BIC_option = c("BICh","BIC","BICq"), BICq_posterior = NULL){
+  
+  # Perform input checks
   
   if(length(BIC_option) > 1){
     BIC_option = BIC_option[1]
   }
   if(!(BIC_option %in% c("BICh","BIC","BICq"))){
     stop("BIC_option must be 'BICh', 'BIC', or 'BICq'")
+  }
+  if(BIC_option != "BICq"){
+    warning("BIC-ICQ will not be calculated since 'BICq' not specified for BIC_option", 
+            immediate. = T)
+  }
+  
+  if(!is.null(lambda0_seq)){
+    if(!is.numeric(lambda0_seq)){
+      stop("lambda0_seq must be numeric")
+    }
+    if(any(lambda0_seq) < 0){
+      stop("lambda0_seq cannot be negative")
+    }
+  }
+  if(!is.null(lambda1_seq)){
+    if(!is.numeric(lambda1_seq)){
+      stop("lambda1_seq must be numeric")
+    }
+    if(any(lambda1_seq < 0)){
+      stop("lambda1_seq cannot be negative")
+    }
+  }
+  
+  # if(!all(floor(x)==x)){ # if any of the above values not integers
+  #   stop("batch_length and burnin_batchnum must be integers")
+  # }
+  if(!(floor(nlambda) == nlambda)){
+    stop("nlambda must be an integer")
+  }
+  if(nlambda < 2){
+    stop("nlambda must be at least 2")
   }
   
   structure(list(lambda0_seq = lambda0_seq,
@@ -51,9 +106,6 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 #' 
 #' Constructs control structure for the adaptive random walk Metropolis-within-Gibbs sampling procedure.
 #' 
-#' @param nMC_burnin positive integer specifying teh number of posterior draws to use as
-#' burnin for each E step in the EM algorithm. Default 200. Function will not allow \code{nMC_burnin}
-#' to be less than 100.
 #' @param batch_length positive integer specifying the number of posterior draws to collect
 #' before the proposal variance is adjusted based on the acceptance rate of the last 
 #' \code{batch_length} posterior draws
@@ -62,28 +114,22 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 #' \verb{
 #' increment = min(0.01, 1 / sqrt(batch*batch_length + offset))
 #' } 
-#' @param burnin_batchnum positive integer specifying the maximum number of batches (of length
 #' \code{batch_length}) during which the proposal variance can be adjusted. Default 1,000.
 #' 
-#' @return The *Control functions return a list (inheriting from class "\code{adaptControl}") 
+#' @return Function returns a list (inheriting from class "\code{adaptControl}") 
 #' containing parameter specifications for the adaptive random walk sampling procedure.
 #' 
 #' @export
-adaptControl = function(batch_length = 100, offset = 0, burnin_batchnum = 500){
+adaptControl = function(batch_length = 100, offset = 0){
   
   if(batch_length < 10){
     stop("batch_length must be at least 10")
   }
-  if(burnin_batchnum < 0){
-    stop("burnin_batchnum cannot be negative")
-  }
-  x = c(batch_length, burnin_batchnum)
-  if(!all(floor(x)==x)){ # if any of the above values not integers
-    stop("batch_length and burnin_batchnum must be integers")
+  if(floor(batch_length)!=batch_length){
+    stop("batch_length must be integer")
   }
   
-  structure(list(batch_length = batch_length, offset = offset, 
-                 burnin_batchnum = burnin_batchnum), 
+  structure(list(batch_length = batch_length, offset = offset), 
             class = "adaptControl")
 }
 
@@ -92,9 +138,12 @@ adaptControl = function(batch_length = 100, offset = 0, burnin_batchnum = 500){
 #' Constructs the control structure for penalized mixed model fitting.
 #' 
 #' @inheritParams fit_dat_B
+#' @param nMC_burnin positive integer specifying teh number of posterior draws to use as
+#' burnin for each E step in the EM algorithm. Default 200. Function will not allow \code{nMC_burnin}
+#' to be less than 100.
 #' @param nMC_start a positive integer for the initial number of Monte Carlo draws. 
 #' 
-#' @return The *Control functions return a list (inheriting from class "\code{optimControl}") 
+#' @return Function returns a list (inheriting from class "\code{optimControl}") 
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
 #' @export
