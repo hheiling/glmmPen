@@ -28,15 +28,11 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                        BICq_posterior = NULL){
   
   # Input modification and restriction for family
-  if(is.character(family)){
-    family = get(family, mode = "function", envir = parent.frame())
-  }
-  if(is.function(family)){
-    family = family()
-  }
-  if(class(family) == "family"){
-    fam = family$family
-  }
+  family_info = family_export(family)
+  fam_fun = family_info$family_fun
+  link = family_info$link
+  link_int = family_info$link_int # Recoded link as integer
+  family = family_info$family
   
   # Extract variables from optimControl
   conv_EM = optim_options$conv_EM
@@ -60,10 +56,9 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   }
   
   # Calculate loglik for saturated model (mu set to y; n parameters, one per observation)
-  if(fam == "binomial"){
+  if((family == "binomial") & (link == "logit")){
     sat_ll = 0
-  }else if(fam == "poisson"){
-    stop("poisson family not yet operational \n")
+  }else if((family == "poisson") & (link == "log")){
     sat_ll = 0
     y = dat$y
     for(i in 1:length(y)){
@@ -71,11 +66,12 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
         sat_ll = sat_ll + dpois(x = y[i], lambda = y[i], log = T)
       }
     }
-  }else if(fam == "gaussian"){
-    stop("gaussian family not yet operational \n")
+  }else if((family == "gaussian") & (link == "identity")){
+    # Will not look at model saturation for gaussian family
+    sat_ll = 0
   }else{
-    print(family)
-    stop("specified family not recognized \n")
+    print(fam_fun)
+    stop("specified family and link combination not available \n")
   }
   # Set null deviance arbitrarily to 1 for the moment
   nullDev = 1.0
@@ -101,12 +97,12 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     
     if(fitfull_needed){
       # Find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
-      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = fam, nlambda = 2)
+      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2)
       lam_min = lam_MaxMin[2]
       # Fit 'full' model
       out = try(fit_dat_B(dat, lambda0 = lam_min, lambda1 = lam_min, 
                           nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = 10^4,
-                          family = family, offset_fit = offset, group_X = group_X,
+                          family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = NULL, u_init = NULL, ufull_describe = NULL,
@@ -184,7 +180,7 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       print("------------------------------------------------------------------")
       out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
                           nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
-                          family = family, offset_fit = offset, group_X = group_X,
+                          family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
@@ -250,18 +246,26 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])
       
-      # Check for model saturation
-      ## set null deviance as deviance for model with fixed and random intercepts only
-      if((i==1) & (j==1)){
-        nullDev = 2*(sat_ll - out$ll)
+      # Check for model saturation in binomial and poisson case
+      if(family %in% c("binomial","poisson")){
+        
+        ## set null deviance as deviance for model with fixed and random intercepts only
+        if((i==1) & (j==1)){
+          nullDev = 2*(sat_ll - out$ll)
+        }
+        
+        ## Calculate deviance
+        Dev = 2*(sat_ll - out$ll)
+        if(is.finite(Dev)){
+          if(Dev / nullDev < 0.01){
+            print("Reached model saturation")
+            saturated = TRUE
+            break
+          }
+        }
+        
       }
-      ## Calculate deviance
-      Dev = 2*(sat_ll - out$ll)
-      if(Dev / nullDev < 0.01){
-        print("Reached model saturation")
-        saturated = TRUE
-        break
-      }
+      
       
     } # End i loop for lambda0_range
     
