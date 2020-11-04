@@ -7,9 +7,10 @@
 #' @param formula a two-sided linear formula object describing both the fixed-effects and 
 #' random-effects part of the model, with the response on the left of a ~ operator and the terms, 
 #' sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
-#' ("|") separating expression for design matrices from grouping factors. (\code{formula} should be 
-#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}.) Only one grouping factor 
+#' ("|") separating expression for design matrices from grouping factors. \code{formula} should be 
+#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
 #' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
+#' The offset must be specified outside of the formula in the 'offset' argument.
 #' @param data an optional data frame containing the variables named in \code{formula}. Although 
 #' \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
 #' omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).

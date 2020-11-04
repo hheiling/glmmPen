@@ -8,9 +8,12 @@
 #' @inheritParams formulaData
 #' @inheritParams fit_dat_B
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
-#' linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
-#' number of cases. Currently, the formula does not allow specification of an offset.
-#' @param fixef_noPen Optional vector of 0's and 1's of the same length as the number of fixed effect covariates
+#' linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
+#' argument is \code{NULL}, this should be a numeric vector of length equal to the 
+#' number of cases (the response). If the data argument specifies a data.frame, the offset
+#' argument should specify the name of a column in the data.frame. 
+#' Currently, the formula does not allow specification of an offset.
+#' @param fixef_noPen Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 #' used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
 #' penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
 #' fixed effects given in the formula.
@@ -46,28 +49,54 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   ## Provide option for offset, weights
   
   # Input modification and restriction for family
-  if(is.character(family)){
-    family = get(family, mode = "function", envir = parent.frame())
-  }
-  if(is.function(family)){
-    family = family()
-  }
-  if(class(family) == "family"){
-    if(!(family$family %in% c("binomial","poisson","gaussian"))){
-      stop("family must be binomial, poisson, or gaussian")
-    }
-  }
+  family_info = family_export(family)
+  fam_fun = family_info$family_fun
+  # family = family_info$family
   
-  penalty = penalty[1]
+  if(length(penalty) > 1){
+    penalty = penalty[1]
+  }
   if(!(penalty %in% c("lasso","MCP","SCAD"))){
     stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
   }
-
+  
+  if(!is.numeric(gamma_penalty)){
+    stop("gamma_penalty must be numeric")
+  }
+  if(penalty == "MCP" & gamma_penalty <= 1){
+    stop("When using MCP penalty, gamma_penalty must be > 1")
+  }else if(penalty == "SCAD" & gamma_penalty <= 2){
+    stop("When using SCAD penalty, gamma_penalty must be > 2")
+  }
+  
+  if(class(optim_options) != "optimControl"){
+    stop("optim_options must be of class 'optimControl', see optimControl documentation")
+  }
+  if(class(adapt_RW_options) != "adaptControl"){
+    stop("adapt_RW_options must be of class 'adaptControl', see adaptControl documentation")
+  }
+  
+  
   # Convert formula and data to useful forms to plug into fit_dat
   fD_out = formulaData(formula, data, na.action)
   if(!any(fD_out$cnms == "(Intercept)")){
     print(fD_out$cnms)
     stop("Model requires an intercept term")
+  }
+  
+  if(is.null(offset)){
+    offset = rep(0, length(fD_out$y))
+  }else if(!is.null(data) & !is.null(offset)){
+    offset_name = offset
+    offset = data$offset_name
+    if(is.null(offset)){
+      stop("offset variable not found in data")
+    }
+  }else if(is.null(data) & !is.null(offset)){
+    # Check offset has appropriate attributes
+    if((!is.numeric(offset)) | (length(offset) != length(fD_out$y))){
+      stop("offset must be a numeric vector of the same length as y")
+    }
   }
   
   ## Convert group to numeric factor - for fit_dat
@@ -138,7 +167,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # Call fit_dat function
     # fit_dat_B function found in "/R/fit_dat_MstepB.R" file
     
-    #
+    # Default arguments:
     # dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
     # family = "binomial", offset_fit = NULL,
     # trace = 0, penalty = c("MCP","SCAD","lasso"),
@@ -153,7 +182,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     
     fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
                     conv_EM = conv_EM, conv_CD = conv_CD,
-                    family = family, offset_fit = offset, trace = trace, 
+                    family = fam_fun, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                     nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
                     t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
@@ -165,7 +194,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
-      lambda0_range = LambdaRange(X = data_input$X[,-1], y = data_input$y, family = family$family, 
+      lambda0_range = LambdaRange(X = data_input$X[,-1], y = data_input$y, family = fam_fun$family, 
                                   alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen)
     }else{
       lambda0_range = tuning_options$lambda0_seq
@@ -182,25 +211,39 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       }
     }
     
+    if(tuning_options$BIC_option != "BICq"){
+      warning("Selection criteria not specified as 'BICq', so BIC-ICQ criteria will not be calculated",
+              immediate. = T)
+    }
+    
+    if(is.null(tuning_options$BICq_posterior) & tuning_options$BIC_option == "BICq"){
+      BICq_posterior = "BICq_Posterior_Draws.txt"
+    }else{
+      BICq_posterior = tuning_options$BICq_posterior
+    }
+    
     # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     # penalty, lambda0_range, lambda1_range,
     # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
     # trace = 0, u_init = NULL, coef_old = NULL, 
     # full_model = T,
     # adapt_RW_options = adaptControl(),
-    # optim_options = optimControl()
+    # optim_options = optimControl(), BICq_posterior
     
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              group_X = group_X, trace = trace,
+                             full_model = (tuning_options$BIC_option == "BICq"),
                              adapt_RW_options = adapt_RW_options, 
-                             optim_options = optim_options)
+                             optim_options = optim_options, BICq_posterior = BICq_posterior)
     
     if(tuning_options$BIC_option == "BICh"){
       fit = fit_select$out[["BICh"]]
-    }else{
+    }else if(tuning_options$BIC_option == "BIC"){
       fit = fit_select$out[["BIC"]]
+    }else if(tuning_options$BIC_option == "BICq"){
+      fit = fit_select$out[["BICq"]]
     }
     
     resultsA = fit_select$results
@@ -213,11 +256,16 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     }
     colnames(beta_results) = c(coef_names$fixed)
     
-    selection_results = cbind(resultsA,beta_results,coef_results[,(ncol(data_input$X)+1):ncol(coef_results)])
+    gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results)]
+    colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
+    
+    selection_results = cbind(resultsA,beta_results,gamma_results)
     
     if(tuning_options$BIC_option == "BICh"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
-    }else{
+    }else if(tuning_options$BIC_option == "BIC"){
+      optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
+    }else if(tuning_options$BIC_option == "BICq"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
     }
     colnames(optim_results) = colnames(selection_results)
@@ -231,13 +279,14 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                     independence = "Metropolis-within-Gibbs Independence Sampler")
   
   # Format Output - create pglmmObj object
-  output = c(fit, list(call = call, formula = formula, data = data, Y = fD_out$y,
-                       X = fD_out$X, Z = fD_out$Z, group = fD_out$flist,
-                       coef_names = coef_names, family = family,
+  output = c(fit, list(call = call, formula = formula, y = fD_out$y,
+                       X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$flist,
+                       coef_names = coef_names, family = fam_fun,
                        offset = offset, frame = fD_out$frame, 
                        sampling = sampling, std_out = std_out, 
-                       selection_results = selection_results, optim_results = optim_results))
-
+                       selection_results = selection_results, optim_results = optim_results,
+                       penalty = penalty, gamma_penalty = gamma_penalty))
+  
   out_object = pglmmObj$new(output)
   return(out_object)
   

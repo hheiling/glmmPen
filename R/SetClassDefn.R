@@ -12,20 +12,23 @@ pglmmObj = setRefClass("pglmmObj",
               posterior_draws = "matrix",
               family = "family",
               J = "dgCMatrix", # sparse matrix
-              # BIC_ICQ = "numeric",
-              # penalty = "list", # type, chosen optimal values for fixed and random effects
+              penalty = "character",
+              gamma_penalty = "numeric",
               nonzeroFE = "numeric", # non-zero fixed effects coefficients (colnames)
               # nonzerovarRE = "character", # coefficients with non-zero variance (colnames)
               call = "call",
               formula = "formula",
               y = "numeric",
               X = "matrix",
-              Z = "dgCMatrix",
+              Z_std = "dgCMatrix",
+              offset = "numeric",
+              std_info = "list",
               frame = "data.frame",
               sampling = "character",
               results_all = "matrix",
-              results_optim = "matrix",
-              extra = "list"
+              results_optim = "matrix"
+              # optim_options = "optimControl",
+              # adapt_RW_options = "adaptControl"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -41,14 +44,16 @@ pglmmObj = setRefClass("pglmmObj",
                 levs = levels(group[[1]])
                 
                 # y, X, Z, frame
-                y <<- x$Y
+                y <<- x$y
                 X <<- x$X
-                Z <<- x$Z
+                Z_std = x$Z_std
                   rand_vars = rep(x$coef_names$random, each = d)
                   grp_levs = rep(levs, times = length(x$coef_names$random))
-                  colnames(Z) <<- noquote(paste(rand_vars, grp_levs, sep = ":"))
-                  rownames(Z) <<- rownames(X)
+                  colnames(Z_std) = noquote(paste(rand_vars, grp_levs, sep = ":"))
+                  rownames(Z_std) = rownames(X)
+                Z_std <<- Z_std
                 frame <<- x$frame
+                offset <<- x$offset
                 
                 # Fixed effects coefficients - need to unstandardize
                 
@@ -58,15 +63,14 @@ pglmmObj = setRefClass("pglmmObj",
                   scale = x$std_out$X_scale
                   beta[1] = beta[1] - sum(center*beta[-1]/scale)
                   beta[-1] = beta[-1] / scale
+                names(beta) = x$coef_names$fixed
                 fixef <<- beta
-                names(fixef) <<- x$coef_names$fixed
                 nonzeroFE <<- fixef[which(fixef != 0)]
                 
                 # Covariance matrix of random effects
                 sigma <<- x$sigma
                 colnames(sigma) <<- x$coef_names$random
                 rownames(sigma) <<- x$coef_names$random
-                # nonzervarRE <<- sum(rowSums(covar) != 0)
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
                   U = x$u
@@ -75,14 +79,14 @@ pglmmObj = setRefClass("pglmmObj",
                   }else{
                     Gam = t(chol(sigma))
                   }
-                q = ncol(Z) / d # Number random variables
+                q = ncol(Z_std) / d # Number random variables
                   post_U = matrix(0, nrow = nrow(U), ncol = ncol(U))
                   for(g in 1:d){
                     idx = seq(from = g, to = (d*q), by = d)
-                    U[,idx] = post_U[,idx] %*% t(Gam)
+                    post_U[,idx] = U[,idx] %*% t(Gam)
                   }
                 posterior_draws <<- post_U
-                colnames(posterior_draws) <<- colnames(Z)
+                colnames(posterior_draws) <<- colnames(Z_std)
                 
                 # Random effects coefficients
                 rand = colMeans(posterior_draws) 
@@ -97,14 +101,14 @@ pglmmObj = setRefClass("pglmmObj",
                 J <<- x$J
                 formula <<- x$formula
                 call <<- x$call
-                # BIC_ICQ <<- x$BIC
-                # penalty <<- x$penalty
+                penalty <<- x$penalty
+                gamma_penalty <<- x$gamma_penalty
                 sampling <<- x$sampling
-                results_full <<- x$selection_results
+                results_all <<- x$selection_results
                 results_optim <<- x$optim_results
                 
-                extra <<- list(okindex = x$extra$okindex, 
-                               Znew2 = x$extra$Znew2, coef = x$coef)
+                std_info <<- list(X_center = x$std_out$X_center,
+                                  X_scale = x$std_out$X_scale)
               },
               show = function(){
                 print(.self)
