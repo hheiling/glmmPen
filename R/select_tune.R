@@ -18,14 +18,14 @@
 #' Rows correspond with the rows of the results matrix.}
 #'  
 #' @importFrom stringr str_c
-#' @importFrom bigmemory as.big.matrix describe
+#' @importFrom bigmemory as.big.matrix describe write.big.matrix read.big.matrix
 #' @export
 select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                        trace = 0, u_init = NULL, coef_old = NULL, full_model = T,
-                       adapt_RW_options = adaptControl(),
-                       optim_options = optimControl()){
+                       adapt_RW_options = adaptControl(),optim_options = optimControl(), 
+                       BICq_posterior = NULL){
   
   # Input modification and restriction for family
   if(is.character(family)){
@@ -87,40 +87,61 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   # If need to calculate full model for BICq calculation
   ## Use minimum lambda in range of lambda
   ufull_describe = NULL
+  
   if(full_model == T){
-    # Find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
-    lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = fam, nlambda = 2)
-    lam_min = lam_MaxMin[2]
-    # Fit 'full' model
-    out = try(fit_dat_B(dat, lambda0 = lam_min, lambda1 = lam_min, 
-                        nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = 10^4,
-                        family = family, offset_fit = offset, group_X = group_X,
-                        penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                        trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
-                        coef_old = NULL, u_init = NULL, ufull_describe = NULL,
-                        maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
-                        M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                        covar = covar, var_start = var_start,
-                        max_cores = max_cores))
-    
-    
-    if(is.character(out)){
-      print("Issue with full model fit, no BICq calculation will be completed")
-      ufull_describe = NULL
-    }else{
-      ufull = out$u
-      if(any(is.na(ufull))){
-        print("Issue with full model fit, no BICq calculation will be completed")
-        ufull_describe = NULL 
+    # If posterior draws from full model not yet created, fit full model and save posterior draws
+    # Otherwise, read in the prevoiusly fit full model posterior draw results
+    if(!is.null(BICq_posterior)){
+      if(file.exists(BICq_posterior)){
+        fitfull_needed = F
       }else{
-        ufull_big = bigmemory::as.big.matrix(ufull)
-        ufull_describe = bigmemory::describe(ufull_big)
+        fitfull_needed = T
       }
-      ufull = NULL
     }
     
+    if(fitfull_needed){
+      # Find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
+      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = fam, nlambda = 2)
+      lam_min = lam_MaxMin[2]
+      # Fit 'full' model
+      out = try(fit_dat_B(dat, lambda0 = lam_min, lambda1 = lam_min, 
+                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = 10^4,
+                          family = family, offset_fit = offset, group_X = group_X,
+                          penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                          trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
+                          coef_old = NULL, u_init = NULL, ufull_describe = NULL,
+                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
+                          M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
+                          covar = covar, var_start = var_start,
+                          max_cores = max_cores))
+      
+      
+      if(is.character(out)){
+        print("Issue with full model fit, no BICq calculation will be completed")
+        ufull_describe = NULL
+      }else{
+        ufull = out$u
+        if(any(is.na(ufull))){
+          print("Issue with full model fit, no BICq calculation will be completed")
+          ufull_describe = NULL 
+        }else{
+          ufull_big = as.big.matrix(ufull)
+          ufull_describe = describe(ufull_big)
+          if(is.null(BICq_posterior)){
+            write.big.matrix(ufull_big, "BICq_Posterior_Draws.txt", sep=' ')
+          }else{
+            write.big.matrix(ufull_big, BICq_posterior, sep = " ")
+          }
+        }
+        ufull = NULL
+      } # End if-else is.character(out)
+      
+    }else{ # if fitfull_needed = F
+      ufull_big = read.big.matrix(filename = BICq_posterior, sep = " ", type = 'double')
+      ufull_describe = describe(ufull_big)
+    }
     
-  }
+  } # End if-else full_model = T
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
