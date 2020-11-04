@@ -6,13 +6,13 @@
 
 # @method fixef pglmmObj
 #' @export
-fixef.pglmmObj = function(object){
+fixef = function(object){
   object$fixef
 }
 
 # @method ranef pglmmObj
 #' @export
-ranef.pglmmObj = function(object){
+ranef = function(object){
   object$ranef
 }
 
@@ -167,7 +167,7 @@ fitted.pglmmObj = function(object){
   ## ToDo: add names/rownames (from X?)
   ## ToDo: Take into account potential offset (in etaCalc)
   
-  eta = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$posterior_draws)
+  eta = etaCalc(X = object$X, Z = object$Z, beta = object$fixef, U = object$posterior_draws)
   mu = invLink(family = family(object), eta)
   
   return(mu)
@@ -187,11 +187,11 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
   if(is.null(newdata)){
     if(!fixed.only){
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
-                    link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), 
+                    link = etaCalc(X = object$X, Z = object$Z, beta = object$fixef, 
                                    U = object$posterior_draws),
                     response = fitted(object))
     }else{ # Fixed.only = T
-      eta = object$X %*% fixef(object)
+      eta = object$X %*% object$fixef
       pred = switch(type[1],
                     link = eta,
                     response = invLink(family = family(object), eta = eta))
@@ -214,13 +214,13 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
       }else{
         U = object$posterior_draws
       }
-      eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = U)
+      eta = etaCalc(fD_out$X, fD_out$Z, beta = object$fixef, U = U)
       pred = switch(type[1], 
                     link = eta,
                     response = invLink(family = family(object), eta = eta))
       
     }else{ # fixed.only = T
-      eta = fD_out$X %*% fixef(object)
+      eta = fD_out$X %*% object$fixef
       pred = switch(type[1], 
                     link = eta,
                     response = invLink(family = family(object), eta = eta))
@@ -322,7 +322,7 @@ prt_call <- function(object) {
 }
 
 prt_fixef = function(object, digits){
-  if(length(fef <- fixef(object)) > 0) {
+  if(length(fef <- object$fixef) > 0) {
     cat("Fixed Effects:\n")
     print.default(format(fef, digits = digits),
                   print.gap = 2L, quote = FALSE)
@@ -431,6 +431,48 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "
   prt_resids(residuals(object, type = resid_type), type = resid_type, digits = digits[1])
   cat("\n")
 }
+
+# @export
+# posterior_draws = function(object, sampler = c("stan","random_walk","independence"), nMC = 10^4,
+#                            nMC_burnin = 250){
+#   
+#   if(length(sampler) > 1){
+#     sampler = sampler[1]
+#   }
+#   if(!(sampler %in% c("stan","random_walk","independence"))){
+#     stop("sampler must be 'stan', 'random_walk', or 'independence'")
+#   }
+#   
+#   # Converge group factor into a numeric factor
+#   group = as.factor(as.numeric(object$group[[1]]))
+#   d = nlevels(group)
+#   
+#   sigma = object$sigma
+#   # Specify which random effect variables are non-zero 
+#   ranef_idx = which(diag(sigma) > 0)
+#   
+#   # Adjust Z to incorporate the cholesky composition of the sigma matrix
+#   gamma = t(chol(sigma))
+#   Z_std = object$Z_std
+#   Znew2 = Z_std
+#   for(i in 1:d){
+#     Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i, seq(i, ncol(Z), by = d)] %*% gamma
+#   }
+#   
+#   family = object$family$family
+#   # if(family == "gaussian"){
+#   #   sig_g =
+#   # }
+#     
+#   # Needed arguments for E_step function
+#   # coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, link, phi, sig_g,
+#   # sampler, d, uold, proposal_SD, batch, batch_length,
+#   # offset_increment, trace, num_cores
+#   draws = E_step(coef = object$fixef, ranef_idx = ranef_idx, y = object$y, X = object$X,
+#                  Znew2 = Znew2, group = group, nMC = nMC, nMC_burnin = nMC_burnin,
+#                  family = family, link = object$family$link,
+#                  sampler = sampler, d = d)
+# }
 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
