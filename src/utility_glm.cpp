@@ -349,7 +349,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
       s2 += sum((y(i)*const_ones - mu) % (y(i)*const_ones - mu));
     }
     
-    s2 = s2 / (M*(N-1));
+    s2 = s2 / (M*N);
     sig = sqrt(s2);
   }
   
