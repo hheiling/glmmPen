@@ -31,7 +31,6 @@
 #' @param group a factor vector of the grouping variable, converted to a factor of 
 #' consecutive numeric integers
 #' @param d integer, the number of groups present (number factors of the group vector)
-#' @param okindex ?
 #' @param uold a matrix with a single row comprised of the last Monte Carlo draw from either the 
 #' most recent E step of the EM algorithm or the final model
 #' @param proposal_SD a matrix of dimension (number of groups)x(number of random effects) that
@@ -45,8 +44,8 @@
 #' @param batch_length an integer specifying the number of posterior draws (ignoring thinning) used
 #' to evaluate the acceptance rate of the random walk algorithm. This acceptance rate is then used
 #' to adjust the proposal standard deviation if necessary.
-#' @param offset
-#' @param burnin_batchnum an integer specifying the number of batches of (unthinned) posterior draws
+#' @param offset (need to add description)
+#' @param nMC_burnin an integer specifying the number of posterior draws
 #' to allow adjustments to the proposal standard deviation. For the MCEM algorithm, it is recommended
 #' to allow for the adjustment of the proposal standard deviation at the beginning of each E step.
 #' 
@@ -68,13 +67,31 @@
 #' 
 #' @importFrom bigmemory big.matrix describe
 #' @export
-sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, okindex,
+sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, group, d,
                                   uold, proposal_SD, batch, batch_length = 100, 
-                                  offset = 0, burnin_batchnum = 500){
+                                  offset = 0, nMC_burnin = 500, phi = 0.0, sig_g = 1.0){
   
-  f = get(family, mode = "function", envir = parent.frame())
+  # Re-code link as integer
+  ## All link_int will have two digits
+  ## First digit corresponds to family that link is canonical for
+  ## 1 = binomial, 2 = poisson or negative binomial, 3 = gaussian
+  ## Second digit: 0 = canonical link, other = arbitrary enumeration of common non-canonical links
+  if(link == "logit"){
+    link_int = 10
+  }else if(link == "probit"){
+    link_int = 11
+  }else if(link == "cloglog"){
+    link_int = 12
+  }else if(link == "log"){
+    link_int = 20
+  }else if(link == "sqrt"){
+    link_int = 21
+  }else if(link == "identity"){
+    link_int = 30
+  }else if(link == "inverse"){
+    link_int = 31
+  }
   
-  uhat  = rep(0, ncol(Z))
   eta = X %*% matrix(coef, ncol=1) 
   
   # matrix to hold accepted samples
@@ -102,7 +119,8 @@ sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, fami
                                             matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
                                             y[select], nMC, uold[index], 
                                             matrix(proposal_SD[i,var_index], nrow = 1), batch, 
-                                            batch_length, offset, burnin_batchnum, trace)
+                                            batch_length, offset, nMC_burnin,
+                                            family, link_int, phi, sig_g)
     
     u0[,index] = gibbs_output[1:nMC,]
     gibbs_accept_rate[i,var_index] = matrix(gibbs_output[(nMC+1),], nrow = 1)
@@ -120,8 +138,29 @@ sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, fami
 #'
 #' @importFrom bigmemory big.matrix describe
 #' @export
-sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, group, d, okindex,
-                             uold){
+sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, group, d, 
+                             uold, phi = 0.0, sig_g = 1.0){
+  
+  # Re-code link as integer
+  ## All link_int will have two digits
+  ## First digit corresponds to family that link is canonical for
+  ## 1 = binomial, 2 = poisson or negative binomial, 3 = gaussian
+  ## Second digit: 0 = canonical link, other = arbitrary enumeration of common non-canonical links
+  if(link == "logit"){
+    link_int = 10
+  }else if(link == "probit"){
+    link_int = 11
+  }else if(link == "cloglog"){
+    link_int = 12
+  }else if(link == "log"){
+    link_int = 20
+  }else if(link == "sqrt"){
+    link_int = 21
+  }else if(link == "identity"){
+    link_int = 30
+  }else if(link == "inverse"){
+    link_int = 31
+  }
   
   uhat  = rep(0, ncol(Z))
   eta = X %*% matrix(coef, ncol=1) 
@@ -149,8 +188,8 @@ sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, trace = 0, family, g
     
     gibbs_list = sample_mc_inner_gibbs(matrix(fitted_mat[select], ncol = 1, nrow = sum(select)), 
                                        matrix(Z[select,index],ncol = length(index), nrow = sum(select)),  
-                                       y[select], uhat[index], nMC, uold[index], 
-                                       trace)
+                                       y[select], uhat[index], nMC, uold[index],
+                                       family, link_int, phi, sig_g)
     u0[,index] = gibbs_list$u
     gibbs_accept_rate[i,] = matrix(gibbs_list$acc_rate, nrow = 1)
   }

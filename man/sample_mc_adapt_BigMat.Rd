@@ -5,12 +5,42 @@
 \alias{sample_mc2_BigMat}
 \title{Calculate Monte Carlo draws using Metropolis-within-Gibbs}
 \usage{
-sample_mc_adapt_BigMat(coef, ranef_idx, y, X, Z, nMC, trace = 0, family,
-  group, d, okindex, uold, proposal_SD, batch, batch_length = 100,
-  offset = 0, burnin_batchnum = 500)
+sample_mc_adapt_BigMat(
+  coef,
+  ranef_idx,
+  y,
+  X,
+  Z,
+  nMC,
+  family,
+  link,
+  group,
+  d,
+  uold,
+  proposal_SD,
+  batch,
+  batch_length = 100,
+  offset = 0,
+  nMC_burnin = 500,
+  phi = 0,
+  sig_g = 1
+)
 
-sample_mc2_BigMat(coef, ranef_idx, y, X, Z, nMC, trace = 0, family,
-  group, d, okindex, uold)
+sample_mc2_BigMat(
+  coef,
+  ranef_idx,
+  y,
+  X,
+  Z,
+  nMC,
+  family,
+  link,
+  group,
+  d,
+  uold,
+  phi = 0,
+  sig_g = 1
+)
 }
 \arguments{
 \item{coef}{a numeric vector of the fixed effects coefficients (from the latest EM iteration or
@@ -28,9 +58,6 @@ decomposition of the sigma matrix (from the latest EM iteration or the final mod
 
 \item{nMC}{a positive integer for the initial number of Monte Carlo draws}
 
-\item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...)}
-
 \item{family}{a description of the error distribution and link function to be used in the model. 
 For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
 See \code{family} options in the Details section.}
@@ -39,8 +66,6 @@ See \code{family} options in the Details section.}
 consecutive numeric integers}
 
 \item{d}{integer, the number of groups present (number factors of the group vector)}
-
-\item{okindex}{?}
 
 \item{uold}{a matrix with a single row comprised of the last Monte Carlo draw from either the 
 most recent E step of the EM algorithm or the final model}
@@ -59,7 +84,9 @@ random walk algorithm is adjusted by a smaller amount.}
 to evaluate the acceptance rate of the random walk algorithm. This acceptance rate is then used
 to adjust the proposal standard deviation if necessary.}
 
-\item{burnin_batchnum}{an integer specifying the number of batches of (unthinned) posterior draws
+\item{offset}{(need to add description)}
+
+\item{nMC_burnin}{an integer specifying the number of posterior draws
 to allow adjustments to the proposal standard deviation. For the MCEM algorithm, it is recommended
 to allow for the adjustment of the proposal standard deviation at the beginning of each E step.}
 }
