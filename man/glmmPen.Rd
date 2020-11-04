@@ -5,20 +5,30 @@
 \title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
-glmmPen(formula, data = NULL, family = "binomial",
-  na.action = na.omit, offset = NULL, fixef_noPen = NULL,
-  penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
+glmmPen(
+  formula,
+  data = NULL,
+  family = "binomial",
+  na.action = na.omit,
+  offset = NULL,
+  fixef_noPen = NULL,
+  penalty = c("MCP", "SCAD", "lasso"),
+  alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
-  optim_options = optimControl(), adapt_RW_options = adaptControl(),
-  trace = 0, tuning_options = selectControl())
+  optim_options = optimControl(),
+  adapt_RW_options = adaptControl(),
+  trace = 0,
+  tuning_options = selectControl()
+)
 }
 \arguments{
 \item{formula}{a two-sided linear formula object describing both the fixed-effects and 
 random-effects part of the model, with the response on the left of a ~ operator and the terms, 
 sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
-("|") separating expression for design matrices from grouping factors. (\code{formula} should be 
-of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}.) Only one grouping factor 
-will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.}
+("|") separating expression for design matrices from grouping factors. \code{formula} should be 
+of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
+will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
+The offset must be specified outside of the formula in the 'offset' argument.}
 
 \item{data}{an optional data frame containing the variables named in \code{formula}. Although 
 \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
@@ -32,10 +42,13 @@ See \code{family} options in the Details section.}
 options \code{na.omit} and \code{na.pass} are recognized by this function.}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
-linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
-number of cases. Currently, the formula does not allow specification of an offset.}
+linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
+argument is \code{NULL}, this should be a numeric vector of length equal to the 
+number of cases (the response). If the data argument specifies a data.frame, the offset
+argument should specify the name of a column in the data.frame. 
+Currently, the formula does not allow specification of an offset.}
 
-\item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effect covariates
+\item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
 penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
 fixed effects given in the formula.}

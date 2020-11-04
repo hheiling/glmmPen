@@ -3,14 +3,17 @@
 \name{lambdaControl}
 \alias{lambdaControl}
 \alias{selectControl}
-\title{Control of Penalization Parameters and Selection Criteria
-
-Constructs control structures for penalized mixed model fitting.}
+\title{Control of Penalization Parameters and Selection Criteria}
 \usage{
 lambdaControl(lambda0 = 0, lambda1 = 0)
 
-selectControl(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
-  BIC_option = c("BICh", "BIC", "BICq"))
+selectControl(
+  lambda0_seq = NULL,
+  lambda1_seq = NULL,
+  nlambda = 10,
+  BIC_option = c("BICh", "BIC", "BICq"),
+  BICq_posterior = NULL
+)
 }
 \arguments{
 \item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
@@ -18,12 +21,9 @@ selectControl(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 20,
 \item{lambda1}{a non-negative numeric penalty parameter for the grouped random effects
 covariance parameters}
 
-\item{lambda0_seq}{a range of non-negative numeric penalty parameter for the fixed 
-effects parameters. If \code{NULL}, then a range will be calculated as described by (...).}
-
-\item{lambda1_seq}{a range of non-negative numeric penalty parameter for the grouped random 
-effects covariance parameters. If \code{NULL}, then a range will be calculated as described 
-by (...).}
+\item{lambda0_seq, lambda1_seq}{a range of non-negative numeric penalty parameter for the fixed 
+and random effect parameters, respectively. If \code{NULL}, then a range will be automatically 
+calculated. See 'Details' section for more details on these default calculations.}
 
 \item{nlambda}{positive integer specifying number of lambda with which to fit a model.
 Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
@@ -31,8 +31,12 @@ Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
 \item{BIC_option}{character value specifing the selection criteria used to select the 'best' model.
 Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-observations). The "BICq" option specifies the BIC ICQ criterion, which requires a fit of 
+observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
 a full model (a small penalty is used for the fixed and random effects).}
+
+\item{BICq_posterior}{character expressing the path and file name of a text file that currently stores
+or will store a \code{big.matrix} of the posterior draws from the full model if 
+\code{BIC_option} = 'BICq' is selected. See 'Details' section for additional details.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
@@ -40,7 +44,27 @@ containing penalization parameter values, presented either as an individual set 
 possible values.
 }
 \description{
-Control of Penalization Parameters and Selection Criteria
-
 Constructs control structures for penalized mixed model fitting.
+}
+\details{
+If unspecified, the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
+automatically calculated. For an initial
+grid search using \code{\link{glmmPen}}, the range will be calculated in the same manner as 
+\code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
+small portion of max, range is composed of \code{nlambda} values spread evenly on the log scale.
+For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
+from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
+finer grid search. The new range spreads between the two lambda values nearest the 'best' lambda.
+
+If the \code{BIC_option} is specified to be 'BICq', a full model assuming a small
+valued lambda penalty will be fit. For models with large numbers of random effects, the fitting
+of this full model could take substantial time. In order to avoid repetitive calculations of
+this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
+posterior draws will be saved in a .txt file. If the file already exits, the big.matrix of 
+posterior draws will be read using \code{bigmemory::read.big.matrix}
+(\code{bigmemory::read.big.matrix(filename, sep = ' ', type = 'double')}) and used in the BIC-ICQ 
+calcuations (the full model will not be fit again). If the file does not exist or \code{NULL} is specified and
+the 'BICq' \code{BIC_option} is selected, the full model will be fit and the full model posterior
+draws will be saved at the specified file location (using \code{bigmemory::write.big.matrix})
+or the working directory with generic filename "BICq_Posterior_Draws.txt" if \code{NULL} is specified.
 }

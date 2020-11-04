@@ -5,11 +5,24 @@
 \title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
-select_tune(dat, offset = NULL, family, group_X = 0:(ncol(dat$X) - 1),
-  penalty, lambda0_range, lambda1_range, alpha = 1,
-  gamma_penalty = switch(penalty[1], SCAD = 4, 3), trace = 0,
-  u_init = NULL, coef_old = NULL, full_model = T,
-  adapt_RW_options = adaptControl(), optim_options = optimControl())
+select_tune(
+  dat,
+  offset = NULL,
+  family,
+  group_X = 0:(ncol(dat$X) - 1),
+  penalty,
+  lambda0_range,
+  lambda1_range,
+  alpha = 1,
+  gamma_penalty = switch(penalty[1], SCAD = 4, 3),
+  trace = 0,
+  u_init = NULL,
+  coef_old = NULL,
+  full_model = T,
+  adapt_RW_options = adaptControl(),
+  optim_options = optimControl(),
+  BICq_posterior = NULL
+)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
@@ -18,8 +31,11 @@ the study, batch, or other group identity to which on observation belongs), with
 observation}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
-linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
-number of cases. Currently, the formula does not allow specification of an offset.}
+linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
+argument is \code{NULL}, this should be a numeric vector of length equal to the 
+number of cases (the response). If the data argument specifies a data.frame, the offset
+argument should specify the name of a column in the data.frame. 
+Currently, the formula does not allow specification of an offset.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 For \code{fit_dat_B} this can be a character string naming a family function or a family function. 

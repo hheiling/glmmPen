@@ -5,17 +5,36 @@
 \title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
-fit_dat_B(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001,
-  conv_CD = 1e-04, family = "binomial", offset_fit = NULL,
-  trace = 0, penalty = c("MCP", "SCAD", "lasso"), alpha = 1,
+fit_dat_B(
+  dat,
+  lambda0 = 0,
+  lambda1 = 0,
+  conv_EM = 0.001,
+  conv_CD = 1e-04,
+  family = "binomial",
+  offset_fit = NULL,
+  trace = 0,
+  penalty = c("MCP", "SCAD", "lasso"),
+  alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
-  group_X = 0:(ncol(dat$X) - 1), nMC_burnin = 500, nMC = 5000,
-  nMC_max = 20000, t = 2, nMC_report = 5000, u_init = NULL,
-  coef_old = NULL, ufull_describe = NULL, maxitEM = 100,
-  maxit_CD = 250, M = 10^4, sampler = c("stan", "random_walk",
-  "independence"), adapt_RW_options = adaptControl(),
-  covar = c("unstructured", "independent"), var_start = 0.5,
-  max_cores = 1)
+  group_X = 0:(ncol(dat$X) - 1),
+  nMC_burnin = 500,
+  nMC = 5000,
+  nMC_max = 20000,
+  t = 2,
+  nMC_report = 5000,
+  u_init = NULL,
+  coef_old = NULL,
+  ufull_describe = NULL,
+  maxitEM = 100,
+  maxit_CD = 250,
+  M = 10^4,
+  sampler = c("stan", "random_walk", "independence"),
+  adapt_RW_options = adaptControl(),
+  covar = c("unstructured", "independent"),
+  var_start = 0.5,
+  max_cores = 1
+)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
@@ -91,22 +110,38 @@ Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "indepe
 \item{covar}{character value specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (including the intercept) is 
-greater than 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
 independent covariance structure (covar switched to "independent").}
-
-\item{fit_type}{integer specifying the verion of the grouped coordinate descent algorithm to use.
-Default equals 1, the 'naive fit', assuming that the random effects covariates do not need any
-additional standardization or adjustments to account for absence of orthogonalization.
-For the time being, this version is recommended. Version 2 adds standardization of the random
-effects covariates compared to version 1.}
+}
+\value{
+a list with the following elements:
+\item{coef}{a numeric vector of coefficients of fixed effects estimates and 
+non-zero estimates of the lower-triangular cholesky decomposition of the random effects
+covariance matrix (in vector form)}
+\item{sigma}{random effects covariance matrix}
+\item{lambda0, lambda1}{the penalty parameters input into the function}
+\item{covgroup}{Organization of how random effects coefficients are grouped.}
+\item{J}{a sparse matrix that transforms the non-zero elements of the lower-triangular cholesky 
+decomposition of the random effects covariance matrix into a vector. For unstructured
+covariance matrices, dimension of dimension q^2 x (q(q+1)/2) (where q = number of random effects).
+For independent covariance matrices, q^2 x q.}
+\item{ll}{estimate of the log likelihood, calculated using the Pajor method}
+\item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
+\item{BIC}{Regular BIC estimate}
+\item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
+then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
+\item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
+and each group (rows)}
+\item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
+random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
+each group (rows)}
 }
 \description{
 Description
 }
 \section{Details}{
  
-Accepted families: binomial, poisson, gaussian. Currently, the algorithm is only equipted to handle
-the canonical links associated with these families (logit link for binomial, log link for poisson,
-identity link for gaussian).
+Accepted families: binomial, poisson, and gaussian. Currently, only canonical links for each 
+family are available.
 }
 

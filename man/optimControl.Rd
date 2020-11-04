@@ -6,11 +6,22 @@
 
 Constructs the control structure for penalized mixed model fitting.}
 \usage{
-optimControl(conv_EM = 0.001, conv_CD = 1e-04, nMC_burnin = 500,
-  nMC_start = 5000, nMC_max = 10000, nMC_report = 5000,
-  maxitEM = 100, maxit_CD = 200, M = 10000, t = 2,
-  covar = c("unstructured", "independent"), sampler = c("stan",
-  "random_walk", "independence"), var_start = 0.5, max_cores = 1)
+optimControl(
+  conv_EM = 0.001,
+  conv_CD = 1e-04,
+  nMC_burnin = 500,
+  nMC_start = 5000,
+  nMC_max = 10000,
+  nMC_report = 5000,
+  maxitEM = 100,
+  maxit_CD = 200,
+  M = 10000,
+  t = 2,
+  covar = c("unstructured", "independent"),
+  sampler = c("stan", "random_walk", "independence"),
+  var_start = 0.5,
+  max_cores = 1
+)
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
@@ -18,6 +29,10 @@ EM algorithm. Default is 0.001.}
 
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
+
+\item{nMC_burnin}{positive integer specifying teh number of posterior draws to use as
+burnin for each E step in the EM algorithm. Default 200. Function will not allow \code{nMC_burnin}
+to be less than 100.}
 
 \item{nMC_start}{a positive integer for the initial number of Monte Carlo draws.}
 
@@ -44,7 +59,7 @@ Positive integer, default equals 2.}
 \item{covar}{character value specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (including the intercept) is 
-greater than 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
 independent covariance structure (covar switched to "independent").}
 
 \item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
@@ -52,7 +67,7 @@ should incorporate an adaptive random walk sampler (default, "random_walk") or a
 independence sampler ("independence").}
 }
 \value{
-The *Control functions return a list (inheriting from class "\code{optimControl}") 
+Function returns a list (inheriting from class "\code{optimControl}") 
 containing fit and optimization criteria values used in optimization routine.
 }
 \description{
