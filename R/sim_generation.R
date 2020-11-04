@@ -1,8 +1,9 @@
-#' @importFrom stringr str_c
+#' @importFrom stringr str_c str_detect
 #' @importFrom ncvreg std
 #' @export
 sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, 
                      slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
+  
   set.seed(seed = seed)
   library(mvtnorm)
   # set variables
@@ -10,6 +11,12 @@ sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binom
   p1 = pnonzero
   d = nstudies
   ok = NULL
+  
+  family_info = family_export(family)
+  fam_fun = family_info$family_fun
+  link = family_info$link
+  link_int = family_info$link_int # Recoded link as integer
+  family = family_info$family
   
   if(pnonzero + pnonzerovar > ptot) stop("pnonzero + pnonzerovar > ptot")
   # create fixed effects covariate matrix
@@ -45,41 +52,32 @@ sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binom
   }
   Z = model.matrix(~drep-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   if(slopes == T) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
+  
+  if(is.null(beta)){
+    if(pnonzerovar > 0){
+      beta <- c(0, rep(2, p1), rep(0, pnonzerovar))
+      X0 = X[,1:(p1+pnonzerovar+1)]
+    }else{
+      beta <- c(0, rep(2, p1))
+      X0 = X[,1:(p1+1)]
+    }
+  }else{
+    if(length(beta) < p1+pnonzerovar+1) beta = c(beta, rep(0, pnonzerovar))
+    X0 = X[,1:(p1+pnonzerovar+1)]
+  }
+  if(slopes == T) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
+  z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
+  
+  eta = X0 %*% matrix(beta, ncol = 1) + Z0 %*% matrix(z1, ncol = 1)
+  mu = invlink(link_int, eta)
  
   # simulate random effect and then y
   if(family == "poisson"){
     
-    # create coefficient matrix for fixed effects, leaving fixed for now
-    beta = matrix(c(0, rep(1, p1), rep(0, p - p1)), ncol = 1)
-    mu = exp(X%*%beta + Z%*%matrix(z1, ncol = 1))
     y  = rpois(n, lambda = mu)
+    
   }else if(family == "binomial"){
     
-    if(is.null(beta)){
-      if(pnonzerovar > 0){
-        beta <- c(0, rep(2, p1), rep(0, pnonzerovar))
-        X0 = X[,1:(p1+pnonzerovar+1)]
-      }else{
-        beta <- c(0, rep(2, p1))
-        X0 = X[,1:(p1+1)]
-      }
-    }else{
-      if(length(beta) < p1+pnonzerovar+1) beta = c(beta, rep(0, pnonzerovar))
-      X0 = X[,1:(p1+pnonzerovar+1)]
-    }
-    if(slopes == T) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
-    z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
-    
-    
-    # create coefficient matrix for fixed effects, leaving fixed for now
-    mu0001 = rowSums(X0 * matrix(beta, ncol = length(beta), nrow = nrow(X0), byrow = T))  #X0%*%matrix(beta, ncol = 1)
-    mu0002 = Z0%*%matrix(z1, ncol = 1)
-    mu000 = mu0001 + mu0002
-    mu00 = as.numeric(mu000) #- apply((X0%*%beta + Z0%*%matrix(z1, ncol = 1)), 1, FUN = function(x){logsumexp(c(0, x))})
-    mu0 = exp(mu00)
-    mu = mu0/(1+mu0)
-    
-    #y  = rbinom(n = n, size = 1, prob = mu)
     y = rep(NA, n)
     for(ii in 1:n){
       y[ii] = rbinom(n = 1, size = 1, prob = mu[ii])
@@ -91,33 +89,21 @@ sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binom
     
   }else if(family == "gaussian"){
     
-    if(is.null(beta)){
-      if(pnonzerovar > 0){
-        beta <- c(0, rep(2, p1), rep(0, pnonzerovar))
-        X0 = X[,1:(p1+pnonzerovar+1)]
-      }else{
-        beta <- c(0, rep(2, p1))
-        X0 = X[,1:(p1+1)]
-      }
-    }else{
-      if(length(beta) < p1+pnonzerovar+1) beta = c(beta, rep(0, pnonzerovar))
-      X0 = X[,1:(p1+pnonzerovar+1)]
-    }
-    if(slopes == T) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
-    z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
-    
-    
-    # create coefficient matrix for fixed effects, leaving fixed for now
-    mu0001 = rowSums(X0 * matrix(beta, ncol = length(beta), nrow = nrow(X0), byrow = T))  #X0%*%matrix(beta, ncol = 1)
-    mu0002 = Z0%*%matrix(z1, ncol = 1)
-    mu000 = mu0001 + mu0002
-    mu00 = as.numeric(mu000) 
-    mu = mu00
-    
-    #y  = rbinom(n = n, size = 1, prob = mu)
     y = rep(NA, n)
     for(ii in 1:n){
       y[ii] = rnorm(n = 1, mean = mu[ii], sd = 0.5)
+    }
+    if(any(is.na(y))){
+      ok = which(is.na(y))
+      stop("y resulted in NA values")
+    }
+    
+  }else if(family == "negbin"){
+    # Default variance: theta = 2.0, phi = 1/2.0 = 0.5
+    # mu + mu^2 / theta = mu + mu^2 * phi
+    y = rep(NA, n)
+    for(ii in 1:n){
+      y[ii] = rnbinom(n = 1, size = 2.0, mu = mu[ii])
     }
     if(any(is.na(y))){
       ok = which(is.na(y))
@@ -142,5 +128,7 @@ sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binom
   } else{
     dat = list(y = y, X = X, Z = Z,  pnonzero =  pnonzero, z1 = matrix(z1, nrow = d), group = drep, X0 = X0)
   }
+  
   return(dat)
+  
 }
