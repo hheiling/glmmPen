@@ -19,7 +19,13 @@ indicator_2 = function(bounds, samples){
 # Pajor IS CAME Method for logLik calcuations
 #' @importFrom mvtnorm rmvnorm dmvnorm
 #' @export
-CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
+CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL){
+  
+  family_info = family_export(family)
+  fam_fun = family_info$family_fun
+  link = family_info$link
+  link_int = family_info$link_int # Recoded link as integer
+  family = family_info$family
   
   # Define variables
   d = nlevels(group)
@@ -101,7 +107,7 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     ## switched Gam to be transposed
     eta_ref = imp_samp %*% t(Gam) %*% t(Z_k) # M x n_k
     ## Full eta - fixed + random effects component
-    eta = eta_fef_k[rep(1, M),] + eta_ref
+    eta = eta_fef_k[rep(1, M),] + eta_ref # M x n_k
     
     # Calculate indicator function
     if(length(cols) > 1){
@@ -113,12 +119,47 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M){
     
     dens_k = rep(1, times = M)
     
+    # Estimate fitted values (see "utility_glm.cpp" for invlink() function details)
+    # Columns of mu correspond to individuals
+    mu = matrix(0, nrow = nrow(eta), ncol = ncol(eta))
+    for(i in 1:ncol(eta)){
+      mu[,i] = invlink(link_int, eta[,i])
+    }
+    
+    # Could assume separate calculation of sig_g (sigma of error term in linear model) 
+    # for each group k
+    # if(family == "gaussian"){
+    #   sig_g = 0
+    #   for(i in 1:ncol(mu)){
+    #     sig_g = sig_g + sum((rep(y_k[i], times=M) - mu[,i])^2)
+    #   }
+    #   sig_g = sig_g / (M * n_k)
+    # }
+    
     if(family == "binomial"){
-      prob_mat = exp(eta) / (1+exp(eta))
-      # Columns of prob_mat correspond to individuals
-      
       for(i in 1:n_k){
-        dens_i = dbinom(y_k[i], size = 1, prob = prob_mat[,i], log = F)
+        dens_i = dbinom(y_k[i], size = 1, prob = mu[,i], log = F)
+        # Multiply together all elements belonging to same alpha_m
+        dens_k = dens_k * dens_i
+      } # End i loop
+    }else if(family == "poisson"){
+      for(i in 1:n_k){
+        dens_i = dpois(y_k[i], lambda = mu[,i], log = F)
+        # Multiply together all elements belonging to same alpha_m
+        dens_k = dens_k * dens_i
+      } # End i loop
+    }else if(family == "gaussian"){
+      if(is.null(gaus_sig)){
+        stop("gaus_sig must be specified for gaussian family")
+      }
+      for(i in 1:n_k){
+        dens_i = dnorm(y_k[i], mean = mu[,i], sd = gaus_sig, log = F)
+        # Multiply together all elements belonging to same alpha_m
+        dens_k = dens_k * dens_i
+      } # End i loop
+    }else if(family == "negbin"){
+      for(i in 1:n_k){
+        dens_i = dnbinom(y_k[i], size = 1/phi, mu = mu[,i], log = F)
         # Multiply together all elements belonging to same alpha_m
         dens_k = dens_k * dens_i
       } # End i loop
