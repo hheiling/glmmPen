@@ -144,7 +144,7 @@ etaCalc = function(X, Z, beta, U){
   return(eta)
 }
 
-#' @export
+# @export
 invLink = function(family, eta){
   fam = family$family
   # Inverse link functions (canonical links only)
