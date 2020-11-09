@@ -392,8 +392,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
 
 }
 
-// estimate of unstandardized variance for linear regression error term
-// standard deviation calculated within fit_dat_B
+// estimate of standard deviation for linear regression error term
 // [[Rcpp::export]]
 double sig_gaus(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
                 const arma::vec& group, const arma::sp_mat& J_q,
@@ -420,7 +419,7 @@ double sig_gaus(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP
   int n_k=0; // Number of observations in group k
   
   arma::uvec col_idx(q);
-  arma::vec const_ones(N); const_ones.ones();
+  arma::vec const_ones(M); const_ones.ones();
   
   arma::mat eta(M,N);
   arma::vec mu(M);
