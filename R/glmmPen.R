@@ -6,7 +6,9 @@
 #' Conditional Minimization (MCECM)
 #' 
 #' @inheritParams formulaData
-#' @inheritParams fit_dat_B
+#' @param family a description of the error distribution and link function to be used in the model. 
+#' Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+#' with canonical links only.
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
 #' linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
 #' argument is \code{NULL}, this should be a numeric vector of length equal to the 
@@ -17,11 +19,19 @@
 #' used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
 #' penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
 #' fixed effects given in the formula.
+#' @param penalty character describing the type of penalty to use in the variable selection procedure.
+#' Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.
+#' @param alpha Tuning parameter for the Mnet estimator which controls the relative contributions 
+#' from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+#' the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+#' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
+#' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
+#' Default is 4.0 for SCAD and 3.0 for MCP.
 #' @param optim_options a list of class "optimControl" created from function \code{\link{optimControl}}
 #' that specifies optimization parameters.
 #' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
 #' containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-#' Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"
+#' Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".
 #' @param tuning_options a list of class selectControl or lambdaControl resulting from 
 #' \code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
 #' If the user wants to run the algorithm using one specific set of
@@ -30,12 +40,46 @@
 #' If the user wants to run the algorithm over multiple possible \code{lambda0} and \code{lambda1},
 #' then use \code{selectControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
 #' documentation for details
+#' @param BICq_posterior an optional character string expressing the path and file name of a text file that 
+#' the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+#' These full model posterior draws will be used in BIC-ICQ calculations if these calculations
+#' are requested. The name of the file should include a .txt extension. If this argument is
+#' specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
+#' will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
+#' See 'Details' section for additional details.
+#' @param trace an integer specifying print output to include as function runs. Default value is 0. 
+#' See Details for more information about output provided when trace = 0, 1, or 2.
 #' 
-## #' @inheritSection fit_dat
+#' @details 
+#' If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 
+#' to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
+#' process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
+#' lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
+#' In order to avoid repetitive calculations of
+#' this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
+#' posterior draws will be saved in a .txt file. If the file already exits, the full model 
+#' will not be fit again and the big.matrix of 
+#' posterior draws will be read using \code{bigmemory::read.big.matrix}
+#' (\code{bigmemory::read.big.matrix(filename, sep = ' ', type = 'double')}) and used in the BIC-ICQ 
+#' calcuations. If the file does not exist or \code{BICq_posterior} 
+#' is specified as \code{NULL}, the full model will be fit and the full model posterior
+#' draws will be saved at the specified file location (using \code{bigmemory::write.big.matrix})
+#' or in the working directory with generic filename "BICq_Posterior_Draws.txt" (if \code{NULL} 
+#' is specified). The algorithm will save 10^4 posterior draws automatically.
 #' 
-#' @return An reference class object of class \code{\link{pglmmObj}} for which many methods are 
+#' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
+#' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+#' from t iterations back EM_diff, and number of non-zero coefficients Non0 Coef). The value of 1
+#' additionally outputs the updated coefficients, updated covariance matrix values, and the
+#' number of coordinate descent iterations used for the M step for each
+#' EM iteration. The value of 2 outputs all of the above plus gibbs acceptance rate information
+#' for the adaptive random walk and independence samplers and the updated proposal standard deviation
+#' for the adaptive random walk. 
+#' 
+#' @return A reference class object of class \code{\link{pglmmObj}} for which many methods are 
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #'  
+#' 
 #' @importFrom stringr str_to_lower str_c
 #' @importFrom Matrix Matrix
 #' @export
@@ -43,7 +87,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                    offset = NULL, fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
-                   trace = 0, tuning_options = selectControl()){
+                   trace = 0, tuning_options = selectControl(), BICq_posterior = NULL){
   # Things to address / Questions to answer:
   ## Specify what fit_dat output will be
   ## Provide option for offset, weights
@@ -190,7 +234,13 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                     covar = covar, max_cores = max_cores)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
-    optim_results = matrix(NA, nrow = 1, ncol = 1)
+    # c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+    optim_results = c(fit$lambda0, fit$lambda1, fit$BICh, fit$BIC, fit$BICq, fit$ll,
+                      sum(fit$coef[2:ncol(data_input$X)] != 0),
+                      sum(diag(fit$sigma) != 0),
+                      sum(fit$coef != 0))
+    optim_results = matrix(optim_results, nrow = 1)
+    colnames(optim_results) = c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
     
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
@@ -211,22 +261,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       }
     }
     
-    if(tuning_options$BIC_option != "BICq"){
-      warning("Selection criteria not specified as 'BICq', so BIC-ICQ criteria will not be calculated",
-              immediate. = T)
-    }
-    
-    if(is.null(tuning_options$BICq_posterior) & tuning_options$BIC_option == "BICq"){
-      BICq_posterior = "BICq_Posterior_Draws.txt"
-    }else{
-      BICq_posterior = tuning_options$BICq_posterior
-    }
-    
     # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     # penalty, lambda0_range, lambda1_range,
     # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
     # trace = 0, u_init = NULL, coef_old = NULL, 
-    # full_model = T,
+    # BICq_calc = T,
     # adapt_RW_options = adaptControl(),
     # optim_options = optimControl(), BICq_posterior
     
@@ -234,7 +273,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              group_X = group_X, trace = trace,
-                             full_model = (tuning_options$BIC_option == "BICq"),
+                             BICq_calc = (tuning_options$BIC_option == "BICq"),
                              adapt_RW_options = adapt_RW_options, 
                              optim_options = optim_options, BICq_posterior = BICq_posterior)
     
@@ -278,6 +317,10 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                     random_walk = "Metropolis-within-Gibbs Adaptive Random Walk Sampler",
                     independence = "Metropolis-within-Gibbs Independence Sampler")
   
+  if(penalty == "lasso"){
+    gamma_penalty = NULL
+  }
+  
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, y = fD_out$y,
                        X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$flist,
@@ -285,7 +328,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                        offset = offset, frame = fD_out$frame, 
                        sampling = sampling, std_out = std_out, 
                        selection_results = selection_results, optim_results = optim_results,
-                       penalty = penalty, gamma_penalty = gamma_penalty))
+                       penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, fixef_noPen = fixef_noPen,
+                       control_options = list(optim_options = optim_options, tuning_options = tuning_options,
+                                              adapt_RW_options = adapt_RW_options)))
   
   out_object = pglmmObj$new(output)
   return(out_object)

@@ -39,12 +39,11 @@ fit_dat_B(
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
 Z (model matrix for the random effects), and group (vector whose value indicates 
-the study, batch, or other group identity to which on observation belongs), with each row an 
-observation}
+the study, batch, or other group identity to which on observation belongs)}
 
 \item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
 
-\item{lambda1}{a non-negative numeric penalty parameter for the grouped random effects
+\item{lambda1}{a non-negative numeric penalty parameter for the (grouped) random effects
 covariance parameters}
 
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
@@ -54,17 +53,17 @@ EM algorithm. Default is 0.001.}
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
-See \code{family} options in the Details section.}
+Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+with canonical links only.}
 
 \item{offset_fit}{This can be used to specify an a priori known component to be included in the 
 linear predictor during fitting. This should be NULL or a numeric vector of length equal to the 
 number of cases.}
 
-\item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...)}
+\item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
+See Details for more information about output provided when trace = 0, 1, or 2.}
 
-\item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
+\item{penalty}{character describing the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
@@ -75,7 +74,11 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
 
-\item{group_X}{vector ...}
+\item{group_X}{vector describing the grouping of the covariates in the model matrix.}
+
+\item{nMC_burnin}{positive integer specifying the number of posterior draws to use as
+burnin for each E step in the EM algorithm. Default 250. Function will not allow \code{nMC_burnin}
+to be less than 100.}
 
 \item{nMC}{a positive integer for the initial number of Monte Carlo draws}
 
@@ -86,7 +89,8 @@ the most recent coefficient estimate and the coefficient estimate from t EM iter
 Positive integer, default equals 2.}
 
 \item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
-when the function ends. Default 5,000. Warning: the returned draws are formatted in a regular
+when the function ends. Default set to the minimum allowed value: 5,000. 
+Warning: the returned draws are formatted as a regular
 matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
 and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
 \code{nMC_report} by (q*d) does not cause memory issues on your operating system.}
@@ -99,19 +103,23 @@ coordinate descent algorithms used within each EM iteration. Default equals 250.
 \item{M}{positive integer specifying the number of posterior draws to use within the 
 Pajor log-likelihood calculation}
 
-\item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
-should incorporate an adaptive random walk sampler (default, "random_walk") or an
+\item{sampler}{character string specifying whether the posterior draws of the random effects
+should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
+incorporating an adaptive random walk sampler ("random_walk") or an
 independence sampler ("independence").}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "independence"}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
 
-\item{covar}{character value specifying whether the covariance matrix should be unstructured
+\item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (including the intercept) is 
 greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
 independent covariance structure (covar switched to "independent").}
+
+\item{var_start}{positive number specifying the starting values to initialize the variance
+of the covariance matrix. Default set to 1.0.}
 }
 \value{
 a list with the following elements:
@@ -128,10 +136,11 @@ For independent covariance matrices, q^2 x q.}
 \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
 \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
 \item{BIC}{Regular BIC estimate}
+\item{BICq}{BIC-ICQ estimate}
 \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
 \item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
-and each group (rows)}
+and each group (rows) when the sampler is either "random_walk" or "independence"}
 \item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
 random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
 each group (rows)}
@@ -139,9 +148,3 @@ each group (rows)}
 \description{
 Description
 }
-\section{Details}{
- 
-Accepted families: binomial, poisson, and gaussian. Currently, only canonical links for each 
-family are available.
-}
-

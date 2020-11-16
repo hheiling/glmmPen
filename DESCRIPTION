@@ -2,7 +2,7 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.4.9.9
+Version: 1.5.0.0
 Date: 2018-10-26
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
@@ -49,6 +49,9 @@ Author: Hillary Heiling [aut, cre],
   Naim Rashid [aut],
   Quefeng Li [aut]
 Suggests: 
-    testthat
+    testthat,
+    knitr,
+    rmarkdown
 Biarch: true
 SystemRequirements: GNU make
+VignetteBuilder: knitr

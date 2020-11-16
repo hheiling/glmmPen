@@ -471,8 +471,10 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
     
   } // End while loop
   
-  Rprintf("Number iterations in grouped coord descent: %i \n", iter);
-  Rcout << "final nu: " << nu << std::endl;
+  if(trace >= 1){
+    Rprintf("Number iterations in grouped coord descent: %i \n", iter);
+    Rcout << "final nu: " << nu << std::endl;
+  }
   
   // If negative binomial family, update phi (dispersion) estimate
   // negbin variance: mu + phi * mu^2

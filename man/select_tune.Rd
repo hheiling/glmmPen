@@ -18,7 +18,7 @@ select_tune(
   trace = 0,
   u_init = NULL,
   coef_old = NULL,
-  full_model = T,
+  BICq_calc = T,
   adapt_RW_options = adaptControl(),
   optim_options = optimControl(),
   BICq_posterior = NULL
@@ -27,8 +27,7 @@ select_tune(
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
 Z (model matrix for the random effects), and group (vector whose value indicates 
-the study, batch, or other group identity to which on observation belongs), with each row an 
-observation}
+the study, batch, or other group identity to which on observation belongs)}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
@@ -38,12 +37,12 @@ argument should specify the name of a column in the data.frame.
 Currently, the formula does not allow specification of an offset.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
-See \code{family} options in the Details section.}
+Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+with canonical links only.}
 
-\item{group_X}{vector ...}
+\item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
-\item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
+\item{penalty}{character describing the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
@@ -54,15 +53,26 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
 
-\item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...)}
+\item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
+See Details for more information about output provided when trace = 0, 1, or 2.}
+
+\item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
+best model.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "independence"}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
 
 \item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
 that specifies optimization parameters.}
+
+\item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
+the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+These full model posterior draws will be used in BIC-ICQ calculations if these calculations
+are requested. The name of the file should include a .txt extension. If this argument is
+specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
+will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
+See 'Details' section for additional details.}
 }
 \value{
 A list with the following elements:

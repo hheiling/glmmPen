@@ -4,14 +4,14 @@
 \alias{optimControl}
 \title{Control of Penalized Generalized Linear Mixed Model Fitting
 
-Constructs the control structure for penalized mixed model fitting.}
+Constructs the control structure for the optimization of the penalized mixed model fit algorithm.}
 \usage{
 optimControl(
   conv_EM = 0.001,
   conv_CD = 1e-04,
-  nMC_burnin = 500,
-  nMC_start = 5000,
-  nMC_max = 10000,
+  nMC_burnin = 250,
+  nMC_start = 1000,
+  nMC_max = 10^4,
   nMC_report = 5000,
   maxitEM = 100,
   maxit_CD = 200,
@@ -19,7 +19,7 @@ optimControl(
   t = 2,
   covar = c("unstructured", "independent"),
   sampler = c("stan", "random_walk", "independence"),
-  var_start = 0.5,
+  var_start = 1,
   max_cores = 1
 )
 }
@@ -30,8 +30,8 @@ EM algorithm. Default is 0.001.}
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
 
-\item{nMC_burnin}{positive integer specifying teh number of posterior draws to use as
-burnin for each E step in the EM algorithm. Default 200. Function will not allow \code{nMC_burnin}
+\item{nMC_burnin}{positive integer specifying the number of posterior draws to use as
+burnin for each E step in the EM algorithm. Default 250. Function will not allow \code{nMC_burnin}
 to be less than 100.}
 
 \item{nMC_start}{a positive integer for the initial number of Monte Carlo draws.}
@@ -39,7 +39,8 @@ to be less than 100.}
 \item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws}
 
 \item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
-when the function ends. Default 5,000. Warning: the returned draws are formatted in a regular
+when the function ends. Default set to the minimum allowed value: 5,000. 
+Warning: the returned draws are formatted as a regular
 matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
 and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
 \code{nMC_report} by (q*d) does not cause memory issues on your operating system.}
@@ -56,15 +57,19 @@ Pajor log-likelihood calculation}
 the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 Positive integer, default equals 2.}
 
-\item{covar}{character value specifying whether the covariance matrix should be unstructured
+\item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (including the intercept) is 
 greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
 independent covariance structure (covar switched to "independent").}
 
-\item{sampler}{character value specifying whether the Metropolis-within-Gibbs procedure 
-should incorporate an adaptive random walk sampler (default, "random_walk") or an
+\item{sampler}{character string specifying whether the posterior draws of the random effects
+should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
+incorporating an adaptive random walk sampler ("random_walk") or an
 independence sampler ("independence").}
+
+\item{var_start}{positive number specifying the starting values to initialize the variance
+of the covariance matrix. Default set to 1.0.}
 }
 \value{
 Function returns a list (inheriting from class "\code{optimControl}") 
@@ -73,5 +78,5 @@ containing fit and optimization criteria values used in optimization routine.
 \description{
 Control of Penalized Generalized Linear Mixed Model Fitting
 
-Constructs the control structure for penalized mixed model fitting.
+Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
 }

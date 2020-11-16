@@ -112,8 +112,8 @@ List sample_mc_inner_gibbs(arma::mat f, // matrix
           // Need to replace 1.0 in below with appropriate sigma
           // sum = sum + R::dnorm4(Y(l), mu_denom(l), 1.0, 1);
           // sumn = sumn + R::dnorm4(Y(l), mu_num(l), 1.0, 1);
-          sum = sum + R::dnorm(Y(l), mu_denom(l), 1.0, 1);
-          sumn = sumn + R::dnorm(Y(l), mu_num(l), 1.0, 1);
+          sum = sum + R::dnorm(Y(l), mu_denom(l), sig_g, 1);
+          sumn = sumn + R::dnorm(Y(l), mu_num(l), sig_g, 1);
         }
       }
       

@@ -4,64 +4,17 @@
 #' 
 #' Description
 #' 
+#' @inheritParams optimControl 
+#' @inheritParams lambdaControl
+#' @inheritParams glmmPen
 #' @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
 #' Z (model matrix for the random effects), and group (vector whose value indicates 
-#' the study, batch, or other group identity to which on observation belongs), with each row an 
-#' observation
-#' @param lambda0 a non-negative numeric penalty parameter for the fixed effects parameters
-#' @param lambda1 a non-negative numeric penalty parameter for the grouped random effects
-#' covariance parameters
-#' @param conv_EM a non-negative numeric convergence criteria for the convergence of the 
-#' EM algorithm. Default is 0.001.
-#' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
-#' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.
-#' @param family a description of the error distribution and link function to be used in the model. 
-#' For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
-#' See \code{family} options in the Details section.
+#' the study, batch, or other group identity to which on observation belongs)
 #' @param offset_fit This can be used to specify an a priori known component to be included in the 
 #' linear predictor during fitting. This should be NULL or a numeric vector of length equal to the 
 #' number of cases. 
-#' @param trace an integer specifying print output to include as function runs. Default value is 0 
-#' (details ...)
-#' @param penalty character descripting the type of penalty to use in the variable selection procedure.
-#' Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.
-#' @param alpha Tuning parameter for the Mnet estimator which controls the relative contributions 
-#' from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
-#' the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-#' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
-#' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
-#' Default is 4.0 for SCAD and 3.0 for MCP.
-#' @param group_X vector ...
+#' @param group_X vector describing the grouping of the covariates in the model matrix.
 #' @param nMC a positive integer for the initial number of Monte Carlo draws
-#' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws
-#' @param t the convergence criteria is based on the average Euclidean distance between 
-#' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
-#' Positive integer, default equals 2.
-#' @param nMC_report positive integer specifying number of Monte Carlo posterior draws to return
-#' when the function ends. Default 5,000. Warning: the returned draws are formatted in a regular
-#' matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
-#' and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
-#' \code{nMC_report} by (q*d) does not cause memory issues on your operating system.
-#' @param maxitEM a positive integer for the maximum number of allowed EM iterations. Default equals 100.
-#' @param maxit_CD a positive integer for the maximum number of allowed interations for the
-#' coordinate descent algorithms used within each EM iteration. Default equals 250.
-#' @param M positive integer specifying the number of posterior draws to use within the 
-#' Pajor log-likelihood calculation
-#' @param sampler character value specifying whether the Metropolis-within-Gibbs procedure 
-#' should incorporate an adaptive random walk sampler (default, "random_walk") or an
-#' independence sampler ("independence"). 
-#' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
-#' containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-#' Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "independence"
-#' @param covar character value specifying whether the covariance matrix should be unstructured
-#' ("unstructured") or diagonal with no covariances between variables ("independent").
-#' Default is "unstructured", but if the number of random effects (including the intercept) is 
-#' greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
-#' independent covariance structure (covar switched to "independent").
-#' 
-#' @section Details: 
-#' Accepted families: binomial, poisson, and gaussian. Currently, only canonical links for each 
-#' family are available.
 #' 
 #' @return a list with the following elements:
 #' \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
@@ -77,15 +30,15 @@
 #' \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
 #' \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
 #' \item{BIC}{Regular BIC estimate}
+#' \item{BICq}{BIC-ICQ estimate}
 #' \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 #' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
 #' \item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
-#' and each group (rows)}
+#' and each group (rows) when the sampler is either "random_walk" or "independence"}
 #' \item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
 #' random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
 #' each group (rows)}
 #' 
-#'  
 #' @useDynLib glmmPen
 #' @importFrom bigmemory attach.big.matrix describe as.big.matrix
 #' @importFrom mvtnorm rmvnorm dmvnorm
@@ -180,7 +133,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     if (inherits(tmp, "try-error")) stop("gamma_penalty must be numeric or able to be coerced to numeric", call.=FALSE)
   }
   
-  if (!is.double(alpha)) {
+  if(!is.double(alpha)) {
     tmp <- try(alpha <- as.double(alpha), silent=TRUE)
     if (inherits(tmp, "try-error")) stop("alpha must be numeric or able to be coerced to numeric", call.=FALSE)
   }else if(alpha == 0.0){
@@ -352,8 +305,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       # last round of selection
       u_big = as.big.matrix(u_init)
       sig_g = sig_gaus(y, X, Z, u_big@address, group, J, c(coef, gamma), offset_fit, c(d, ncol(Z)/d), link_int)
+      
     }
-    
+   
     if(trace >= 1){
       cat("initial residual error SD: ", sig_g, "\n")
     }
@@ -478,8 +432,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     if(family == "gaussian"){
       # if family = 'gaussian', calculate sigma of error term (standard deviation)
-      sig_g = sig_gaus(y, X, Z, u0@address, group, J, coef, offset_fit, c(d, ncol(Z)/d), link_int)
-      cat("sig_g: ", sig_g, "\n")
+      sig_g = sig_gaus(y, X, Z, u0@address, group, J, c(coef, gamma), offset_fit, c(d, ncol(Z)/d), link_int)
+      if(trace >= 1){
+        cat("sig_g: ", sig_g, "\n")
+      }
+     
     }
     
     # if(family == "negbin"){
@@ -492,20 +449,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       print(coef)
     }
     
-    # If fixed effects penalized to 0, make sure associated random effects also penalized to 0
-    
-    u2 = matrix(0, nMC2, ncol(Z))
-    for(ii in 1:d){
-      u2[,seq(ii, ncol(Z), by = d)] = rmvnorm(n = nMC2,sigma=var)
-    }
-    
     # Q-function estimate
     ll0 = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, phi)
     
     if(!is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)){
       # For now, assume divergent in any abs(coefficient) > 10^5
       problem = T
-      ll0 = Inf
       print("Updated coef:")
       print(coef)
     }
@@ -514,10 +463,27 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       warning("Error in M step", immediate. = T)
       out = list(coef = coef, sigma = cov,  
                  lambda0 = lambda0, lambda1 = lambda1, 
-                 covgroup = covgroup, J = J, ll = -Inf, BIC = Inf, BICh = Inf,
-                 extra = list(Znew2 = Znew2),
+                 covgroup = covgroup, J = J, ll = -Inf, BICh = Inf, BIC = Inf, BICq = Inf,
                  gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
-                 EM_iter = i)
+                 EM_iter = i, EM_conv = NA)
+      # !is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)
+      if(any(is.na(coef))){
+        out$warnings = sprintf("coefficient estimates contained NA values at iteration %i",i)
+      }else if(any(abs(coef) > 10^5)){
+        if(family == "gaussian"){
+          out$warnings = "Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl"
+        }else{
+          out$warnings = "Error in M step: coefficient values diverged"
+        }
+      }else if(!is.finite(ll0)){
+        out$warnings = "Error in M step: Q function estimated as -Inf"
+      }
+      
+      if(sampler %in% c("random_walk","independence")){
+        out$gibbs_accept_rate = gibbs_accept_rate
+        out$proposal_SD = proposal_SD
+      }
+      
       if(is.null(coef_old)){
         out$coef_naive = fit_naive
       }
@@ -532,6 +498,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         u0_out = bigmemory::as.matrix(u0)
       }
       out$u = u0_out
+      
+      
       
       return(out)
     } # End problem == T
@@ -579,10 +547,10 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     if(trace >= 1){
       if(nrow(cov) <= 5){
-        print("cov:")
+        print("covariance matrix:")
         print(cov)
       }else{
-        print("cov diagonal:")
+        print("covariance matrix diagonal:")
         print(diag(cov))
       }
     }
@@ -617,6 +585,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   # Another E step for loglik calculation (number draws = M)
+  ## In optimControl() set minimum of M as 10^4
   
   # Note: Assume that at end of EM algorithm, which(diag(cov) > 0) corresponds with the
   # sampling restrictions specified within EM algorithm:
@@ -626,7 +595,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     ## Make sure to always keep random intercept
   
   Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
-                     nMC=nMC, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g = sig_g,
+                     nMC=M, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g = sig_g,
                      sampler=sampler, d=d, uold=as.numeric(u0[nrow(u0),]), proposal_SD=proposal_SD, 
                      batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
                      trace=trace, num_cores=num_cores)
@@ -671,23 +640,26 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     BICq = NA
   }
   
+  out = list(coef = coef, sigma = cov,  
+             lambda0 = lambda0, lambda1 = lambda1, 
+             covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq,
+             extra = list(Znew2 = Znew2), EM_iter = i, EM_conv = diff[i])
+  
   if(sampler %in% c("random_walk","independence")){
-    out = list(coef = coef, sigma = cov,  
-               lambda0 = lambda0, lambda1 = lambda1, 
-               covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq,
-               extra = list(Znew2 = Znew2),
-               gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
-               EM_iter = i)
+    out$gibbs_accept_rate = gibbs_accept_rate
+    out$proposal_SD = proposal_SD
   }else if(sampler == "stan"){
-    out = list(coef = coef, sigma = cov,  
-               lambda0 = lambda0, lambda1 = lambda1, 
-               covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq,
-               extra = list(Znew2 = Znew2), EM_iter = i)
+    out$gibbs_accept_rate = NULL
+    out$proposal_SD = NULL
   }
   
   if((is.null(coef_old)) & (trace >= 1)){
     out$coef_naive = fit_naive
   }
+  if(EM_converged == 0){
+    out$warnings = "glmmPen algorithm did not converge within maxit_EM iterations"
+  }
+  
   
   if(nrow(u0) >= nMC_report){
     # Take last nMC_report rows
@@ -695,9 +667,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     r_end = nrow(u0)
     u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
   }else{
-    
+    # Run E step for another nMC_report draws
     Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
-                       nMC=nMC, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
+                       nMC=nMC_report, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
                        sampler=sampler, d=d, uold=as.numeric(u0[nrow(u0),]), proposal_SD=proposal_SD, 
                        batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
                        trace=trace, num_cores=num_cores)

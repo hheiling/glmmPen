@@ -21,6 +21,8 @@ indicator_2 = function(bounds, samples){
 #' @export
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL){
   
+  cat("Pajor Log-Likelihood Calculation \n")
+  
   family_info = family_export(family)
   fam_fun = family_info$family_fun
   link = family_info$link
@@ -115,7 +117,7 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
     }else{
       indic = indicator_2(bounds[,cols], imp_samp)
     }
-    cat("proportion of samples inside bounds:", mean(indic), "\n")
+    cat("proportion of importance samples inside bounds:", mean(indic), "\n")
     
     dens_k = rep(1, times = M)
     
@@ -125,16 +127,6 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
     for(i in 1:ncol(eta)){
       mu[,i] = invlink(link_int, eta[,i])
     }
-    
-    # Could assume separate calculation of sig_g (sigma of error term in linear model) 
-    # for each group k
-    # if(family == "gaussian"){
-    #   sig_g = 0
-    #   for(i in 1:ncol(mu)){
-    #     sig_g = sig_g + sum((rep(y_k[i], times=M) - mu[,i])^2)
-    #   }
-    #   sig_g = sig_g / (M * n_k)
-    # }
     
     if(family == "binomial"){
       for(i in 1:n_k){

@@ -16,6 +16,11 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
     u0 = attach.big.matrix(samplemc_out$u0)
     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
     
+    if(trace >= 2){
+      print("Gibbs acceptance rate for E step:")
+      print(gibbs_accept_rate)
+    }
+    
   }else if(sampler == "random_walk"){ 
     # First adapt the proposal variance during an initial burnin period
     samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, 
@@ -47,6 +52,11 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
     
     gibbs_accept_rate = samplemc_out$gibbs_accept_rate
     u0 = attach.big.matrix(samplemc_out$u0)
+    
+    if(trace >= 2){
+      print("Gibbs acceptance rate for E step:")
+      print(gibbs_accept_rate)
+    }
     
   }else if(sampler == "stan"){
     
@@ -139,10 +149,6 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
     } # End k for loop
     
   } # End if-else sampler
-  
-  if(any(is.na(u0[,]))){
-    print(head(u0[,]))
-  }
   
   return(list(u0 = describe(u0), proposal_SD = proposal_SD, gibbs_accept_rate = gibbs_accept_rate,
               updated_batch = batch))

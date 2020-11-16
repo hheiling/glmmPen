@@ -8,65 +8,8 @@
 # Output a big.matrix for the posterior draws 
 ############################################################################
 
-#' @name sample_mc_adapt_BigMat
-#' @aliases sample_mc2_BigMat
-#' 
-#' @title Calculate Monte Carlo draws using Metropolis-within-Gibbs
-#' 
-#' @description Samples draws from the posterior distribution of the random effects using 
-#' Metropolis-within-Gibbs. \code{sample_mc_adapt_BigMat} samples using adaptive 
-#' random walk and \code{sample_mc2_BigMat} samples using independence sampling. See
-#' \code{\link{adaptControl}} for possible adaptive random walk adjustments. Draws are automatically
-#' thinned to only record every fifth sample.
-#' 
-#' @inheritParams fit_dat_B
-#' @param coef a numeric vector of the fixed effects coefficients (from the latest EM iteration or
-#' the final model of interest)
-#' @param ranef_idx a vector of integers describing which random effects are non-zero (i.e. which
-#' diagonal elements of the sigma matrix are non-zero)
-#' @param y a numeric vector of the response variable
-#' @param X a model matrix of the fixed effects covariates
-#' @param Z a sparse model matrix of the random effects multiplied by the lower triangular cholesky
-#' decomposition of the sigma matrix (from the latest EM iteration or the final model of interest)
-#' @param group a factor vector of the grouping variable, converted to a factor of 
-#' consecutive numeric integers
-#' @param d integer, the number of groups present (number factors of the group vector)
-#' @param uold a matrix with a single row comprised of the last Monte Carlo draw from either the 
-#' most recent E step of the EM algorithm or the final model
-#' @param proposal_SD a matrix of dimension (number of groups)x(number of random effects) that
-#' gives the proposal standard deviation for the adaptive random walk. The \code{glmmPen} MCEM 
-#' algorithm initializes the proposal standard deviation as 1.0 for all variables and groups
-#' and is updated at the start of every E step when the Metropolis-within-Gibbs adaptive random walk
-#' algorithm is used. 
-#' @param batch integer specifying how many batches of posterior draws has already been sampled in
-#' the MCEM algorithm. As the batch number increases, the proposal standard deviation for the adaptive 
-#' random walk algorithm is adjusted by a smaller amount.
-#' @param batch_length an integer specifying the number of posterior draws (ignoring thinning) used
-#' to evaluate the acceptance rate of the random walk algorithm. This acceptance rate is then used
-#' to adjust the proposal standard deviation if necessary.
-#' @param offset (need to add description)
-#' @param nMC_burnin an integer specifying the number of posterior draws
-#' to allow adjustments to the proposal standard deviation. For the MCEM algorithm, it is recommended
-#' to allow for the adjustment of the proposal standard deviation at the beginning of each E step.
-#' 
-#' @return a list made of the following components:
-#' \item{u0}{list of the information needed to attached to a big.matrix object. Use 
-#' \code{bigmemory::attach.big.matrix(u0)} to extract a big.matrix of the Monte Carlo draws of
-#' the random effect posterior distribution. Number rows = nMC, number columns = 
-#' (number random effects)*(number groups) = ncol(Z). Organization of columns: first by random effect 
-#' variable, then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
-#' \item{gibbs_accept_rate}{matrix of dimension (number groups)x(number random effects). Each entry
-#' gives the proportion of accepted draws for the particular random effect variable in group k 
-#' either in the entire \code{nMC} draws (for \code{sample_mc2_BigMat}) or for the last 
-#' \code{batch_length} draws.}
-#' \item{proposal_SD}{a matrix of dimension (number of groups)x(number of random effects) that is
-#' only output from \code{sample_mc_adapt_BigMat}. It records the updated proposal standard deviation
-#' for the particular random effect variable in group k.}
-#' \item{updated_batch}{integer specifying the updated number of batches of posterior draws that 
-#' have been sampled.}
-#' 
+
 #' @importFrom bigmemory big.matrix describe
-#' @export
 sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, group, d,
                                   uold, proposal_SD, batch, batch_length = 100, 
                                   offset = 0, nMC_burnin = 500, phi = 0.0, sig_g = 1.0){
@@ -134,10 +77,7 @@ sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, g
   
 } # End sample_mc_adapt_BigMat()
 
-#' @rdname sample_mc_adapt_BigMat
-#'
 #' @importFrom bigmemory big.matrix describe
-#' @export
 sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, group, d, 
                              uold, phi = 0.0, sig_g = 1.0){
   

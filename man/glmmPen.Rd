@@ -18,7 +18,8 @@ glmmPen(
   optim_options = optimControl(),
   adapt_RW_options = adaptControl(),
   trace = 0,
-  tuning_options = selectControl()
+  tuning_options = selectControl(),
+  BICq_posterior = NULL
 )
 }
 \arguments{
@@ -35,8 +36,8 @@ The offset must be specified outside of the formula in the 'offset' argument.}
 omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
-See \code{family} options in the Details section.}
+Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+with canonical links only.}
 
 \item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
 options \code{na.omit} and \code{na.pass} are recognized by this function.}
@@ -53,7 +54,7 @@ used in the model. Value 0 indicates the variable should not have its fixed effe
 penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
 fixed effects given in the formula.}
 
-\item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
+\item{penalty}{character describing the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
@@ -69,10 +70,10 @@ that specifies optimization parameters.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
 
-\item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...)}
+\item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
+See Details for more information about output provided when trace = 0, 1, or 2.}
 
 \item{tuning_options}{a list of class selectControl or lambdaControl resulting from 
 \code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
@@ -82,12 +83,46 @@ If no penalization is desired, use this setting with \code{lambda0} = \code{lamb
 If the user wants to run the algorithm over multiple possible \code{lambda0} and \code{lambda1},
 then use \code{selectControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
 documentation for details}
+
+\item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
+the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+These full model posterior draws will be used in BIC-ICQ calculations if these calculations
+are requested. The name of the file should include a .txt extension. If this argument is
+specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
+will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
+See 'Details' section for additional details.}
 }
 \value{
-An reference class object of class \code{\link{pglmmObj}} for which many methods are 
+A reference class object of class \code{\link{pglmmObj}} for which many methods are 
 available (e.g. \code{methods(class = "pglmmObj")})
 }
 \description{
 \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
 Conditional Minimization (MCECM)
+}
+\details{
+If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 
+to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
+process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
+lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
+In order to avoid repetitive calculations of
+this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
+posterior draws will be saved in a .txt file. If the file already exits, the full model 
+will not be fit again and the big.matrix of 
+posterior draws will be read using \code{bigmemory::read.big.matrix}
+(\code{bigmemory::read.big.matrix(filename, sep = ' ', type = 'double')}) and used in the BIC-ICQ 
+calcuations. If the file does not exist or \code{BICq_posterior} 
+is specified as \code{NULL}, the full model will be fit and the full model posterior
+draws will be saved at the specified file location (using \code{bigmemory::write.big.matrix})
+or in the working directory with generic filename "BICq_Posterior_Draws.txt" (if \code{NULL} 
+is specified). The algorithm will save 10^4 posterior draws automatically.
+
+Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t iterations back EM_diff, and number of non-zero coefficients Non0 Coef). The value of 1
+additionally outputs the updated coefficients, updated covariance matrix values, and the
+number of coordinate descent iterations used for the M step for each
+EM iteration. The value of 2 outputs all of the above plus gibbs acceptance rate information
+for the adaptive random walk and independence samplers and the updated proposal standard deviation
+for the adaptive random walk.
 }

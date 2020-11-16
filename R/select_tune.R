@@ -5,9 +5,12 @@
 #' \code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
 #' Conditional Minimization (MCECM) over multiple tuning parameters
 #' 
-#' @inheritParams fit_dat_B
 #' @inheritParams glmmPen
-#' 
+#' @inheritParams fit_dat_B
+#' @inheritParams selectControl
+#' @inheritParams optimControl
+#' @param BICq_calc boolean value indicating if the BIC-ICQ criterion should be used to select the
+#' best model.
 #' 
 #' @return A list with the following elements:
 #' \item{results}{matrix of summary results for each lambda tuning parameter combination, used
@@ -23,7 +26,7 @@
 select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                       trace = 0, u_init = NULL, coef_old = NULL, full_model = T,
+                       trace = 0, u_init = NULL, coef_old = NULL, BICq_calc = T,
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
                        BICq_posterior = NULL){
   
@@ -84,15 +87,25 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   ## Use minimum lambda in range of lambda
   ufull_describe = NULL
   
-  if(full_model == T){
+  if(BICq_calc == T){
     # If posterior draws from full model not yet created, fit full model and save posterior draws
     # Otherwise, read in the prevoiusly fit full model posterior draw results
     if(!is.null(BICq_posterior)){
       if(file.exists(BICq_posterior)){
+        cat("Using saved posterior draws from full model for BIC-ICQ calculation: ",
+            BICq_posterior,"\n")
         fitfull_needed = F
       }else{
+        cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n")
+        # warning("BICq_posterior file ",BICq_posterior," not found", 
+        #         "  Creating new full model posterior draws", immediate. = T)
         fitfull_needed = T
       }
+    }else{ # if is.null(BICq_posterior)
+      BICq_posterior = "BICq_Posterior_Draws.txt"
+      cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n",
+          "  within working directory \n")
+      fitfull_needed = T
     }
     
     if(fitfull_needed){
@@ -123,21 +136,27 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
         }else{
           ufull_big = as.big.matrix(ufull)
           ufull_describe = describe(ufull_big)
-          if(is.null(BICq_posterior)){
-            write.big.matrix(ufull_big, "BICq_Posterior_Draws.txt", sep=' ')
-          }else{
-            write.big.matrix(ufull_big, BICq_posterior, sep = " ")
-          }
+          write.big.matrix(ufull_big, BICq_posterior, sep = " ")
         }
         ufull = NULL
       } # End if-else is.character(out)
       
     }else{ # if fitfull_needed = F
+      cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
       ufull_big = read.big.matrix(filename = BICq_posterior, sep = " ", type = 'double')
       ufull_describe = describe(ufull_big)
-    }
+      # Checks
+      if(ncol(ufull_big) != ncol(dat$Z)){
+        stop("The number of columns in the saved full model posterior draws do not match \n",
+             "  the number of columns in the random effects matrix Z: ",ncol(dat$Z))
+      }
+      if(nrow(ufull_big) < 10^4){
+        warning("The number of posterior draws saved in ",BICq_posterior, "\n",
+                "  is less than the recommended 10^4",immediate. = T)
+      }
+    } # End if-else fitfull_needed
     
-  } # End if-else full_model = T
+  } # End if-else BICq_calc = T
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
@@ -146,6 +165,8 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   BICqold = BICq = Inf
   
   res = matrix(0, n1*n2, 9)
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+  
   coef = NULL
   coef_oldj0 = NULL
   uj0 = NULL
@@ -275,7 +296,6 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     
   } # end j loop for lambda1_range
   
-  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
   return(list(results = res, out = fout, coef = coef))

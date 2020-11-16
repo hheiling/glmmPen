@@ -48,9 +48,9 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
       nu = nu_tmp;
     }
     
-    // if(nu < 0.0001){
-    //   nu = 0.0001;
-    // }
+    if(nu < 0.0001){
+      nu = 0.0001;
+    }
   } // End family if-else
   
   resid = ((yi*const_ones) - mu); // Will divide zetaj by nu later
@@ -133,10 +133,11 @@ arma::vec zeta_fixef_calc(arma::mat X, arma::mat resid, arma::uvec idxj){
   int i = 0;
   
   arma::mat Xj = X.cols(idxj);
+  arma::vec Xji(idxj.n_elem); Xji.zeros();
   
   for(i=0;i<N;i++){
     // Update zetaj sum
-    arma::vec Xji = Xj.row(i);
+    Xji = trans(Xj.row(i));
     zetaj = zetaj + Xji * sum(resid.col(i));
     
   } // End i for loop
