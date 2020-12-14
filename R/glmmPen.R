@@ -1,20 +1,154 @@
 
-#' Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+#' @title Fit a Generalized Mixed Model via Monte Carlo Expectation Conditional Minimization (MCECM)
+#' 
+#' @description \code{glmm} is used to fit a single generalized mixed model via Monte Carlo 
+#' Expectation Conditional Minimization (MCECM). Unlike \code{glmmPen}, no model selection 
+#' is performed.
+#' 
+#' @inheritParams glmmPen
+#' @param ... additional arguments that could be passed into \code{glmmPen}. See \code{\link{glmmPen}}
+#' for further details.
+#' 
+#' @details The \code{glmm} function can be used to fit a single generalized mixed model.
+#' While this approach is meant to be used in the 'oracle' case where the user knows which
+#' covariates belong in the fixed and random effects and no penalization is required, one is
+#' allowed to specify non-zero fixed and random effects penalites using \code{\link{lambdaControl}}
+#' and the (...) arguments. The (...) allow for specification of penalty-related arguments; see
+#' \code{\link{glmmPen}} for details. For a high dimensional situation, the user may want to fit a 
+#' full model using a small penalty for the fixed and random effects and save the posterior
+#' draws from this full model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
+#' Specifying a .txt file in the 'BICq_posterior' argument will save the posterior draws from the 
+#' \code{glmm} model into a big.matrix within the .txt file specified (\code{bigmemory::write.big.matrix}).
+#' 
+#' 
+#' @return A reference class object of class \code{\link{pglmmObj}} for which many methods are 
+#' available (e.g. \code{methods(class = "pglmmObj")})
+#' 
+#' @export
+glmm = function(formula, data = NULL, family = "binomial", covar = c("unstructured","independent"),
+                offset = NULL, na.action = na.omit, 
+                optim_options = optimControl(), adapt_RW_options = adaptControl(),
+                trace = 0, tuning_options = lambdaControl(), ...){
+  
+  # Check that (...) arguments are subsets of glmmPen arguments
+  args_extra = list(...)
+  args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior")
+  if(length(args_extra) >= 1){
+    if(!(names(args_extra) %in% args_avail)){
+      stop("additional arguments provided in '...' input must match glmmPen arguments \n",
+           "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior' \n",
+           "see glmmPen documentation for details")
+    }
+  }
+  
+  if(!inherits(tuning_options, "lambdaControl")){
+    stop("glmm requires the use of lambdaControl for the tuning_options. \n",
+         "  In order to use selectControl for model selection, please use glmmPen function")
+  }
+  
+  # If ... arguments empty or only includes a few of the args_avail, 
+  # glmmPen will use default arguments 
+  out = glmmPen(formula = formula, data = data, family = family, covar = covar,
+                offset = offset, na.action = na.action, optim_options = optim_options,
+                adapt_RW_options = adapt_RW_options, trace = trace,
+                tuning_options = tuning_options, ...)
+  
+  return(out)
+  
+}
+
+fD_adj = function(out){
+  frame = out$fr
+  y = model.response(frame)
+  X = out$X
+  reTrms = out$reTrms
+  Zt = reTrms$Zt
+  cnms = reTrms$cnms
+  flist = reTrms$flist
+  
+  # Check y and X input
+  if(!is.double(y)) {
+    tmp <- try(y <- as.double(y), silent=TRUE)
+    if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
+  }
+  
+  if(!is.matrix(X)){
+    stop("X must be a matrix \n")
+  }else if(typeof(X)=="integer") storage.mode(X) <- "double"
+  
+  if(nrow(X) != length(y)){
+    stop("the dimension of X and y do not match")
+  }
+  
+  # For now, retrict algorithm to only handle single grouping factor
+  if(length(flist) > 1){
+    stop("procedure can only handle one group")
+  }else{
+    group = flist[[1]]
+    group_name = names(flist)
+    cnms = cnms[[1]]
+  }
+  
+  d = nlevels(group)
+  numvars = nrow(Zt)/d
+  Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
+  # mkReTrms Zt rows: organized first by level of group, then vars 
+  # Want Z columns organized first by vars, then levels of group within vars
+  for(lev in 1:numvars){
+    Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = numvars, length.out = d),])
+  }
+  colnames(Z) = str_c(rep(cnms, each = d), ":", levels(group))
+  
+  ## Make sure colnames random effects subset of colnames of fixed effects model matrix X
+  if(sum(!(cnms %in% colnames(X))) > 0){
+    stop("random effects must be a subset of fixed effects")
+  }
+  
+  if(!any(cnms == "(Intercept)")){
+    print(cnms)
+    stop("Model requires a random intercept term")
+  }
+  
+  ## Checks for converting character factor X (and Z) covariates to numeric factors ...
+  ##  Here or somewhere else (glFormula_edit, XZ_std ...) ?
+  
+  return(list(frame = frame, y = y, X = X, Z = Z, group = group, cnms = cnms,
+              group_name = group_name, reTrms = reTrms))
+  
+} # End fD_adj() function
+
+#' Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
 #' Minimization (MCECM)
 #' 
 #' \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-#' Conditional Minimization (MCECM)
+#' Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 #' 
-#' @inheritParams formulaData
+#' @param formula a two-sided linear formula object describing both the fixed-effects and 
+#' random-effects part of the model, with the response on the left of a ~ operator and the terms, 
+#' sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
+#' ("|") separating expression for design matrices from grouping factors. \code{formula} should be 
+#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
+#' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
+#' The offset must be specified outside of the formula in the 'offset' argument.
+#' @param data an optional data frame containing the variables named in \code{formula}. Although 
+#' \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
+#' omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).
 #' @param family a description of the error distribution and link function to be used in the model. 
 #' Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
 #' with canonical links only.
+#' @param covar character string specifying whether the covariance matrix should be unstructured
+#' ("unstructured") or diagonal with no covariances between variables ("independent").
+#' Default is "unstructured", but if the number of random effects (including the intercept) is 
+#' greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+#' independent covariance structure (covar switched to "independent").
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
 #' linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
 #' argument is \code{NULL}, this should be a numeric vector of length equal to the 
 #' number of cases (the response). If the data argument specifies a data.frame, the offset
 #' argument should specify the name of a column in the data.frame. 
 #' Currently, the formula does not allow specification of an offset.
+#' #' @param na.action a function that indicates what should happen when the data contain NAs. Only the 
+#' options \code{na.omit} and \code{na.pass} are recognized by this function.
 #' @param fixef_noPen Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 #' used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
 #' penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
@@ -79,12 +213,13 @@
 #' @return A reference class object of class \code{\link{pglmmObj}} for which many methods are 
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #'  
-#' 
-#' @importFrom stringr str_to_lower str_c
+#' @importFrom stringr str_to_lower str_c str_detect
 #' @importFrom Matrix Matrix
+#' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @export
-glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omit,
-                   offset = NULL, fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
+glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstructured","independent"),
+                   offset = NULL, na.action = na.omit, 
+                   fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
                    trace = 0, tuning_options = selectControl(), BICq_posterior = NULL){
@@ -92,26 +227,23 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   ## Specify what fit_dat output will be
   ## Provide option for offset, weights
   
+  # Input argument checks
+  
   # Input modification and restriction for family
   family_info = family_export(family)
   fam_fun = family_info$family_fun
-  # family = family_info$family
   
-  if(length(penalty) > 1){
-    penalty = penalty[1]
-  }
-  if(!(penalty %in% c("lasso","MCP","SCAD"))){
-    stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
-  }
+  # Check penalty parameters
+  penalty_check = checkPenalty(penalty, gamma_penalty, alpha)
+  penalty = penalty_check$penalty
+  gamma_penalty = penalty_check$gamma_penalty
+  alpha = penalty_check$alpha
   
-  if(!is.numeric(gamma_penalty)){
-    stop("gamma_penalty must be numeric")
-  }
-  if(penalty == "MCP" & gamma_penalty <= 1){
-    stop("When using MCP penalty, gamma_penalty must be > 1")
-  }else if(penalty == "SCAD" & gamma_penalty <= 2){
-    stop("When using SCAD penalty, gamma_penalty must be > 2")
-  }
+  # Check covariance matrix specification
+  covar = checkCovar(covar)
+  
+  # Check BICq_posterior format is appropriate
+  checkBICqPost(BICq_posterior)
   
   if(class(optim_options) != "optimControl"){
     stop("optim_options must be of class 'optimControl', see optimControl documentation")
@@ -120,37 +252,34 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     stop("adapt_RW_options must be of class 'adaptControl', see adaptControl documentation")
   }
   
-  
   # Convert formula and data to useful forms to plug into fit_dat
-  fD_out = formulaData(formula, data, na.action)
-  if(!any(fD_out$cnms == "(Intercept)")){
-    print(fD_out$cnms)
-    stop("Model requires an intercept term")
-  }
+  # Code glFormula_edit() edited version of glFormula() from lme4 package
+  # fD_out = 'formula-data output'
+  # fD_out0: list with elements formula, fr (model.frame), X (fixed effects matrix), 
+  #   reTrms (list with a random effects matrix Zt (needs to be adjusted), 
+  #   cnms (names of random effects), and flist (list of the groups) as well as some other 
+  #   output not utilized by the glmmPen package)
+  fD_out0 = glFormula_edit(formula = formula, data = data, family = fam_fun, subset = NULL,
+                           weights = NULL, na.action = na.action, offset = offset,
+                           contrasts = NULL)
   
-  if(is.null(offset)){
+  # Select output of interest from fD_out0, adjust formatting of Z matrix, and
+  #   perform additional checks and restrictions
+  fD_out = fD_adj(out = fD_out0)
+  
+  # If offset = NULL, then set offset as arbitrary vector of 0s
+  if(is.null(model.offset(fD_out$frame))){
     offset = rep(0, length(fD_out$y))
-  }else if(!is.null(data) & !is.null(offset)){
-    offset_name = offset
-    offset = data$offset_name
-    if(is.null(offset)){
-      stop("offset variable not found in data")
-    }
-  }else if(is.null(data) & !is.null(offset)){
-    # Check offset has appropriate attributes
-    if((!is.numeric(offset)) | (length(offset) != length(fD_out$y))){
+  }else{
+    offset = model.offset(fD_out$frame)
+    if((!is.numeric(offset)) | (length(offset) != length(y))){
       stop("offset must be a numeric vector of the same length as y")
     }
   }
   
-  ## Convert group to numeric factor - for fit_dat
+  ## Convert group to numeric factor - for fit_dat function
   ## Even if already numeric, convert to levels 1,2,3,... (consecutive integers)
   group_num = as.factor(as.numeric(fD_out$group))
-  # if(any(is.character(fD_out$group))){
-  #   group = as.factor(as.numeric(fD_out$group))
-  # }else{
-  #   group = fD_out$group
-  # }
   
   # Standardize X and Z
   std_out = XZ_std(fD_out, group_num)
@@ -204,7 +333,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     maxit_CD = optim_options$maxit_CD
     M = optim_options$M
     t = optim_options$t
-    covar = optim_options$covar
+    mcc = optim_options$mcc
+    # covar = optim_options$covar
     sampler = optim_options$sampler
     max_cores = optim_options$max_cores
     
@@ -217,30 +347,36 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     # trace = 0, penalty = c("MCP","SCAD","lasso"),
     # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
     # group_X = 0:(ncol(dat$X)-1),
-    # nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2,
+    # nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2, mcc = 3,
     # nMC_report = 5000, u_init = NULL, coef_old = NULL, 
     # ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
     # M = 10^4, sampler = c("stan","random_walk","independence"),
     # adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-    # var_start = 0.5, max_cores = 1
+    # var_start = 0.5, max_cores = 1, checks_complete = F
     
     fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
                     conv_EM = conv_EM, conv_CD = conv_CD,
                     family = fam_fun, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                     nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
-                    t = t, maxitEM = maxitEM, maxit_CD = maxit_CD,
+                    t = t, mcc = mcc, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, max_cores = max_cores)
+                    covar = covar, max_cores = max_cores, checks_complete = T)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
-    # c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
-    optim_results = c(fit$lambda0, fit$lambda1, fit$BICh, fit$BIC, fit$BICq, fit$ll,
+    # c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+    optim_results = c(fit$lambda0, fit$lambda1, fit$BICh, fit$BIC, fit$BICq, fit$BICNgrp, fit$ll,
                       sum(fit$coef[2:ncol(data_input$X)] != 0),
                       sum(diag(fit$sigma) != 0),
                       sum(fit$coef != 0))
     optim_results = matrix(optim_results, nrow = 1)
-    colnames(optim_results) = c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+    colnames(optim_results) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+    
+    # If relevant, save posterior draws for later BIC-ICQ calculations
+    if(!is.null(BICq_posterior)){
+      ufull_big = attach.big.matrix(fit$u_big)
+      write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
+    }
     
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
@@ -261,6 +397,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
       }
     }
     
+    BIC_option = tuning_options$BIC_option
+    
     # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     # penalty, lambda0_range, lambda1_range,
     # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
@@ -273,17 +411,13 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              group_X = group_X, trace = trace,
-                             BICq_calc = (tuning_options$BIC_option == "BICq"),
                              adapt_RW_options = adapt_RW_options, 
-                             optim_options = optim_options, BICq_posterior = BICq_posterior)
+                             optim_options = optim_options, covar = covar,
+                             BICq_calc = (tuning_options$BIC_option == "BICq"),
+                             BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
+                             checks_complete = T)
     
-    if(tuning_options$BIC_option == "BICh"){
-      fit = fit_select$out[["BICh"]]
-    }else if(tuning_options$BIC_option == "BIC"){
-      fit = fit_select$out[["BIC"]]
-    }else if(tuning_options$BIC_option == "BICq"){
-      fit = fit_select$out[["BICq"]]
-    }
+    fit = fit_select$out
     
     resultsA = fit_select$results
     coef_results = fit_select$coef
@@ -300,18 +434,16 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
     
     selection_results = cbind(resultsA,beta_results,gamma_results)
     
-    if(tuning_options$BIC_option == "BICh"){
+    if(BIC_option == "BICh"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
-    }else if(tuning_options$BIC_option == "BIC"){
+    }else if(BIC_option == "BIC"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
-    }else if(tuning_options$BIC_option == "BICq"){
+    }else if(BIC_option == "BICq"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
     }
     colnames(optim_results) = colnames(selection_results)
   }
   
-  # Things that should be included in fit_dat:
-  ## (fill in later)
   
   sampling = switch(optim_options$sampler, stan = "Stan", 
                     random_walk = "Metropolis-within-Gibbs Adaptive Random Walk Sampler",
@@ -323,7 +455,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", na.action = na.omi
   
   # Format Output - create pglmmObj object
   output = c(fit, list(call = call, formula = formula, y = fD_out$y,
-                       X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$flist,
+                       X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
                        coef_names = coef_names, family = fam_fun,
                        offset = offset, frame = fD_out$frame, 
                        sampling = sampling, std_out = std_out, 

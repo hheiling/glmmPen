@@ -11,7 +11,7 @@ selectControl(
   lambda0_seq = NULL,
   lambda1_seq = NULL,
   nlambda = 10,
-  BIC_option = c("BICh", "BIC", "BICq")
+  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp")
 )
 }
 \arguments{
@@ -31,7 +31,8 @@ Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
 Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-a full model (a small penalty is used for the fixed and random effects).}
+a full model; a small penalty is used for the fixed and/or random effects if the number of 
+effects is 10 or greater.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
@@ -52,4 +53,7 @@ from the initial round (based on the specified \code{BIC_option}) will be used t
 finer grid search. The new max and min lambda values are the lambda values two 
 positions away from the best lambda in the original lambda sequences for the fixed and random
 effects.
+
+The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
+non-zero penalty parameter combination. However, this is generally not recommended.
 }

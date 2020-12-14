@@ -21,14 +21,16 @@
 #' Rows correspond with the rows of the results matrix.}
 #'  
 #' @importFrom stringr str_c
-#' @importFrom bigmemory as.big.matrix describe write.big.matrix read.big.matrix
+#' @importFrom bigmemory attach.big.matrix describe write.big.matrix read.big.matrix
 #' @export
-select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
+select_tune = function(dat, offset = NULL, family, covar = c("unstructured","independent"), 
+                       group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                       trace = 0, u_init = NULL, coef_old = NULL, BICq_calc = T,
+                       trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
-                       BICq_posterior = NULL){
+                       BIC_option = c("BICh","BIC","BICq","BICNgrp"), BICq_calc = T, 
+                       BICq_posterior = NULL, checks_complete = F){
   
   # Input modification and restriction for family
   family_info = family_export(family)
@@ -48,14 +50,17 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   maxit_CD = optim_options$maxit_CD
   M = optim_options$M
   t = optim_options$t
-  covar = optim_options$covar
+  mcc = optim_options$mcc
+  # covar = optim_options$covar
   sampler = optim_options$sampler
   var_start = optim_options$var_start
   max_cores = optim_options$max_cores
   
-  covar = covar[1]
-  if(!(covar %in% c("unstructured","independent"))){
-    stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
+  if(length(BIC_option) > 1){
+    BIC_option = BIC_option[1]
+  }
+  if(!(BIC_option %in% c("BICh","BIC","BICq","BICNgrp"))){
+    stop("BIC_option must be 'BICh', 'BIC', 'BICq', or 'BICNgrp'")
   }
   
   # Calculate loglik for saturated model (mu set to y; n parameters, one per observation)
@@ -109,37 +114,32 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
     }
     
     if(fitfull_needed){
-      # Find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
+      # For high dimensions (number of fixed or random effects >= 10 not including intercept), 
+      # find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
       lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2)
       lam_min = lam_MaxMin[2]
+      if(ncol(dat$X) >= 11) lam0 = lam_min else lam0 = 0
+      if(ncol(dat$Z)/nlevels(dat$group) >= 11) lam1 = lam_min else lam1 = 0
       # Fit 'full' model
-      out = try(fit_dat_B(dat, lambda0 = lam_min, lambda1 = lam_min, 
-                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = 10^4,
+      ## Note: M restricted to be >= 10^4 in optimControl(). Will report M posterior draws from full model
+      out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
+                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = NULL, u_init = NULL, ufull_describe = NULL,
-                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
+                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start,
-                          max_cores = max_cores))
-      
+                          max_cores = max_cores, checks_complete = checks_complete))
       
       if(is.character(out)){
         print("Issue with full model fit, no BICq calculation will be completed")
         ufull_describe = NULL
       }else{
-        ufull = out$u
-        if(any(is.na(ufull))){
-          print("Issue with full model fit, no BICq calculation will be completed")
-          ufull_describe = NULL 
-        }else{
-          ufull_big = as.big.matrix(ufull)
-          ufull_describe = describe(ufull_big)
-          write.big.matrix(ufull_big, BICq_posterior, sep = " ")
-        }
-        ufull = NULL
-      } # End if-else is.character(out)
+        ufull_big = attach.big.matrix(out$u_big)
+        write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
+      }
       
     }else{ # if fitfull_needed = F
       cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
@@ -160,17 +160,16 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
   
   n1 = length(lambda0_range)
   n2 = length(lambda1_range)
-  BICold = BIC = Inf
-  BIChold = BICh = Inf
-  BICqold = BICq = Inf
+  # Keep track of BIC-type selection criteria
+  ## BIC_critold: record of largest BIC-type critera so far during selection
+  BIC_crit = BIC_critold = Inf
   
-  res = matrix(0, n1*n2, 9)
-  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+  res = matrix(0, n1*n2, 10)
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
   
   coef = NULL
   coef_oldj0 = NULL
   uj0 = NULL
-  outl = list()
   
   saturated = FALSE
   fout = list()
@@ -205,10 +204,10 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
-                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t,
+                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start,
-                          max_cores = max_cores))
+                          max_cores = max_cores, checks_complete = checks_complete))
       
 
       if(is.character(out)) next
@@ -219,51 +218,45 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
         uj0 = out$u 
       }
       
-      BICh = out$BICh
-      print(BICh)
-      if(!is.numeric(BICh)) BICh = Inf
-      if(length(BICh) != 1) BICh = Inf
-      
-      if(BICh < BIChold){
-        fout[["BICh"]] = out
-        BIChold = BICh
-      }
-      
-      BIC = out$BIC
-      print(BIC)
-      if(!is.numeric(BIC)) BIC = Inf
-      if(length(BIC) != 1) BIC = Inf
-      
-      if(BIC < BICold){
-        fout[["BIC"]] = out
-        BICold = BIC
-      }
-      
-      BICq = out$BICq
-      if(!is.na(BICq)){
-        if(!is.numeric(BICq)) BICq = Inf
-        if(length(BICq) != 1) BICq = Inf
-        
-        if(BICq < BICqold){
-          fout[["BICq"]] = out
-          BICqold = BICq
+      if(BIC_option == "BICh"){
+        BIC_crit = out$BICh
+      }else if(BIC_option == "BIC"){
+        BIC_crit = out$BIC
+      }else if(BIC_option == "BICq"){
+        BIC_crit = out$BICq
+        if(is.na(BIC_crit)){
+          warning("BIC-ICQ not calculated, using BICh for selection criteria instead",immediate. = T)
         }
+      }else if(BIC_option == "BICNgrp"){
+        BIC_crit = out$BICNgrp
       }
+      
+      if(!is.numeric(BIC_crit)) BIC_crit = Inf
+      if(length(BIC_crit) != 1) BIC_crit = Inf
+      
+      if(BIC_crit < BIC_critold){
+        fout = out
+        BIC_critold = BIC_crit
+      }
+      
+      BICh = out$BICh
+      BIC = out$BIC
+      BICq = out$BICq
+      BICNgrp = out$BICNgrp
+      BIC_report = c(BICh,BIC,BICq,BICNgrp)
+      names(BIC_report) = c("BICh","BIC","BICq","BICNgrp")
+      print(BIC_report)
       
       res[(j-1)*n1+i,1] = lambda0_range[i]
       res[(j-1)*n1+i,2] = lambda1_range[j]
       res[(j-1)*n1+i,3] = BICh
       res[(j-1)*n1+i,4] = BIC
       res[(j-1)*n1+i,5] = BICq
-      # res[(j-1)*n1+i,4] = out$llb
-      res[(j-1)*n1+i,6] = out$ll
-      res[(j-1)*n1+i,7] = sum(out$coef[2:ncol(dat$X)] !=0)
-      res[(j-1)*n1+i,8] = sum(diag(out$sigma) !=0)
-      res[(j-1)*n1+i,9] = sum(out$coef !=0)
-      # if(maxitEM > 1) res[(i-1)*(n2)+j,8] = loglik(dat = dat, coef = out$coef, u0 = out$u, nMC = 100000, J = out$J)
-      # if(maxitEM > 1) res[(j-1)*n1+i,8] = out$ll
-      # res[(i-1)*(n2)+j,9] = -2*res[(i-1)*(n2)+j,8] + log(length(dat$y))*sum(out$coef!=0)
-      outl[[(j-1)*n1+i]] = 1
+      res[(j-1)*n1+i,6] = BICNgrp
+      res[(j-1)*n1+i,7] = out$ll
+      res[(j-1)*n1+i,8] = sum(out$coef[2:ncol(dat$X)] !=0)
+      res[(j-1)*n1+i,9] = sum(diag(out$sigma) !=0)
+      res[(j-1)*n1+i,10] = sum(out$coef !=0)
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])
       
@@ -271,6 +264,9 @@ select_tune = function(dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
       if(family %in% c("binomial","poisson")){
         
         ## set null deviance as deviance for model with fixed and random intercepts only
+        ## This assumes lambda.max is the first element of the lambda0 and lambda1 sequences
+        ## This assumption not valid if users specify their own lambda0/1 sequences
+        ## Idea: fit random intercept model using lme4 and use the given log-lik for the null model
         if((i==1) & (j==1)){
           nullDev = 2*(sat_ll - out$ll)
         }

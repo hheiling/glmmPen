@@ -15,6 +15,10 @@
 #' number of cases. 
 #' @param group_X vector describing the grouping of the covariates in the model matrix.
 #' @param nMC a positive integer for the initial number of Monte Carlo draws
+#' @param checks_complete boolean value indicating whether the function has been called within
+#' \code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
+#' performs additional checks on the input data. If false, assumes data input checks have 
+#' already been performed
 #' 
 #' @return a list with the following elements:
 #' \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
@@ -49,16 +53,18 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
-                     nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2,
+                     nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2, mcc = 3,
                      nMC_report = 5000, u_init = NULL, coef_old = NULL, 
                      ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 0.5, max_cores = 1){
+                     var_start = 0.5, max_cores = 1, checks_complete = F){
   
   ############################################################################################
   # Data input checks
   ############################################################################################
+  
+  # if calling fit_dat_B directly instead of within glmm or glmmPen, perform data checks
   
   y = dat$y
   X = base::as.matrix(dat$X)
@@ -67,92 +73,63 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   group = dat$group
   d = nlevels(factor(group))
   
-  if (!is.double(y)) {
-    tmp <- try(y <- as.double(y), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
-  }
-  
-  if(!is.matrix(X)){
-    stop("X must be a matrix \n")
-  }else if(typeof(X)=="integer") storage.mode(X) <- "double"
-  
-  if(nrow(X) != length(y)){
-    stop("the dimension of X and y do not match")
-  }
-  
-  if(is.null(offset_fit)){
-    offset_fit = rep(0.0, length(y))
-  }else{
-    if((!is.numeric(offset_fit)) | (length(offset_fit) != length(y))){
-      stop("offset must be a numeric vector of the same length as y")
+  if(!checks_complete){
+    
+    if(!is.double(y)) {
+      tmp <- try(y <- as.double(y), silent=TRUE)
+      if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
     }
-  }
+    
+    if(!is.matrix(X)){
+      stop("X must be a matrix \n")
+    }else if(typeof(X)=="integer") storage.mode(X) <- "double"
+    
+    if(nrow(X) != length(y)){
+      stop("the dimension of X and y do not match")
+    }
+    
+    if(is.null(offset_fit)){
+      offset_fit = rep(0.0, length(y))
+    }else{
+      if((!is.numeric(offset_fit)) | (length(offset_fit) != length(y))){
+        stop("offset must be a numeric vector of the same length as y")
+      }
+    }
+    
+    if(!is.factor(group)){
+      group <- as.factor(as.numeric(group))
+    }
+    
+    # Check penalty parameters
+    penalty_check = checkPenalty(penalty, gamma_penalty, alpha)
+    penalty = penalty_check$penalty
+    gamma_penalty = penalty_check$gamma_penalty
+    alpha = penalty_check$alpha
+    
+    # Check covariance matrix specification
+    covar = checkCovar(covar)
+    
+    # Check sampler specification
+    sampler = checkSampler(sampler)
+    
+  } # End checks of input
   
-  if(!is.factor(group)){
-    group <- factor(group)
-  }
   
-  # Potential code to use if want to constrict random effects such that zero-valued fixed effects
-  #   implies zero-valued random effects
-  # if(is.null(XZ_map)){
-  #   # Organization of Z: First d columns correspond to all group levels within Variable 1
-  #   ## In similar fashion, sequential batches of d columns correspond to a particular variable
-  #   # column names of Z: Variable:Group
-  #   Z_names = str_split_fixed(colnames(Z), pattern = ":", n = 2)
-  #   Z_vars = Z_names[seq(from = 1, to = ncol(Z), by = d), 1]
-  #   X_vars = colnames(X)
-  #   XZ_map = numeric(ncol(X))
-  #   for(j in 1:ncol(X)){
-  #     XZ_map[j] = ifelse(X_vars[j] %in% Z_vars, which(Z_vars == X_vars[j]), 0)
-  #   }
-  # }
-  
+  # Extract relevant family information
   family_info = family_export(family)
   fam_fun = family_info$family_fun
   link = family_info$link
   link_int = family_info$link_int # Recoded link as integer
   family = family_info$family
   
-  if(length(penalty) > 1){
-    penalty = penalty[1]
-  }
-  if(!(penalty %in% c("lasso","MCP","SCAD"))){
-    stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
-  }
-  
   # Set small penalties to zero
   if(lambda0 <=10^-6) lambda0 = 0
   if(lambda1 <=10^-6) lambda1 = 0
   
-  if(penalty == "MCP" & gamma_penalty <= 1){
-    stop("gamma_penalty must be > 1 when using MCP penalty")
-  }else if(penalty == "SCAD" & gamma_penalty <= 2){
-    stop("gamma_penalty must be > 2 when using SCAD penalty")
-  }else if(!is.double(gamma_penalty)){
-    tmp <- try(gamma_penalty <- as.double(gamma_penalty), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("gamma_penalty must be numeric or able to be coerced to numeric", call.=FALSE)
-  }
-  
-  if(!is.double(alpha)) {
-    tmp <- try(alpha <- as.double(alpha), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("alpha must be numeric or able to be coerced to numeric", call.=FALSE)
-  }else if(alpha == 0.0){
-    stop("alpha cannot equal 0. Pick a small value > 0 instead (e.g. 0.001) \n");
-  }
-  
-  covar = covar[1]
-  if(!(covar %in% c("unstructured","independent"))){
-    stop("algorithm currently only handles 'unstructured' or 'independent' covariance structure \n")
-  }
-  if(covar == "unstructured" & ncol(Z)/d >= 7){
+  if((covar == "unstructured") & (ncol(Z)/d >= 7)){
     warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation \n",
             immediate. = T)
     covar = "independent"
-  }
-  
-  sampler = sampler[1] # Default of stan
-  if(!(sampler %in% c("independence","random_walk","stan"))){
-    stop("sampler must be specified as either 'independence' or 'random_walk' or 'stan'")
   }
   
   # Create J matrix (from t(alpha_k kronecker z_ki) * J from paper) and 
@@ -190,6 +167,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     }
     covgroup = rep(1:(ncol(Z)/d))
   }
+  
   
   ############################################################################################
   # Initialization
@@ -499,8 +477,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       }
       out$u = u0_out
       
-      
-      
       return(out)
     } # End problem == T
     
@@ -525,22 +501,29 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     # Update latest record of coef
     coef_record = rbind(coef_record[-1,], t(coef))
-    # coef_record_all[i,] = coef
     
-    if( sum(diff[i:max(i-2, 1)] < conv_EM) >=3 ){
+    if(sum(diff[max(i-mcc+1,1):i] < conv_EM) >= mcc){
       EM_converged = 1
       break
     } 
     
     # Increase nMC in nMC below nMC_max
+    ## Increase nMC by a multiplicative factor. 
+    ## The size of this factor depends on the EM iteration (based on mcemGLM package recommendations)
+    if(i <= 15){
+      nMC_fact = 1.05
+    }else if(i <= 30){
+      nMC_fact = 1.20
+    }else{
+      nMC_fact = 1.50
+    }
     if(nMC < nMC_max){
-      # Set f at constant 1.05
-      nMC = nMC * 1.05
+      nMC = round(nMC * nMC_fact)
     }
     # If after update nMC exceeds nMC_max, reduce to nMC_max value
     if(nMC > nMC_max) nMC = nMC_max
     
-    # now update limits  
+    # now update EM iteration information  
     update_limits = c(i, nMC , diff[i], sum(coef!=0))
     names(update_limits) = c("Iter","nMC","EM diff","Non0 Coef")
     print(update_limits)
@@ -604,12 +587,23 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   proposal_SD = Estep_out$proposal_SD
   gibbs_accept_rate = Estep_out$proposal_SD
   batch = Estep_out$updated_batch
- 
+  
   if(sampler == "random_walk" & trace >= 2){
     print("Updated proposal_SD:")
     print(proposal_SD)
     print("Updated batch:")
     print(batch)
+  }
+  
+  # Calculate posterior modes
+  post_U = big.matrix(nrow = nrow(u0), ncol = ncol(u0))
+  for(k in 1:d){
+    idx = seq(from = k, to = ncol(Z), by = d)
+    post_U[,idx] = u0[,idx] %*% t(gamma)
+  }
+  post_modes = numeric(ncol(u0))
+  for(j in 1:ncol(u0)){
+    post_modes[j] = mean(post_U[,j])
   }
   
   # Calculate loglik using Pajor method (see "logLik_Pajor.R")
@@ -621,6 +615,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   BICh = -2*ll + sum(coef[-c(1:ncol(X))] != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
   # Usual BIC
   BIC = -2*ll + sum(coef != 0)*log(nrow(X))
+  # BIC using N = nlevels(group)
+  BICNgrp = -2*ll + sum(coef != 0)*log(d)
   
   # Calculated BICq
   ## Using posterior draws from the full model (ufull) and the coefficients from the
@@ -642,8 +638,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   
   out = list(coef = coef, sigma = cov,  
              lambda0 = lambda0, lambda1 = lambda1, 
-             covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq,
-             extra = list(Znew2 = Znew2), EM_iter = i, EM_conv = diff[i])
+             covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq, 
+             BICNgrp = BICNgrp, extra = list(Znew2 = Znew2), EM_iter = i, EM_conv = diff[i],
+             u_big = Estep_out$u0, post_modes = post_modes)
   
   if(sampler %in% c("random_walk","independence")){
     out$gibbs_accept_rate = gibbs_accept_rate
@@ -661,11 +658,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   
-  if(nrow(u0) >= nMC_report){
+  if(nrow(post_U) >= nMC_report){
     # Take last nMC_report rows
-    r_start = nrow(u0) - nMC_report + 1
-    r_end = nrow(u0)
-    u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
+    r_start = nrow(post_U) - nMC_report + 1
+    r_end = nrow(post_U)
+    u_out = bigmemory::as.matrix(post_U[c(r_start:r_end),])
   }else{
     # Run E step for another nMC_report draws
     Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
@@ -675,14 +672,22 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                        trace=trace, num_cores=num_cores)
     
     u0 = attach.big.matrix(Estep_out$u0)
-    u0_out = bigmemory::as.matrix(u0)
     proposal_SD = Estep_out$proposal_SD
     gibbs_accept_rate = Estep_out$proposal_SD
     batch = Estep_out$updated_batch
     
+    post_U = big.matrix(nrow = nrow(u0), ncol = ncol(u0))
+    for(k in 1:d){
+      idx = seq(from = k, to = ncol(Z), by = d)
+      post_U[,idx] = u0[,idx] %*% t(gamma)
+    }
+    
+    u_out = bigmemory::as.matrix(post_U)
+    
   }
   
-  out$u = u0_out
+  # Change to saving of big.matrix instead of regular matrix?
+  out$u = u_out
   
   # if(family == "negbin"){
   #   out$phi = phi
@@ -705,3 +710,18 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
 # negative binomial distribution, either set family = "negbin" (which assumes a canonical log link)
 # or family = \code{MASS::negative.binomial} using any arbitrary \code{theta} value and the desired
 # link function.
+
+# Potential code to use if want to constrict random effects such that zero-valued fixed effects
+#   implies zero-valued random effects
+# if(is.null(XZ_map)){
+#   # Organization of Z: First d columns correspond to all group levels within Variable 1
+#   ## In similar fashion, sequential batches of d columns correspond to a particular variable
+#   # column names of Z: Variable:Group
+#   Z_names = str_split_fixed(colnames(Z), pattern = ":", n = 2)
+#   Z_vars = Z_names[seq(from = 1, to = ncol(Z), by = d), 1]
+#   X_vars = colnames(X)
+#   XZ_map = numeric(ncol(X))
+#   for(j in 1:ncol(X)){
+#     XZ_map[j] = ifelse(X_vars[j] %in% Z_vars, which(Z_vars == X_vars[j]), 0)
+#   }
+# }

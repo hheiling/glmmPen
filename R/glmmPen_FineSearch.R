@@ -14,7 +14,11 @@
 #' documentation for details. The user can specify their own fine grid search, or if the 
 #' lambda0_seq and lambda1_seq arguments are left as \code{NULL}, the algorithm will automatically
 #' select a fine grid search based on the best model from the previous selection. See Details for 
-#' more information. 
+#' more information. Default value set to 1.
+#' @param idx_range a positive integer that determines what positions within the sequence of the 
+#' fixed and random effect lambda penalty parameters used in the previous coarse grid search
+#' will be used as the new fixed and random effect lambda penalty parameter ranges. See Details 
+#' for more information.
 #' @param optim_options an optional list of class "optimControl" created from function \code{\link{optimControl}}
 #' that specifies optimization parameters. If set to the default \code{NULL}, will use the 
 #' optimization parameters used for the previous round of selection stored within the 
@@ -45,9 +49,9 @@
 #' tuning options, the \code{glmmPen_FineSearch} algorithm performs the following steps to find
 #' the finer lambda grid search: (i) The lambda combination from the best model is identified 
 #' from the earlier selection results saved in the \code{pglmmObj} object. (ii) For the fixed and
-#' lambda effects separately, the new max and min lambda values are the lambda values two 
+#' random effects separately, the new max and min lambda values are the lambda values \code{idx_range} 
 #' positions away from the best lambda in the original lambda sequences for the fixed and random
-#' effects.
+#' effects. 
 #' 
 #' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 #' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
@@ -62,7 +66,7 @@
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #' 
 #' @export
-glmmPen_FineSearch = function(object, tuning_options = selectControl(),
+glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_range = 1,
                               optim_options = NULL, adapt_RW_options = NULL, 
                               trace = 0, BICq_posterior = NULL){
   
@@ -132,21 +136,25 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(),
     stop("tuning_options must be of class 'selectControl', see selectControl documentation")
   }
   
+  if((floor(idx_range) != idx_range) | (idx_range <= 0)){
+    stop("idx_range must be a positive integer")
+  }
+  
   select_coarse = object$results_all
   if(!inherits(object$control_info$tuning_options, "selectControl") | (ncol(object$results_all)==1)){
     stop("Input pglmmObj object must output selection results. \n",
          "  Given input only gives results for a single lambda penalty combination")
   }
   
-  
   crit = tuning_options$BIC_option
   if(length(crit) > 1){
     crit = crit[1]
   }
-  # if(crit != "BICq"){
-  #   warning("Selection criteria not specified as 'BICq', so BIC-ICQ criteria will not be calculated",
-  #           immediate. = T)
-  # }
+  
+  if((crit == "BICq") & (any(is.na(select_coarse[,crit])))){
+    stop("BIC-ICQ not calculated in previous coarse grid search \n",
+         "  Selection option BIC_option = 'BICq' not appropriate")
+  }
   
   opt_res = select_coarse[which.min(select_coarse[,crit]),]
   
@@ -161,8 +169,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(),
       lam_best = opt_res["lambda1"]
     }
     idx_best = which(coarse == lam_best)
-    lam_seq = exp(seq(from = log(coarse[max(idx_best-2,1)]), 
-                      to = log(coarse[min(idx_best+2,length(coarse))]),
+    lam_seq = exp(seq(from = log(coarse[max(idx_best-idx_range,1)]), 
+                      to = log(coarse[min(idx_best+idx_range,length(coarse))]),
                       length.out = tuning_options$nlambda))
     
     return(lam_seq)

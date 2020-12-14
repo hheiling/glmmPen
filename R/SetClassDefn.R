@@ -1,5 +1,27 @@
 # Setting class definitions
+# Example from merMod in lme4: https://github.com/lme4/lme4/blob/master/R/AllClass.R
 
+#' @title Class "pglmmObj" of Fitted Penalized Generalized Mixed-Effects Models
+#' 
+#' @description The functions \code{\link{glmm}}, \code{\link{glmmPen}}, and 
+#' \code{\link{glmmPen_FineSearch}} output the reference class object of type \code{pglmmObj}.
+#' 
+#' @name pglmmObj-class
+#' @aliases pglmmObj-class pglmmObj
+#' show, pglmmObj-method, coef.pglmmObj, fitted.pglmmObj, fixef.pglmmObj, formula.pglmmObj,
+#' logLik.pglmmObj, model.frame.pglmmObj, model.matrix.pglmmObj, print.pglmmObj, 
+#' ranef.pglmmObj, residuals.pglmmObj,
+#' sigma.pglmmObj, summary.pglmmObj
+#' 
+#' @docType class
+#' 
+#' @keywords classes
+#' 
+#' @examples
+#' 
+#' showClass("pglmmObj")
+#' methods(class = "pglmmObj")
+#' 
 #' @export
 pglmmObj = setRefClass("pglmmObj",
             fields = list(
@@ -8,6 +30,7 @@ pglmmObj = setRefClass("pglmmObj",
               sigma = "matrix", 
                 # sigma: Turn in to "dgCMatrix"? - sparse for large dimensions matrix
                 # alternatively, if large dims, assume diagonal, could report matrix with ncol = 1
+              scale = "list",
               posterior_draws = "matrix",
               sampling = "character",
               results_all = "matrix",
@@ -58,9 +81,9 @@ pglmmObj = setRefClass("pglmmObj",
                   p = ncol(X)
                   beta = x$coef[1:p]
                   center = x$std_out$X_center
-                  scale = x$std_out$X_scale
-                  beta[1] = beta[1] - sum(center*beta[-1]/scale)
-                  beta[-1] = beta[-1] / scale
+                  scale_std = x$std_out$X_scale
+                  beta[1] = beta[1] - sum(center*beta[-1]/scale_std)
+                  beta[-1] = beta[-1] / scale_std
                 names(beta) = x$coef_names$fixed
                 fixef <<- beta
                 nonzeroFE <<- fixef[which(fixef != 0)]
@@ -71,19 +94,12 @@ pglmmObj = setRefClass("pglmmObj",
                 rownames(sigma) <<- x$coef_names$random
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
-                  U = x$u
-                  Gam = matrix(x$J%*%matrix(x$coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z_std)/d)
-                  q = ncol(Z_std) / d # Number random variables
-                  post_U = matrix(0, nrow = nrow(U), ncol = ncol(U))
-                  for(g in 1:d){
-                    idx = seq(from = g, to = (d*q), by = d)
-                    post_U[,idx] = U[,idx] %*% t(Gam)
-                  }
-                posterior_draws <<- post_U
+                posterior_draws <<- x$u
                 colnames(posterior_draws) <<- colnames(Z_std)
                 
                 # Random effects coefficients
-                rand = colMeans(posterior_draws) 
+                rand = x$post_modes
+                q = ncol(Z_std) / d
                 
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
@@ -92,6 +108,15 @@ pglmmObj = setRefClass("pglmmObj",
                 ranef <<- lapply(group, function(j) ref)
                 
                 family <<- x$family
+                # If Gaussian family, return gaussian residual error variance estimate
+                if(family$family == "gaussian"){
+                  scale <<- list(Gaus_sig2 = x$sigma_gaus)^2
+                }else if(family$family == "negbin"){
+                  scale <<- list(phi = x$phi)
+                }else{
+                  scale <<- list(scale = NULL)
+                }
+                
                 J <<- x$J
                 formula <<- x$formula
                 call <<- x$call

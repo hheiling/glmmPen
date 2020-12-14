@@ -12,6 +12,10 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+# Sweave(file = "C:/Users/hheiling/Documents/LaTeX/Journal of Statistical Software/article.Rnw")
+# Above line created 'article.tex' and 'article-visualization.pdf in the vignettes folder. 
+#  Can run (pdf)latex on 'article.tex'
 ```
 
 ```{r setup}

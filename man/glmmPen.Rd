@@ -2,15 +2,16 @@
 % Please edit documentation in R/glmmPen.R
 \name{glmmPen}
 \alias{glmmPen}
-\title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+\title{Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
 glmmPen(
   formula,
   data = NULL,
   family = "binomial",
-  na.action = na.omit,
+  covar = c("unstructured", "independent"),
   offset = NULL,
+  na.action = na.omit,
   fixef_noPen = NULL,
   penalty = c("MCP", "SCAD", "lasso"),
   alpha = 1,
@@ -39,15 +40,20 @@ omitted, variables will be taken from the environment of \code{formula} (if spec
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
 with canonical links only.}
 
-\item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
-options \code{na.omit} and \code{na.pass} are recognized by this function.}
+\item{covar}{character string specifying whether the covariance matrix should be unstructured
+("unstructured") or diagonal with no covariances between variables ("independent").
+Default is "unstructured", but if the number of random effects (including the intercept) is 
+greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+independent covariance structure (covar switched to "independent").}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
 argument is \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the response). If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame. 
-Currently, the formula does not allow specification of an offset.}
+Currently, the formula does not allow specification of an offset.
+#' @param na.action a function that indicates what should happen when the data contain NAs. Only the 
+options \code{na.omit} and \code{na.pass} are recognized by this function.}
 
 \item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
@@ -98,7 +104,7 @@ available (e.g. \code{methods(class = "pglmmObj")})
 }
 \description{
 \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-Conditional Minimization (MCECM)
+Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 }
 \details{
 If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 

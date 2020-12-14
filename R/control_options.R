@@ -16,6 +16,8 @@
 #' positions away from the best lambda in the original lambda sequences for the fixed and random
 #' effects.
 #' 
+#' The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
+#' non-zero penalty parameter combination. However, this is generally not recommended.  
 #' 
 #' @param lambda0 a non-negative numeric penalty parameter for the fixed effects parameters
 #' @param lambda1 a non-negative numeric penalty parameter for the (grouped) random effects
@@ -29,7 +31,8 @@
 #' Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 #' observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-#' a full model (a small penalty is used for the fixed and random effects). 
+#' a full model; a small penalty is used for the fixed and/or random effects if the number of 
+#' effects is 10 or greater. 
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing penalization parameter values, presented either as an individual set or as a range of
@@ -37,6 +40,12 @@
 #' 
 #' @export
 lambdaControl = function(lambda0 = 0, lambda1 = 0){
+  if(!is.numeric(c(lambda0,lambda1))){
+    stop("lambda0 and lambda1 must be numeric values")
+  }
+  if((lambda0 < 0) | (lambda1 < 0)){
+    stop("lambda0 and lambda1 must be postive numeric values")
+  }
   structure(list(lambda0 = lambda0, lambda1 = lambda1), 
             class = c("lambdaControl","pglmmControl"))
 }
@@ -44,15 +53,15 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 #' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
-                         BIC_option = c("BICh","BIC","BICq")){
+                         BIC_option = c("BICh","BIC","BICq","BICNgrp")){
   
   # Perform input checks
   
   if(length(BIC_option) > 1){
     BIC_option = BIC_option[1]
   }
-  if(!(BIC_option %in% c("BICh","BIC","BICq"))){
-    stop("BIC_option must be 'BICh', 'BIC', or 'BICq'")
+  if(!(BIC_option %in% c("BICh","BIC","BICq","BICNgrp"))){
+    stop("BIC_option must be 'BICh', 'BIC', 'BICq', or 'BICNgrp'")
   }
   if(BIC_option != "BICq"){
     warning("BIC-ICQ will not be calculated since 'BICq' not specified for BIC_option", 
@@ -66,6 +75,11 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     if(any(lambda0_seq) < 0){
       stop("lambda0_seq cannot be negative")
     }
+    for(i in 2:length(lambda0_seq)){
+      if(lambda0_seq[i] > lambda0_seq[i-1]){
+        stop("lambda0_seq must be a sequence of descending order (max value to min value)")
+      }
+    }
   }
   if(!is.null(lambda1_seq)){
     if(!is.numeric(lambda1_seq)){
@@ -73,6 +87,11 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     }
     if(any(lambda1_seq < 0)){
       stop("lambda1_seq cannot be negative")
+    }
+    for(i in 2:length(lambda1_seq)){
+      if(lambda1_seq[i] > lambda1_seq[i-1]){
+        stop("lambda1_seq must be a sequence of descending order (max value to min value)")
+      }
     }
   }
   
@@ -150,15 +169,12 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @param t the convergence criteria is based on the average Euclidean distance between 
 #' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 #' Positive integer, default equals 2.
+#' @param mcc the number of times the convergence critera must be met before the algorithm is
+#' seen as having converged. (mc for 'meet condition counter'). Default set to 3.
 #' @param sampler character string specifying whether the posterior draws of the random effects
 #' should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 #' incorporating an adaptive random walk sampler ("random_walk") or an
 #' independence sampler ("independence"). 
-#' @param covar character string specifying whether the covariance matrix should be unstructured
-#' ("unstructured") or diagonal with no covariances between variables ("independent").
-#' Default is "unstructured", but if the number of random effects (including the intercept) is 
-#' greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
-#' independent covariance structure (covar switched to "independent").
 #' @param var_start positive number specifying the starting values to initialize the variance
 #' of the covariance matrix. Default set to 1.0. 
 #' 
@@ -168,26 +184,20 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @export
 optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
                         nMC_burnin = 250, nMC_start = 1000, nMC_max = 10^4, nMC_report = 5000,
-                        maxitEM = 100, maxit_CD = 200, M = 10000, t = 2,
-                        covar = c("unstructured","independent"),
+                        maxitEM = 100, maxit_CD = 200, M = 10000, t = 2, mcc = 3,
                         sampler = c("stan","random_walk","independence"), 
                         var_start = 1.0, max_cores = 1){
   
   # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
   
-  x = c(nMC_burnin, nMC_start, nMC_max, nMC_report, maxitEM, M)
-  if(!all(floor(x)==x)){ # if any of the above values not integers
-    stop("all nMC arguments must be integers")
+  x = c(nMC_burnin, nMC_start, nMC_max, nMC_report, maxitEM, maxit_CD, M, t, mcc)
+  if((!all(floor(x)==x)) | (sum(x <= 0) > 0)){ # if any of the above values not positive integers
+    stop("the nMC arguments, maxit arguments, M, t, and mcc must be positive integers")
   }
-  if(sum(x <= 0) > 0){
-    stop("nMC_start, nMC_max, and maxitEM must be positive integers")
-  }
-  # Checks
+  
+  # More restrictive checks
   if(M < 10^4){
     stop("M must be greater than or equal to 10^4")
-  }
-  if(nMC_report < 5000){
-    stop("nMC_report must be greater than or equal to 5000")
   }
   if(nMC_burnin < 100){
     warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
@@ -198,29 +208,17 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   }
   
   if(var_start <= 0){
-    stop("var_start must be a positive number")
+    stop("var_start must be a positive numeric value")
   }
   if((max_cores < 1) | (max_cores) %% 1 != 0){
     stop("max_cores must be a positive integer")
   }
   
-  if(length(covar) > 1){
-    covar = covar[1]
-  }
-  if(!(covar %in% c("unstructured","independent"))){
-    stop("covariance structure, 'covar', must be either 'unstructured' or 'independent'")
-  }
-  
-  if(length(sampler) > 1){
-    sampler = sampler[1]
-  }
-  if(!(sampler %in% c("stan","random_walk","independence"))){
-    stop("sampler must be either 'stan', 'random_walk', or 'independence'")
-  }
+  sampler = checkSampler(sampler)
   
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, 
-                 maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, covar = covar,
+                 maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, mcc = mcc,
                  sampler = sampler, var_start = var_start,
                  max_cores = max_cores),
             class = "optimControl")

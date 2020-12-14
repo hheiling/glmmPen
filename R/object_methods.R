@@ -4,19 +4,31 @@
 # Properties: 
 ## Reference Class object
 
+#' @importFrom lme4 fixef
 #' @export
-fixef = function(object){
+fixef.pglmmObj = function(object){
   object$fixef
 }
 
+#' @importFrom lme4 ranef
 #' @export
-ranef = function(object){
+ranef.pglmmObj = function(object){
   object$ranef
 }
 
+#' @importFrom stats sigma
 #' @export
-CovarMat = function(object){
-  return(object$sigma)
+sigma.pglmmObj = function(object){
+  
+  # Return covariance matrix of the random effects and any scale parameters
+  group = object$data$group
+  grp = names(group)
+  scale = object$scale[[1]]
+  out = list()
+  out[[grp]] = object$sigma
+  out[["scale"]] = scale
+  
+  return(out)
 }
 
 #' @importFrom stats coef
@@ -200,17 +212,23 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     
   }else{
     # Calculate prediction for new data.frame
-    fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
+    # Convert formula and data to useful forms to plug into fit_dat
+    # Code glFormula_edit() edited version of glFormula() from lme4 package
+    # fD_out = 'formula-data output'
+    # fD_out0: list with elements formula, fr (model.frame), X (fixed effects matrix), 
+    #   reTrms (list with a random effects matrix Zt (needs to be adjusted), 
+    #   cnms (names of random effects), and flist (list of the groups) as well as some other 
+    #   output not utilized by the glmmPen package)
+    fD_out0 = glFormula_edit(formula = formula, data = data, family = fam_fun, subset = NULL,
+                             weights = NULL, na.action = na.action, offset = offset,
+                             contrasts = NULL)
+    # Select output of interest from fD_out0, adjust formatting of Z matrix, and
+    #   perform additional checks and restrictions
+    fD_out = fD_adj(out = fD_out0)
+    
     X = fD_out$X
     if(!fixed.only){ # fixed.only = F
       stop("prediction using random effects not appropriate for new data")
-      # U = object$posterior_draws
-      # Z = fD_out$Z
-      # eta = etaCalc(X, Z_std, beta = object$fixef, U = U)
-      # pred = switch(type[1], 
-      #               link = eta,
-      #               response = invLink(family = family(object), eta = eta))
-      
     }else{ # fixed.only = T
       eta = X %*% object$fixef
       pred = switch(type[1], 
@@ -240,46 +258,51 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
 }
 
 
-# Functions for residuals.pglmmObj
-ll = function(family, mu, y, v = NULL){ 
-  if(family == "binomial"){
-    llik = dbinom(y, size = 1, prob = mu, log = T)
-  }else if(family == "poisson"){
-    llik = dpois(y, lambda = mu, log = T)
-  }else if(family == "gaussian"){
-    llik = dnorm(y, mean = mu, sd = sqrt(v), log = T)
-  }
-  return(llik)
-}
-
-var_hat = function(family, mu, sig2 = NULL){
+# Function for residuals.pglmmObj
+var_hat = function(family, mu, sig2 = NULL, phi = NULL){
   if(family == "binomial"){
     v_hat = mu*(1-mu)
   }else if(family == "poisson"){
     v_hat = mu
   }else if(family == "gaussian"){
     v_hat = sig2
+  }else if(family == "negbin"){
+    v_hat = mu + phi * mu^2 
   }
   return(v_hat)
 }
 
-#' @importFrom stats predict
 #' @export
 residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working")){
   # What is working response?
-  Y = object$data$y
+  y = object$data$y
   mu = Matrix::as.matrix(fitted(object))
   type = match.arg(type)
   fam = family(object)
+  family = fam$family
+  sig2 = object$scale$Gaus_sig2 # Residual error variance only used if family = gaussian
+  phi = object$scale$phi # Only used if family = negbin
   
-  if(type == "deviance"){
-    res = sign(Y - mu)*sqrt(-2*(ll(fam$family, mu, Y)))
+  if(type == "deviance"){ # reference: mcemGLM package
+    if(family == "binomial"){
+      res = ifelse(y, 1, -1) * sqrt(-2*(y * log(mu) + (1 - y) * log(1 - mu)))
+    }else if(family == "poisson"){
+      res = sign(y - mu) * sqrt(2 * ifelse(y > 0, y * log(y/mu), 0) - 2 * (y - mu))
+    }else if(family == "gaussian"){
+      res = (y - mu) / sqrt(sig2)
+    }else if(family == "negbin"){
+      # Note: a0 from mcemGLM = 1/phi
+      stop("family not available")
+      res = sign(y - mu) * sqrt(2 * (ifelse(y > 0, y * log(y/mu), 0)) - 2 * (y + 1/phi) * log((y + 1/phi)/(mu + 1/phi)))
+    }else{
+      stop("family not available")
+    }
   }else if(type == "pearson"){
-    res = (Y - mu) / sqrt(var_hat(fam$family, mu))
+    res = (y - mu) / sqrt(var_hat(family, mu, sig2, phi))
   }else if(type == "response"){
-    res = Y - mu
-  }else{
-    res = (Y - mu) / mu
+    res = y - mu
+  }else{ # working residuals
+    res = (y - mu) / mu
   }
   
   attr(res, "residual type") = type
@@ -474,14 +497,19 @@ logLik.pglmmObj = function(object){
 
 }
 
+
+# @method extractBIC pglmmObj
 #' @importFrom stringr str_detect
 #' @export
 extractBIC = function(object){ # extractBIC.pglmmObj
   
   results_optim = object$results_optim
   BIC_elem = which(str_detect(colnames(results_optim), "BIC"))
+  BIC_names = colnames(results_optim[,BIC_elem, drop = F])
+  BIC_out = results_optim[,BIC_elem]
+  names(BIC_out) = BIC_names
   
-  return(results_optim[BIC_elem])
+  return(BIC_out)
   
 }
 
@@ -714,7 +742,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
 #' @method plot pglmmObj
 #' @export
 plot.pglmmObj = function(object, x = fitted(object), y = residuals(object, type = "deviance"),
-                      x_label = "Fitted Values", y_label = NULL){
+                         x_label = "Fitted Values", y_label = NULL){
   
   if(length(x) != length(y)){
     stop("x and y need to be of same length")

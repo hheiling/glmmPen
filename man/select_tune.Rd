@@ -9,6 +9,7 @@ select_tune(
   dat,
   offset = NULL,
   family,
+  covar = c("unstructured", "independent"),
   group_X = 0:(ncol(dat$X) - 1),
   penalty,
   lambda0_range,
@@ -18,10 +19,12 @@ select_tune(
   trace = 0,
   u_init = NULL,
   coef_old = NULL,
-  BICq_calc = T,
   adapt_RW_options = adaptControl(),
   optim_options = optimControl(),
-  BICq_posterior = NULL
+  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
+  BICq_calc = T,
+  BICq_posterior = NULL,
+  checks_complete = F
 )
 }
 \arguments{
@@ -34,11 +37,19 @@ linear predictor during fitting. Default set to \code{NULL} (no offset). If the 
 argument is \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the response). If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame. 
-Currently, the formula does not allow specification of an offset.}
+Currently, the formula does not allow specification of an offset.
+#' @param na.action a function that indicates what should happen when the data contain NAs. Only the 
+options \code{na.omit} and \code{na.pass} are recognized by this function.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
 with canonical links only.}
+
+\item{covar}{character string specifying whether the covariance matrix should be unstructured
+("unstructured") or diagonal with no covariances between variables ("independent").
+Default is "unstructured", but if the number of random effects (including the intercept) is 
+greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+independent covariance structure (covar switched to "independent").}
 
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
@@ -56,15 +67,22 @@ Default is 4.0 for SCAD and 3.0 for MCP.}
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
 
-\item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
-best model.}
-
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
 Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
 
 \item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
 that specifies optimization parameters.}
+
+\item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
+Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
+observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+a full model; a small penalty is used for the fixed and/or random effects if the number of 
+effects is 10 or greater.}
+
+\item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
+best model.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
 the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
@@ -73,6 +91,11 @@ are requested. The name of the file should include a .txt extension. If this arg
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
 will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
 See 'Details' section for additional details.}
+
+\item{checks_complete}{boolean value indicating whether the function has been called within
+\code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
+performs additional checks on the input data. If false, assumes data input checks have 
+already been performed}
 }
 \value{
 A list with the following elements:

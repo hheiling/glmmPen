@@ -22,6 +22,7 @@ fit_dat_B(
   nMC = 5000,
   nMC_max = 20000,
   t = 2,
+  mcc = 3,
   nMC_report = 5000,
   u_init = NULL,
   coef_old = NULL,
@@ -33,7 +34,8 @@ fit_dat_B(
   adapt_RW_options = adaptControl(),
   covar = c("unstructured", "independent"),
   var_start = 0.5,
-  max_cores = 1
+  max_cores = 1,
+  checks_complete = F
 )
 }
 \arguments{
@@ -88,6 +90,9 @@ to be less than 100.}
 the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 Positive integer, default equals 2.}
 
+\item{mcc}{the number of times the convergence critera must be met before the algorithm is
+seen as having converged. (mc for 'meet condition counter'). Default set to 3.}
+
 \item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
 when the function ends. Default set to the minimum allowed value: 5,000. 
 Warning: the returned draws are formatted as a regular
@@ -120,6 +125,11 @@ independent covariance structure (covar switched to "independent").}
 
 \item{var_start}{positive number specifying the starting values to initialize the variance
 of the covariance matrix. Default set to 1.0.}
+
+\item{checks_complete}{boolean value indicating whether the function has been called within
+\code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
+performs additional checks on the input data. If false, assumes data input checks have 
+already been performed}
 }
 \value{
 a list with the following elements:

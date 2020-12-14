@@ -17,7 +17,7 @@ optimControl(
   maxit_CD = 200,
   M = 10000,
   t = 2,
-  covar = c("unstructured", "independent"),
+  mcc = 3,
   sampler = c("stan", "random_walk", "independence"),
   var_start = 1,
   max_cores = 1
@@ -57,11 +57,8 @@ Pajor log-likelihood calculation}
 the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 Positive integer, default equals 2.}
 
-\item{covar}{character string specifying whether the covariance matrix should be unstructured
-("unstructured") or diagonal with no covariances between variables ("independent").
-Default is "unstructured", but if the number of random effects (including the intercept) is 
-greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure (covar switched to "independent").}
+\item{mcc}{the number of times the convergence critera must be met before the algorithm is
+seen as having converged. (mc for 'meet condition counter'). Default set to 3.}
 
 \item{sampler}{character string specifying whether the posterior draws of the random effects
 should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 

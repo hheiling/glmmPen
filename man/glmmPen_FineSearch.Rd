@@ -12,6 +12,7 @@ values, and performs model selection on this finer grid search.}
 glmmPen_FineSearch(
   object,
   tuning_options = selectControl(),
+  idx_range = 1,
   optim_options = NULL,
   adapt_RW_options = NULL,
   trace = 0,
@@ -27,7 +28,12 @@ containing model selection control parameters. See the \code{\link{selectControl
 documentation for details. The user can specify their own fine grid search, or if the 
 lambda0_seq and lambda1_seq arguments are left as \code{NULL}, the algorithm will automatically
 select a fine grid search based on the best model from the previous selection. See Details for 
-more information.}
+more information. Default value set to 1.}
+
+\item{idx_range}{a positive integer that determines what positions within the sequence of the 
+fixed and random effect lambda penalty parameters used in the previous coarse grid search
+will be used as the new fixed and random effect lambda penalty parameter ranges. See Details 
+for more information.}
 
 \item{optim_options}{an optional list of class "optimControl" created from function \code{\link{optimControl}}
 that specifies optimization parameters. If set to the default \code{NULL}, will use the 
@@ -74,9 +80,9 @@ If the sequences of lambda penalty values are left unspecified in the \code{\lin
 tuning options, the \code{glmmPen_FineSearch} algorithm performs the following steps to find
 the finer lambda grid search: (i) The lambda combination from the best model is identified 
 from the earlier selection results saved in the \code{pglmmObj} object. (ii) For the fixed and
-lambda effects separately, the new max and min lambda values are the lambda values two 
+random effects separately, the new max and min lambda values are the lambda values \code{idx_range} 
 positions away from the best lambda in the original lambda sequences for the fixed and random
-effects.
+effects. 
 
 Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
