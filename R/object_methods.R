@@ -178,13 +178,14 @@ fitted.pglmmObj = function(object, fixed.only = T){
     eta = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, U = object$posterior_draws) + offset
   }
   
-  mu = invLink(family = family(object), eta)
+  mu = invLink(family = object$family, eta)
   
   return(mu)
   
 }
 
-#' @importFrom stats predict
+#' @importFrom stats predict drop.terms reformulate
+#' @importFrom lme4 nobars
 #' @export
 predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
                             fixed.only = T, na.action = na.pass){
@@ -205,36 +206,59 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
       eta = object$data$X %*% object$fixef
       pred = switch(type[1],
                     link = eta,
-                    response = invLink(family = family(object), eta = eta))
+                    response = invLink(family = object$family, eta = eta))
     }
     
     data = object$data$X
     
-  }else{
-    # Calculate prediction for new data.frame
-    # Convert formula and data to useful forms to plug into fit_dat
-    # Code glFormula_edit() edited version of glFormula() from lme4 package
-    # fD_out = 'formula-data output'
-    # fD_out0: list with elements formula, fr (model.frame), X (fixed effects matrix), 
-    #   reTrms (list with a random effects matrix Zt (needs to be adjusted), 
-    #   cnms (names of random effects), and flist (list of the groups) as well as some other 
-    #   output not utilized by the glmmPen package)
-    fD_out0 = glFormula_edit(formula = formula, data = data, family = fam_fun, subset = NULL,
-                             weights = NULL, na.action = na.action, offset = offset,
-                             contrasts = NULL)
-    # Select output of interest from fD_out0, adjust formatting of Z matrix, and
-    #   perform additional checks and restrictions
-    fD_out = fD_adj(out = fD_out0)
-    
-    X = fD_out$X
-    if(!fixed.only){ # fixed.only = F
+  }else{ # Calculate prediction for newdata
+    if(!fixed.only){
       stop("prediction using random effects not appropriate for new data")
-    }else{ # fixed.only = T
-      eta = X %*% object$fixef
-      pred = switch(type[1], 
-                    link = eta,
-                    response = invLink(family = family(object), eta = eta))
     }
+    if(!is.data.frame(newdata)){
+      newdata = as.data.frame(newdata)
+    }
+    # Make sure column names of newdata match model matrix from pglmmObj object
+    ## Ignore intercept
+    if(!(colnames(newdata) %in% colnames(object$X[,-1]))){
+      stop("covariate names in newdata do not match covariate names of model.matrix in pglmmObj object")
+    }
+    # Create a fixed effects formula with all nonzero fixed effects
+    fixef_all = object$fixef
+    fixef = which(fixef_all != 0)
+    terms_all = colnames(object$X)
+    terms_keep = terms_all[which(terms_all %in% names(fixef))]
+    formula_fixed = reformulate(termlabels = terms_keep, response = object$formula[[2]])
+    
+    # # Extract fixed effects-only terms from formula 
+    # formula_fixed = nobars(object$formula)
+    # # Only keep fixed effects in formula that are associated with nonzero fixed effects from model fit
+    # terms_all = labels(terms(formula_fixed))
+    # fixef_all = object$fixef
+    # fixef = which(fixef_all != 0)
+    # terms_keep = terms_all[which(terms_all %in% names(fixef))]
+    # if(length(terms_keep) == 0){ # differences in covariate names between formula and model matrix
+    #   terms_all = colnames(object$X)
+    #   terms_keep = terms_all[which(terms_all %in% names(fixef))]
+    #   formula_fixed = reformulate(termlabels = terms_keep, response = object$formula[[2]])
+    # }else{
+    #   terms_drop = which(!(terms_all %in% terms_keep))
+    #   if(length(terms_drop) >= 1){
+    #     terms1 = terms(formula_fixed)
+    #     terms2 = drop.terms(terms1, terms_drop)
+    #     formula_fixed = reformulate(termlabels = labels(terms2), response = object$formula[[2]])
+    #   }
+    # }
+    
+    # Create model.matrix using newdata and fixed effects formula with non-zero fixed effects
+    X = model.matrix(formula_fixed, data = newdata)
+    
+    
+    eta = X %*% fixef
+    pred = switch(type[1], 
+                  link = eta,
+                  response = invLink(family = object$family, eta = eta))
+    
     
     data = newdata
     
@@ -739,6 +763,8 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
   
 }
 
+#' @importFrom stringr str_c str_to_title
+#' @import ggplot2 
 #' @method plot pglmmObj
 #' @export
 plot.pglmmObj = function(object, x = fitted(object), y = residuals(object, type = "deviance"),

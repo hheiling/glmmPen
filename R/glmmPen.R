@@ -46,12 +46,18 @@ glmm = function(formula, data = NULL, family = "binomial", covar = c("unstructur
          "  In order to use selectControl for model selection, please use glmmPen function")
   }
   
+  call = match.call(expand.dots = F)
+  
   # If ... arguments empty or only includes a few of the args_avail, 
   # glmmPen will use default arguments 
-  out = glmmPen(formula = formula, data = data, family = family, covar = covar,
-                offset = offset, na.action = na.action, optim_options = optim_options,
-                adapt_RW_options = adapt_RW_options, trace = trace,
-                tuning_options = tuning_options, ...)
+  output = glmmPen(formula = formula, data = data, family = family, covar = covar,
+                   offset = offset, na.action = na.action, optim_options = optim_options,
+                   adapt_RW_options = adapt_RW_options, trace = trace,
+                   tuning_options = tuning_options, ...)
+  
+  output$call = call
+  out_object = pglmmObj$new(output)
+  return(out_object)
   
   return(out)
   
@@ -138,8 +144,8 @@ fD_adj = function(out){
 #' with canonical links only.
 #' @param covar character string specifying whether the covariance matrix should be unstructured
 #' ("unstructured") or diagonal with no covariances between variables ("independent").
-#' Default is "unstructured", but if the number of random effects (including the intercept) is 
-#' greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+#' Default is "unstructured", but if the number of random effects (not including the intercept) is 
+#' greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
 #' independent covariance structure (covar switched to "independent").
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
 #' linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
@@ -336,6 +342,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     mcc = optim_options$mcc
     # covar = optim_options$covar
     sampler = optim_options$sampler
+    var_start = optim_options$var_start
     max_cores = optim_options$max_cores
     
     # Call fit_dat function
@@ -361,7 +368,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                     nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
                     t = t, mcc = mcc, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, max_cores = max_cores, checks_complete = T)
+                    covar = covar, var_start = var_start, max_cores = max_cores, checks_complete = T)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     # c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
@@ -380,7 +387,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
-      lambda0_range = LambdaRange(X = data_input$X[,-1], y = data_input$y, family = fam_fun$family, 
+      lambda0_range = LambdaRange(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
                                   alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen)
     }else{
       lambda0_range = tuning_options$lambda0_seq
@@ -454,7 +461,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   }
   
   # Format Output - create pglmmObj object
-  output = c(fit, list(call = call, formula = formula, y = fD_out$y,
+  output = c(fit, list(formula = formula, y = fD_out$y,
                        X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
                        coef_names = coef_names, family = fam_fun,
                        offset = offset, frame = fD_out$frame, 
@@ -464,11 +471,15 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                        control_options = list(optim_options = optim_options, tuning_options = tuning_options,
                                               adapt_RW_options = adapt_RW_options)))
   
-  out_object = pglmmObj$new(output)
-  return(out_object)
+  if(inherits(tuning_options, "lambdaControl")){
+    return(output)
+  }else if(inherits(tuning_options, "selectControl")){
+    output$call = call
+    out_object = pglmmObj$new(output)
+    return(out_object)
+  }
   
-  # return(fit)
-
+  
 }
 
 
@@ -477,7 +488,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
 XZ_std = function(fD_out, group_num){
   # Standardize X - ncvreg::std method
   X = fD_out$X
-  X_noInt_std = std(X[,-1])
+  X_noInt_std = std(X[,-1, drop = F])
   X_std = cbind(1, X_noInt_std)
   X_center = attr(X_noInt_std, "center")
   X_scale = attr(X_noInt_std, "scale")
@@ -497,17 +508,25 @@ XZ_std = function(fD_out, group_num){
   if("(Intercept)" %in% fD_out$cnms){
     v_start = 2
   }else{
-    stop("Model requires the assumption of an intercept")
-    v_start = 1
+    stop("Model requires the assumption of a random intercept")
   }
   
-  for(v in v_start:num_vars){ 
-    cols = seq(from = (v - 1)*d + 1, to = v*d, by = 1)
-    for(k in 1:nlevels(group_num)){
-      ids = which(group_num == k)
-      Z_std[ids, cols[k]] = (Z_sparse[ids, cols[k]] - Z_center[v-1]) / Z_scale[v-1]
+  if(length(fD_out$cnms) > 1){ # If have more than just a random intercept
+    if(num_vars > 2){
+      idx_seq = v_start:num_vars
+    }else{
+      idx_seq = v_start
+    }
+    for(v in idx_seq){ 
+      cols = seq(from = (v - 1)*d + 1, to = v*d, by = 1)
+      print(cols)
+      for(k in 1:nlevels(group_num)){
+        ids = which(group_num == k)
+        Z_std[ids, cols[k]] = (Z_sparse[ids, cols[k]] - Z_center[v-1]) / Z_scale[v-1]
+      }
     }
   }
+  
   
   colnames(X_std) = colnames(X)
   colnames(Z_std) = colnames(fD_out$Z)

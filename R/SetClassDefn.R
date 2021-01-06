@@ -9,8 +9,8 @@
 #' @name pglmmObj-class
 #' @aliases pglmmObj-class pglmmObj
 #' show, pglmmObj-method, coef.pglmmObj, fitted.pglmmObj, fixef.pglmmObj, formula.pglmmObj,
-#' logLik.pglmmObj, model.frame.pglmmObj, model.matrix.pglmmObj, print.pglmmObj, 
-#' ranef.pglmmObj, residuals.pglmmObj,
+#' logLik.pglmmObj, model.frame.pglmmObj, model.matrix.pglmmObj, plot.pglmmObj, 
+#' predict.pglmmObj, print.pglmmObj, ranef.pglmmObj, residuals.pglmmObj,
 #' sigma.pglmmObj, summary.pglmmObj
 #' 
 #' @docType class
@@ -110,7 +110,7 @@ pglmmObj = setRefClass("pglmmObj",
                 family <<- x$family
                 # If Gaussian family, return gaussian residual error variance estimate
                 if(family$family == "gaussian"){
-                  scale <<- list(Gaus_sig2 = x$sigma_gaus)^2
+                  scale <<- list(Gaus_sig2 = x$sigma_gaus^2)
                 }else if(family$family == "negbin"){
                   scale <<- list(phi = x$phi)
                 }else{

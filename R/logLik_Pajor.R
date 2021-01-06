@@ -17,6 +17,16 @@ indicator_2 = function(bounds, samples){
 }
 
 # Pajor IS CAME Method for logLik calcuations
+# article{pajor2017estimating,
+#   title={Estimating the marginal likelihood using the arithmetic mean identity},
+#   author={Pajor, Anna and others},
+#   journal={Bayesian Analysis},
+#   volume={12},
+#   number={1},
+#   pages={261--287},
+#   year={2017},
+#   publisher={International Society for Bayesian Analysis}
+# }
 #' @importFrom mvtnorm rmvnorm dmvnorm
 #' @export
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL){

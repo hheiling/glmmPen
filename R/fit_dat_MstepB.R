@@ -58,7 +58,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 0.5, max_cores = 1, checks_complete = F){
+                     var_start = 1.0, max_cores = 1, checks_complete = F){
   
   ############################################################################################
   # Data input checks
@@ -126,7 +126,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   if(lambda0 <=10^-6) lambda0 = 0
   if(lambda1 <=10^-6) lambda1 = 0
   
-  if((covar == "unstructured") & (ncol(Z)/d >= 7)){
+  if((covar == "unstructured") & (ncol(Z)/d >= 11)){
     warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation \n",
             immediate. = T)
     covar = "independent"
@@ -441,9 +441,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       warning("Error in M step", immediate. = T)
       out = list(coef = coef, sigma = cov,  
                  lambda0 = lambda0, lambda1 = lambda1, 
-                 covgroup = covgroup, J = J, ll = -Inf, BICh = Inf, BIC = Inf, BICq = Inf,
+                 covgroup = covgroup, J = J, ll = -Inf, BICh = Inf, BIC = Inf, BICq = Inf, BICNgrp = Inf,
                  gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
-                 EM_iter = i, EM_conv = NA)
+                 EM_iter = i, EM_conv = NA, u_big = Estep_out$u0, post_modes = rep(NA, times = nrow(Z)))
       # !is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)
       if(any(is.na(coef))){
         out$warnings = sprintf("coefficient estimates contained NA values at iteration %i",i)
@@ -477,6 +477,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       }
       out$u = u0_out
       
+      
+      
       return(out)
     } # End problem == T
     
@@ -509,14 +511,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     # Increase nMC in nMC below nMC_max
     ## Increase nMC by a multiplicative factor. 
-    ## The size of this factor depends on the EM iteration (based on mcemGLM package recommendations)
+    ## The size of this factor depends on the EM iteration (similar to mcemGLM package recommendations)
     if(i <= 15){
       nMC_fact = 1.05
     }else if(i <= 30){
       nMC_fact = 1.20
-    }else{
-      nMC_fact = 1.50
     }
+    
     if(nMC < nMC_max){
       nMC = round(nMC * nMC_fact)
     }

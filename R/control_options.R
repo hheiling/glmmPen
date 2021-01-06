@@ -170,7 +170,8 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 #' Positive integer, default equals 2.
 #' @param mcc the number of times the convergence critera must be met before the algorithm is
-#' seen as having converged. (mc for 'meet condition counter'). Default set to 3.
+#' seen as having converged. (mcc for 'meet condition counter'). Default set to 3. Value retricted 
+#' to be no less than 3.
 #' @param sampler character string specifying whether the posterior draws of the random effects
 #' should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 #' incorporating an adaptive random walk sampler ("random_walk") or an
@@ -215,6 +216,10 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   }
   
   sampler = checkSampler(sampler)
+  
+  if(mcc < 3){
+    stop("mcc must be at least 3")
+  }
   
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, 
