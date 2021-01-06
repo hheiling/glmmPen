@@ -215,45 +215,41 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     if(!fixed.only){
       stop("prediction using random effects not appropriate for new data")
     }
-    if(!is.data.frame(newdata)){
-      newdata = as.data.frame(newdata)
-    }
-    # Make sure column names of newdata match model matrix from pglmmObj object
-    ## Ignore intercept
-    if(!(colnames(newdata) %in% colnames(object$X[,-1]))){
-      stop("covariate names in newdata do not match covariate names of model.matrix in pglmmObj object")
-    }
-    # Create a fixed effects formula with all nonzero fixed effects
-    fixef_all = object$fixef
-    fixef = which(fixef_all != 0)
-    terms_all = colnames(object$X)
-    terms_keep = terms_all[which(terms_all %in% names(fixef))]
-    formula_fixed = reformulate(termlabels = terms_keep, response = object$formula[[2]])
     
-    # # Extract fixed effects-only terms from formula 
-    # formula_fixed = nobars(object$formula)
-    # # Only keep fixed effects in formula that are associated with nonzero fixed effects from model fit
-    # terms_all = labels(terms(formula_fixed))
-    # fixef_all = object$fixef
-    # fixef = which(fixef_all != 0)
-    # terms_keep = terms_all[which(terms_all %in% names(fixef))]
-    # if(length(terms_keep) == 0){ # differences in covariate names between formula and model matrix
-    #   terms_all = colnames(object$X)
-    #   terms_keep = terms_all[which(terms_all %in% names(fixef))]
-    #   formula_fixed = reformulate(termlabels = terms_keep, response = object$formula[[2]])
-    # }else{
-    #   terms_drop = which(!(terms_all %in% terms_keep))
-    #   if(length(terms_drop) >= 1){
-    #     terms1 = terms(formula_fixed)
-    #     terms2 = drop.terms(terms1, terms_drop)
-    #     formula_fixed = reformulate(termlabels = labels(terms2), response = object$formula[[2]])
-    #   }
-    # }
+    fixef = object$fixef
     
-    # Create model.matrix using newdata and fixed effects formula with non-zero fixed effects
-    X = model.matrix(formula_fixed, data = newdata)
+    # Make sure newdata has relevant variables needed for prediction
+    # fixed_vars: names of the fixed effects used in analysis (from get_all_vars(fixed_formula[-2],data))
+    fixed_vars = object$fixed_vars
+    # If NA terms in var_names, this indicates that formula was specified using a matrix
+    #   (e.g. formula = y ~ X + (X | group)) instead of specified using either the names of column
+    #   names of a data frame or named vectors
+    if(!any(is.na(fixed_vars))){
+      if(!(fixed_vars %in% colnames(newdata))){
+        cat("newdata must have the following variables: \n",
+            fixed_vars, "\n")
+        stop("newdata must have the variables listed in 'fixed_vars' from pglmmObj object")
+      }
+      
+      formula_fixed = nobars(object$formula)
+      formula_fixed = formula_fixed[-2] # remove response
+      
+      # Create model.matrix using newdata and fixed effects formula with non-zero fixed effects
+      X = model.matrix(formula_fixed, data = newdata)
+      
+    }else{ # if any(is.na(fixed_vars))
+      # Check that number of columns of newdata matches number of fixed effects
+      cat("it is assumed that the columns of newdata match the order of the fixef coefficients")
+      # Ignoring intercept (model always contains intercept), check that number of variables in
+      # newdata match number of variables in the fixed effects coefficients
+      if(ncol(newdata) != (length(fixef)-1)){ 
+        stop("number of newdata columns ", ncol(newdata),
+             " does not match the number of fixed effects coefficients in fixef (ignoring intercept) ",
+             (length(fixef)-1))
+      }
+    } # End if-else any(is.na(fixed_vars))
     
-    
+    X = cbind(1, as.matrix(newdata))
     eta = X %*% fixef
     pred = switch(type[1], 
                   link = eta,
@@ -262,7 +258,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     
     data = newdata
     
-  }
+  } # End if-else is.null(newdata)
   
   if(class(pred) %in% c("dgeMatrix","matrix")){
     if(is.null(rownames(data))){

@@ -71,6 +71,7 @@ fD_adj = function(out){
   Zt = reTrms$Zt
   cnms = reTrms$cnms
   flist = reTrms$flist
+  fixed_vars = out$fixed_vars
   
   # Check y and X input
   if(!is.double(y)) {
@@ -119,7 +120,7 @@ fD_adj = function(out){
   ##  Here or somewhere else (glFormula_edit, XZ_std ...) ?
   
   return(list(frame = frame, y = y, X = X, Z = Z, group = group, cnms = cnms,
-              group_name = group_name, reTrms = reTrms))
+              group_name = group_name, reTrms = reTrms, fixed_vars = fixed_vars))
   
 } # End fD_adj() function
 
@@ -461,7 +462,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   }
   
   # Format Output - create pglmmObj object
-  output = c(fit, list(formula = formula, y = fD_out$y,
+  output = c(fit, list(formula = formula, y = fD_out$y, fixed_vars = fD_out$fixed_vars,
                        X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
                        coef_names = coef_names, family = fam_fun,
                        offset = offset, frame = fD_out$frame, 
@@ -519,7 +520,6 @@ XZ_std = function(fD_out, group_num){
     }
     for(v in idx_seq){ 
       cols = seq(from = (v - 1)*d + 1, to = v*d, by = 1)
-      print(cols)
       for(k in 1:nlevels(group_num)){
         ids = which(group_num == k)
         Z_std[ids, cols[k]] = (Z_sparse[ids, cols[k]] - Z_center[v-1]) / Z_scale[v-1]

@@ -36,12 +36,12 @@ pglmmObj = setRefClass("pglmmObj",
               results_all = "matrix",
               results_optim = "matrix",
               family = "family",
-              J = "dgCMatrix", # sparse matrix
+              J = "Matrix", # sparse matrix
               penalty_info = "list",
               nonzeroFE = "numeric", # non-zero fixed effects coefficients (colnames)
-              # nonzerovarRE = "character", # coefficients with non-zero variance (colnames)
               call = "call",
               formula = "formula",
+              fixed_vars = "character",
               data = "list",
               optinfo = "list",
               control_info = "list",
@@ -119,6 +119,7 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 J <<- x$J
                 formula <<- x$formula
+                fixed_vars <<- x$fixed_vars
                 call <<- x$call
                 sampling <<- x$sampling
                 results_all <<- x$selection_results

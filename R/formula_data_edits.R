@@ -158,9 +158,11 @@ glFormula_edit <- function(formula, data=NULL, family,
   fixedform <- nobars(formula)
   X <- model.matrix(fixedform, fr, contrasts)#, sparse = FALSE, row.names = FALSE) ## sparseX not yet
   checkXmatrix(X)
+  # all fixed effects variables used in analysis
+  fixed_vars = colnames(get_all_vars(fixedform[-2], data = data))
   
   list(fr = fr, X = X, reTrms = reTrms, family = family, formula = formula,
-       wmsgs = c(Nlev = wmsgNlev))
+       fixed_vars = fixed_vars, fwmsgs = c(Nlev = wmsgNlev))
 }
 
 #####################################################################################################
