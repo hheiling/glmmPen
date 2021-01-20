@@ -85,17 +85,26 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       y_k = y[idx_k]
       X_k = X[idx_k,]
       cols_use = cols_k[ranef_idx]
-      if(length(cols_use) == 1){
+      if((length(cols_use) == 1) | (length(idx_k) == 1)){
         Z_k = matrix(Znew2[idx_k, cols_use], nrow = length(idx_k), ncol = length(cols_use))
       }else{ # length(cols_use) > 1
         Z_k = Znew2[idx_k, cols_use]
       }
       
-      dat_list = list(N = length(idx_k), # Number individuals in group k
-                      q = length(ranef_idx), # number random effects
-                      eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
-                      y = y_k, # outcomes for group k
-                      Z = Z_k) # portion of Z matrix corresonding to group k
+      if(length(idx_k) == 1){
+        dat_list = list(N = length(idx_k), # Number individuals in group k
+                        q = length(ranef_idx), # number random effects
+                        eta_fef = as.array(as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1))), # fixed effects componenet of linear predictor
+                        y = as.array(y_k), # outcomes for group k
+                        Z = Z_k) # portion of Z matrix corresonding to group k
+      }else{ # length(idx_k) > 1
+        dat_list = list(N = length(idx_k), # Number individuals in group k
+                        q = length(ranef_idx), # number random effects
+                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                        y = y_k, # outcomes for group k
+                        Z = Z_k) # portion of Z matrix corresonding to group k
+      }
+      
       
       if(family == "gaussian"){
         

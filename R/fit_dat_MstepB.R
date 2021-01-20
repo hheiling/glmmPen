@@ -292,7 +292,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
   }else{
     sig_g = 1.0 # specify an arbitrary placeholder (will not be used in calculations)
-  }
+  } # End if-else family == "gaussian"
   
   
   
@@ -428,9 +428,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     }
     
     # Q-function estimate
-    ll0 = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, phi)
+    # ll0 = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, sig_g, phi)
     
-    if(!is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)){
+    if(any(is.na(coef)) | any(abs(coef) > 10^5)){ # !is.finite(ll0) | 
       # For now, assume divergent in any abs(coefficient) > 10^5
       problem = T
       print("Updated coef:")
@@ -443,7 +443,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                  lambda0 = lambda0, lambda1 = lambda1, 
                  covgroup = covgroup, J = J, ll = -Inf, BICh = Inf, BIC = Inf, BICq = Inf, BICNgrp = Inf,
                  gibbs_accept_rate = gibbs_accept_rate, proposal_SD = proposal_SD,
-                 EM_iter = i, EM_conv = NA, u_big = Estep_out$u0, post_modes = rep(NA, times = nrow(Z)))
+                 EM_iter = i, EM_conv = NA, u_big = Estep_out$u0, post_modes = rep(NA, times = ncol(Z)))
       # !is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)
       if(any(is.na(coef))){
         out$warnings = sprintf("coefficient estimates contained NA values at iteration %i",i)
@@ -453,9 +453,10 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         }else{
           out$warnings = "Error in M step: coefficient values diverged"
         }
-      }else if(!is.finite(ll0)){
-        out$warnings = "Error in M step: Q function estimated as -Inf"
       }
+      # else if(!is.finite(ll0)){
+      #   out$warnings = "Error in M step: Q function estimated as -Inf"
+      # }
       
       if(sampler %in% c("random_walk","independence")){
         out$gibbs_accept_rate = gibbs_accept_rate
@@ -624,7 +625,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   ## current penalized model, calculate the Q function
   if(!is.null(ufull_describe)){
     ufull = attach.big.matrix(ufull_describe)
-    q1 = Qfun(y, X, Z, ufull@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, phi)
+    q1 = Qfun(y, X, Z, ufull@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, sig_g, phi)
     q2 = 0
     for(k in 1:d){
       cols_idx = seq(from = k, to = ncol(Z), by = d)

@@ -13,6 +13,8 @@
 \alias{logLik.pglmmObj,}
 \alias{model.frame.pglmmObj,}
 \alias{model.matrix.pglmmObj,}
+\alias{plot.pglmmObj,}
+\alias{predict.pglmmObj,}
 \alias{print.pglmmObj,}
 \alias{ranef.pglmmObj,}
 \alias{residuals.pglmmObj,}

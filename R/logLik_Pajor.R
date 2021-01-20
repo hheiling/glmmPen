@@ -88,10 +88,10 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
     cols_all = seq(from = k, by = d, length.out = num_var)
     # Restrict above colums to those belonging to variables with non-zero random effect variance
     cols = cols_all[which(diag(sigma) != 0)]
-    Z_k = Z[ids,cols]
-    if(length(cols) == 1){
-      Z_k = matrix(Z_k, ncol = 1)
-    }
+    Z_k = Z[ids,cols,drop=F]
+    # if((length(cols) == 1) | (length(ids) == 1)){
+    #   Z_k = matrix(Z_k, nrow = length(ids), ncol = length(cols))
+    # }
     
     # Sample M samples from the importance function
     ## Importance function: multivariate normal (multivariate t?)

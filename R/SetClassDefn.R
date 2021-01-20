@@ -127,8 +127,8 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 penalty_info <<- list(penalty = x$penalty, gamma_penalty = x$gamma_penalty, 
                                       alpha = x$alpha, fixef_noPen = x$fixef_noPen)
-                optinfo <<- list(control_options = x$control_options$optim_options,
-                                 warnings = x$warnings, iter = x$EM_iter, conv_val = x$EM_conv)
+                optinfo <<- list(iter = x$EM_iter, conv = x$EM_conv, warnings = x$warnings,
+                                 control_options = x$control_options$optim_options)
                 control_info <<- x$control_options
                 Gibbs_info <<- list(gibbs_accept_rate = x$gibbs_accept_rate, proposal_SD = x$proposal_SD)
                 

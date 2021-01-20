@@ -280,7 +280,7 @@ arma::vec varfun(const char* family, arma::vec mu, double phi){
 double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
             const arma::vec& group, const arma::sp_mat& J_q,
             const arma::vec& beta, const arma::vec offset, arma::vec dims,
-            const char* family, int link, double phi){
+            const char* family, int link, double sig_g, double phi){
   
   const char* bin = "binomial";
   const char* pois = "poisson";
@@ -313,8 +313,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
   arma::vec mu(M);
   
   // parameters needed for gaussian distribution
-  double s2 = 0.0; // estimate of sigma^2 
-  double sig = 0.0; // square root of s2 
+  // double s2 = sig_g * sig_g; // estimate of sigma^2 
   
   double llQ = 0.0;
   
@@ -340,18 +339,6 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
     
   } // End k for loop
   
-  // If gaussian family, calculate sigma^2 
-  if(std::strcmp(family, gaus) == 0){
-    // Sum up SSE
-    s2 = 0.0;
-    for(i=0;i<N;i++){
-      mu = invlink(link, eta.col(i));
-      s2 += sum((y(i)*const_ones - mu) % (y(i)*const_ones - mu));
-    }
-    
-    s2 = s2 / (M*N);
-    sig = sqrt(s2);
-  }
   
   // Calculate llQ (The Q1 portion of the Q function specified in Section 4 of Rashid et al paper)
   
@@ -376,7 +363,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
       }
     }else if(std::strcmp(family, gaus) == 0){
       for(m=0;m<M;m++){
-        llQ = llQ + R::dnorm(y(i), mu(m), sig, 1); // log value
+        llQ = llQ + R::dnorm(y(i), mu(m), sig_g, 1); // log value
       }
     }else if(std::strcmp(family, Gamma) == 0){
       stop("Gamma not yet available");

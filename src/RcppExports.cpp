@@ -155,8 +155,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // Qfun
-double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, const arma::vec& group, const arma::sp_mat& J_q, const arma::vec& beta, const arma::vec offset, arma::vec dims, const char* family, int link, double phi);
-RcppExport SEXP _glmmPen_Qfun(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP pBigMatSEXP, SEXP groupSEXP, SEXP J_qSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP dimsSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP phiSEXP) {
+double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, const arma::vec& group, const arma::sp_mat& J_q, const arma::vec& beta, const arma::vec offset, arma::vec dims, const char* family, int link, double sig_g, double phi);
+RcppExport SEXP _glmmPen_Qfun(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP pBigMatSEXP, SEXP groupSEXP, SEXP J_qSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP dimsSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP sig_gSEXP, SEXP phiSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -171,8 +171,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
     Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
     Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< double >::type sig_g(sig_gSEXP);
     Rcpp::traits::input_parameter< double >::type phi(phiSEXP);
-    rcpp_result_gen = Rcpp::wrap(Qfun(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, phi));
+    rcpp_result_gen = Rcpp::wrap(Qfun(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, sig_g, phi));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -241,7 +242,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_sample_mc_inner_gibbs", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs, 10},
     {"_glmmPen_sample_mc_gibbs_adapt_rw", (DL_FUNC) &_glmmPen_sample_mc_gibbs_adapt_rw, 14},
     {"_glmmPen_invlink", (DL_FUNC) &_glmmPen_invlink, 2},
-    {"_glmmPen_Qfun", (DL_FUNC) &_glmmPen_Qfun, 12},
+    {"_glmmPen_Qfun", (DL_FUNC) &_glmmPen_Qfun, 13},
     {"_glmmPen_sig_gaus", (DL_FUNC) &_glmmPen_sig_gaus, 10},
     {"_glmmPen_phi_ml", (DL_FUNC) &_glmmPen_phi_ml, 6},
     {"_glmmPen_phi_ml_init", (DL_FUNC) &_glmmPen_phi_ml_init, 5},

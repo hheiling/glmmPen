@@ -58,7 +58,8 @@ the most recent coefficient estimate and the coefficient estimate from t EM iter
 Positive integer, default equals 2.}
 
 \item{mcc}{the number of times the convergence critera must be met before the algorithm is
-seen as having converged. (mc for 'meet condition counter'). Default set to 3.}
+seen as having converged. (mcc for 'meet condition counter'). Default set to 3. Value retricted 
+to be no less than 3.}
 
 \item{sampler}{character string specifying whether the posterior draws of the random effects
 should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 

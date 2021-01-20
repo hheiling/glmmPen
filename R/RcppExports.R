@@ -34,8 +34,8 @@ invlink <- function(link, eta) {
     .Call('_glmmPen_invlink', PACKAGE = 'glmmPen', link, eta)
 }
 
-Qfun <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, phi) {
-    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, phi)
+Qfun <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, sig_g, phi) {
+    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, sig_g, phi)
 }
 
 sig_gaus <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, link) {

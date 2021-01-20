@@ -121,8 +121,9 @@ glFormula_edit <- function(formula, data=NULL, family,
   
   mf <- mc <- match.call()
   ## Note: input family is the family function passed from glmmPen
-  if (family$family %in% c("quasibinomial", "quasipoisson", "quasi"))
+  if (family$family %in% c("quasibinomial", "quasipoisson", "quasi")){
     stop('"quasi" families cannot be used in glmmPen package')
+  }
   
   denv <- checkFormulaData(formula, data, checkLHS = T, checkData = T, debug = F)
   mc$formula <- formula <- as.formula(formula, env = denv)    ## substitute evaluated version

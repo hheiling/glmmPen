@@ -42,8 +42,8 @@ with canonical links only.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
-Default is "unstructured", but if the number of random effects (including the intercept) is 
-greater than or equal to 7 (i.e. high dimensional), then the algorithm automatically assumes an 
+Default is "unstructured", but if the number of random effects (not including the intercept) is 
+greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
 independent covariance structure (covar switched to "independent").}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 

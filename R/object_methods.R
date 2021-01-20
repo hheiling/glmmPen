@@ -20,13 +20,19 @@ ranef.pglmmObj = function(object){
 #' @export
 sigma.pglmmObj = function(object){
   
+  fam_fun = object$family
+  family = fam_fun$family
   # Return covariance matrix of the random effects and any scale parameters
   group = object$data$group
   grp = names(group)
   scale = object$scale[[1]]
   out = list()
   out[[grp]] = object$sigma
-  out[["scale"]] = scale
+  if(family == "gaussian"){
+    out[["Residual Variance"]] = scale
+  }else if(family == "negbin"){
+    out[["phi"]] = scale
+  }
   
   return(out)
 }
