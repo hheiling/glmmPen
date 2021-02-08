@@ -114,7 +114,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
   lam.subvec(0,J_X-1) = lambda0 * sqrt(K_vec.subvec(0,J_X-1));
   lam.subvec(J_X,J_XZ-1) = lambda1 * sqrt(K_vec.subvec(J_X,J_XZ-1));
   
-  
+
   // Recall link coding (see "fit_dat_MstepB.R" for logic):
   // 10: logit, 11: probit, 12: cloglog
   // 20: log, 30: identity, 40: inverse
@@ -170,8 +170,6 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
     nu = tmp_out(M);
   }
   
-  // Rcout << "initial nu: " << nu << std::endl;
-  
   // Note: resid in the above calculation is (y - mu), but really want (y-mu)/nu
   // Therefore, divide entire residual matrix by nu
   resid = resid / nu;
@@ -204,7 +202,8 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
         // Therefore, skip to next covariate grouping
         continue;
       }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
-        // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
+        // If beta penalized to zero in past round of EM iteration for same lambda, 
+        // will stay zero in further rounds of EM algorithm
         // Therefore, skip to next covariate grouping
         continue;
       }
@@ -329,10 +328,26 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
         // Therefore, skip to next covariate grouping
         continue;
       }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
-        // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
+        // If beta penalized to zero in past round of EM iteration for same lambda,
+        // will stay zero in further rounds of EM algorithm
         // Therefore, skip to next covariate grouping
         continue;
       }
+      
+      // if(sum(beta.elem(idxj)) == 0){
+      //   // Random effects coefficient senarios:
+      //   // *Initialized coefficients at start of M step*
+      //   // Start of full MCECM algorithm:
+      //   //  If ranef_keep for the jth random effect is set to 0, the random effect is prescreened out
+      //   //  and should remain 0 for entire MCECM algorithm
+      //   // Middle of MCECM algorithm:
+      //   //  If random effect coefficient penalized to 0 in past round of MCECM algorithm, then
+      //   //  continue to keep random effect coefficient penalized to 0
+      //   // *Within M step*
+      //   // If random effect coefficient penalized to 0 in past round of M step, keep penalized to 0
+      //   // in future rounds of the M step
+      //   continue;
+      // }
       
       //----------------------------------------------------------------------------------//
       // Update eta and resid from last updated beta (group r)

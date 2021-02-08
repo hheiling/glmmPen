@@ -392,7 +392,7 @@ double sig_gaus(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP
   int M = pMat->nrow();
   int N = y.n_elem;
   int p = X.n_cols; // Number fixed effects covariates
-  int p2 = beta.n_elem; // Total number of coefficients 
+  int p2 = beta.n_elem; // Total number of coefficients (p+H)
   int H = J_q.n_cols; // From paper, J_q
   
   int i=0;

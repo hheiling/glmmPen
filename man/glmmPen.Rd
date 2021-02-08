@@ -16,7 +16,7 @@ glmmPen(
   penalty = c("MCP", "SCAD", "lasso"),
   alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
-  optim_options = optimControl(),
+  optim_options = "recommend",
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = selectControl(),

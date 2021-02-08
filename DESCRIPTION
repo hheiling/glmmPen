@@ -2,7 +2,7 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.5.0.3
+Version: 1.5.0.8
 Date: 2018-10-26
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
@@ -19,7 +19,6 @@ Imports:
     Matrix,
     methods,
     ncvreg,
-    lme4,
     reshape2,
     rstan (>= 2.18.1),
     rstantools (>= 2.0.0),
@@ -27,6 +26,7 @@ Imports:
     mvtnorm,
     MASS
 Depends: 
+    lme4,
     BH (>= 1.66.0),
     bigmemory,
     R (>= 3.6.0),

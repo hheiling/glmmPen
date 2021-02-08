@@ -1,7 +1,7 @@
 #' @importFrom stringr str_c str_detect
 #' @importFrom ncvreg std
 #' @export
-sim.data2 = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, 
+sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, 
                      slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
   
   set.seed(seed = seed)

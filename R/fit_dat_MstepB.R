@@ -45,7 +45,7 @@
 #' 
 #' @useDynLib glmmPen
 #' @importFrom bigmemory attach.big.matrix describe as.big.matrix
-#' @importFrom mvtnorm rmvnorm dmvnorm
+#' @importFrom mvtnorm dmvnorm
 #' @importFrom Matrix Matrix
 #' @export
 fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
@@ -58,7 +58,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 1.0, max_cores = 1, checks_complete = F){
+                     var_start = 1.0, max_cores = 1, checks_complete = F,
+                     ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group)))){
   
   ############################################################################################
   # Data input checks
@@ -127,7 +128,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   if(lambda1 <=10^-6) lambda1 = 0
   
   if((covar == "unstructured") & (ncol(Z)/d >= 11)){
-    warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation \n",
+    warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation",
             immediate. = T)
     covar = "independent"
   }
@@ -174,30 +175,48 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   ############################################################################################
   
   # Initialize cov and coef for start of EM algorithm
+  ## coef: Initializes coefficients for M step
+  ## gamma: Initializes (a) random effects for M step and (b) random effects for first E step
+  ## cov: Initializes covariance matrix. If variance for a predictor (the diagonal) is
+  ##    greater than 0, E step will sample from posterior for this predictor. Otherwise,
+  ##    no posterior samples will be drawn for that predictor
   
   if(!is.null(coef_old)){
     
     print("using coef from past model to intialize")
     gamma = matrix(J%*%matrix(coef_old[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
-    # cov = var = Matrix(data = gamma %*% t(gamma), sparse = T)
     
     # If the random effect for a variable penalized out in a past model, still possible for that
     # variable to not be penalized out this next model. Therefore, initialize the variance of
     # these penalized-out random effects to have a non-zero variance (specified by var_start)
+    # However, if random effect is penalized out in the pre-screening step, then keep this
+    # effect with a 0 variance
+    # In E step, only random effects with non-zero variance in covariance matrix have MCMC
+    # samples from the posterior distribution
+    # Also need to update gamma (gamma used in E step)
     ok = which(diag(var) > 0)
     if(length(ok) != length(diag(var))){
       ranef0 = which(diag(var) == 0)
       for(j in ranef0){
-        var[j,j] = var_start
+        if(ranef_keep[j] == 1){
+          var[j,j] = var_start
+        }
       }
-      
-      # Re-define cov and gamma with new variances
       cov = var
-      gamma = t(chol(cov))
+      # Update gamma matrix
+      ## add small constant to diagonals so that chol() operation works
+      gamma = t(chol(var + diag(10^-6,nrow(var))))
     }
     
-    coef = coef_old[1:ncol(X)]
+    if(covar == "unstructured"){
+      gamma_vec = c(gamma)[which(lower.tri(matrix(0,nrow=nrow(cov),ncol=ncol(cov)),diag=T))]
+    }else if(covar == "independent"){
+      gamma_vec = diag(gamma)
+    }
+    
+    # Initialize fixed and random effects 
+    coef = c(coef_old[1:ncol(X)], gamma_vec)
     
   }else{
     
@@ -239,19 +258,31 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     # Initialize covariance matrix (cov)
     if(ncol(Z)/d > 1){
-      vars = rep(var_start, ncol(Z)/d)
+      vars = rep(var_start, ncol(Z)/d) * ranef_keep
       cov = var = diag(vars)
-      gamma = t(chol(var)) # chol outputs upper triangular, so transposing here to get lower triangular
+      gamma = diag(sqrt(vars)) 
     }else{
       vars = var_start
       cov = var = matrix(vars, ncol = 1)
-      gamma = var
+      gamma = matrix(sqrt(var), ncol = 1)
     }
     
     if(trace >= 1){
-      print("initialized covariance matrix:")
-      print(cov)
+      if(covar == "unstructured"){
+        print("initialized covariance matrix:")
+        print(cov)
+      }else if(covar == "independent"){
+        print("initialized covariance matrix diagonal:")
+        print(diag(cov))
+      }
     }
+    
+    if(covar == "unstructured"){
+      gamma_vec = c(gamma)[which(lower.tri(matrix(0,nrow=nrow(cov),ncol=ncol(cov)),diag=T))]
+    }else if(covar == "independent"){
+      gamma_vec = diag(gamma)
+    }
+    coef = c(coef[1:ncol(X)], gamma_vec)
     
     
   } # End if-else !is.null(coef_old)
@@ -275,14 +306,14 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     if(is.null(u_init)){
       # Find initial estimate of the variance of the error term using initial fixed effects only
-      eta = X %*% coef
+      eta = X %*% coef[1:ncol(X)]
       s2_g = sum((y - invlink(link_int, eta))^2)
       sig_g = sqrt(s2_g / length(y))
     }else{
       # Find initial estimate of variance of the error term using fixed and random effects from 
       # last round of selection
       u_big = as.big.matrix(u_init)
-      sig_g = sig_gaus(y, X, Z, u_big@address, group, J, c(coef, gamma), offset_fit, c(d, ncol(Z)/d), link_int)
+      sig_g = sig_gaus(y, X, Z, u_big@address, group, J, coef, offset_fit, c(d, ncol(Z)/d), link_int)
       
     }
    
@@ -293,8 +324,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }else{
     sig_g = 1.0 # specify an arbitrary placeholder (will not be used in calculations)
   } # End if-else family == "gaussian"
-  
-  
   
   
   Znew2 = Z
@@ -330,17 +359,16 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   # At start of EM algorithm, acquire posterior draws from all random effect variables
-  ranef_idx = 1:length(diag(cov))
+  # Note: restricted to just which variables were not selected out in previous selection models
+  ranef_idx = which(diag(cov) != 0)
   
   if(!is.null(u_init)){
     print("using u from previous model to initialize")
-    
     if(is.matrix(u_init)){
-      uold = as.numeric(u_init[nrow(u_init),])
-    }else if(is.vector(u_init)){
-      uold = u_init
+      u_big = as.big.matrix(u_init)
+      uold = as.numeric(u_big[nrow(u_big),])
     }else{
-      stop("u_init must be either a matrix of posterior draws or a vector of a single set of posterior draws")
+      stop("u_init must be a matrix of posterior draws")
     }
     
     Estep_out = E_step(coef = coef, ranef_idx = ranef_idx, y=y, X=X, Znew2=Znew2, group=group, 
@@ -382,11 +410,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   
   # Record last t coef vectors (each row = coef vector for a past EM iteration)
   # Initialize with initial coef vector
-  coef = c(coef, rep(0, length(covgroup)))
   coef_record = matrix(coef, nrow = t, ncol = length(coef), byrow = T)
-  # coef_record_all = matrix(NA, nrow = maxitEM, ncol = length(coef), byrow = T)
   
   problem = FALSE # Determining if issue with EM algorithm results
+  
+  # Remove initialized big matrix of posterior draws
+  u_big = NULL
   
   ############################################################################################
   # EM Algorithm
@@ -410,7 +439,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     
     if(family == "gaussian"){
       # if family = 'gaussian', calculate sigma of error term (standard deviation)
-      sig_g = sig_gaus(y, X, Z, u0@address, group, J, c(coef, gamma), offset_fit, c(d, ncol(Z)/d), link_int)
+      sig_g = sig_gaus(y, X, Z, u0@address, group, J, coef, offset_fit, c(d, ncol(Z)/d), link_int)
       if(trace >= 1){
         cat("sig_g: ", sig_g, "\n")
       }
@@ -423,8 +452,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     # }
     
     if(trace >= 1){
-      print("Updated coef:")
-      print(coef)
+      print("Updated fixed effects:")
+      print(coef[1:ncol(X)])
     }
     
     # Q-function estimate
@@ -438,7 +467,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     }
     
     if(problem == T){
-      warning("Error in M step", immediate. = T)
+      warning("Error in M step, see optinfo$warnings in output for details", immediate. = T)
       out = list(coef = coef, sigma = cov,  
                  lambda0 = lambda0, lambda1 = lambda1, 
                  covgroup = covgroup, J = J, ll = -Inf, BICh = Inf, BIC = Inf, BICq = Inf, BICNgrp = Inf,
@@ -449,14 +478,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         out$warnings = sprintf("coefficient estimates contained NA values at iteration %i",i)
       }else if(any(abs(coef) > 10^5)){
         if(family == "gaussian"){
+          warning("Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl", immediate. = T)
           out$warnings = "Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl"
         }else{
           out$warnings = "Error in M step: coefficient values diverged"
         }
       }
-      # else if(!is.finite(ll0)){
-      #   out$warnings = "Error in M step: Q function estimated as -Inf"
-      # }
       
       if(sampler %in% c("random_walk","independence")){
         out$gibbs_accept_rate = gibbs_accept_rate
@@ -477,8 +504,6 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
         u0_out = bigmemory::as.matrix(u0)
       }
       out$u = u0_out
-      
-      
       
       return(out)
     } # End problem == T
@@ -505,6 +530,12 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     # Update latest record of coef
     coef_record = rbind(coef_record[-1,], t(coef))
     
+    # now update EM iteration information  
+    ## Round integers i, nMC, and sum(coef != 0) to avoid printing of unnecessary decimals (x.00000)
+    update_limits = c(i, nMC , round(diff[i],6), (sum(coef!=0)))
+    names(update_limits) = c("Iter","nMC","EM conv","Non0 Coef")
+    print(update_limits)
+    
     if(sum(diff[max(i-mcc+1,1):i] < conv_EM) >= mcc){
       EM_converged = 1
       break
@@ -514,28 +545,24 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     ## Increase nMC by a multiplicative factor. 
     ## The size of this factor depends on the EM iteration (similar to mcemGLM package recommendations)
     if(i <= 15){
-      nMC_fact = 1.05
-    }else if(i <= 30){
+      nMC_fact = 1.1
+    }else{
       nMC_fact = 1.20
     }
+    # nMC_fact = 1.2
     
     if(nMC < nMC_max){
       nMC = round(nMC * nMC_fact)
+      # If after update nMC exceeds nMC_max, reduce to nMC_max value
+      if(nMC > nMC_max) nMC = nMC_max
     }
-    # If after update nMC exceeds nMC_max, reduce to nMC_max value
-    if(nMC > nMC_max) nMC = nMC_max
-    
-    # now update EM iteration information  
-    update_limits = c(i, nMC , diff[i], sum(coef!=0))
-    names(update_limits) = c("Iter","nMC","EM diff","Non0 Coef")
-    print(update_limits)
     
     if(trace >= 1){
       if(nrow(cov) <= 5){
-        print("covariance matrix:")
+        print("random effect covariance matrix:")
         print(cov)
       }else{
-        print("covariance matrix diagonal:")
+        print("random effect covariance matrix diagonal:")
         print(diag(cov))
       }
     }
@@ -566,7 +593,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   if(EM_converged == 0){
-    warning("glmmPen algorithm did not converge within maxit_EM iterations", immediate. = T)
+    warning("glmmPen algorithm did not converge within maxit_EM iterations, conv = ", round(diff[i],6), immediate. = T)
   }
   
   # Another E step for loglik calculation (number draws = M)
@@ -643,6 +670,15 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
              covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq, 
              BICNgrp = BICNgrp, extra = list(Znew2 = Znew2), EM_iter = i, EM_conv = diff[i],
              u_big = Estep_out$u0, post_modes = post_modes)
+  
+  # If gaussian family, take last 1000 rows of u0 for u_init in next round of selection 
+  #  (to use for sig_g calculation)
+  # Else, take last row for initializing E step in next round of selection
+  if(family == "gaussian"){
+    out$u_init = u0[(nrow(u0)-999):nrow(u0),]
+  }else{
+    out$u_init = matrix(u0[nrow(u0),], nrow = 1)
+  }
   
   if(sampler %in% c("random_walk","independence")){
     out$gibbs_accept_rate = gibbs_accept_rate

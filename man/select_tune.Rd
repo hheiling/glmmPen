@@ -24,7 +24,8 @@ select_tune(
   BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
   BICq_calc = T,
   BICq_posterior = NULL,
-  checks_complete = F
+  checks_complete = F,
+  pre_screen = T
 )
 }
 \arguments{
@@ -96,6 +97,9 @@ See 'Details' section for additional details.}
 \code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
 performs additional checks on the input data. If false, assumes data input checks have 
 already been performed}
+
+\item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
+during selection when the number random effect predictors is 10 or more. Default \code{TRUE}.}
 }
 \value{
 A list with the following elements:

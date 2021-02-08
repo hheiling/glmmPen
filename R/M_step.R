@@ -3,7 +3,6 @@
 # Coordinate Descent (ungrouped) for fixed effects only
 #################################################################################################
 
-#' @export
 CD = function(y, X, family, link_int, offset,
               coef_init, maxit_CD = 250, conv = 0.0001,
               penalty, lambda, gamma, alpha = 1.0, penalty_factor, trace = 0){
@@ -36,7 +35,6 @@ CD = function(y, X, family, link_int, offset,
 # init: if this is the first attempt at a fit (using initial coef)
 # family: character describing which family
 # link_int: integer summarizing with link to use (see coding in fit_dat_B())
-#' @export
 M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offset, phi,
                   maxit_CD = 250, conv_CD = 0.0001,
                   init, group_X = 0:(ncol(X)-1), covgroup,

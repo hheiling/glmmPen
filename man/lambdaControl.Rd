@@ -11,7 +11,8 @@ selectControl(
   lambda0_seq = NULL,
   lambda1_seq = NULL,
   nlambda = 10,
-  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp")
+  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
+  pre_screen = T
 )
 }
 \arguments{
@@ -33,6 +34,9 @@ The regular "BIC" option penalty term uses (total non-zero coefficients)*(length
 observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
 a full model; a small penalty is used for the fixed and/or random effects if the number of 
 effects is 10 or greater.}
+
+\item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
+during selection when the number random effect predictors is 10 or more. Default \code{TRUE}.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 

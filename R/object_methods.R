@@ -4,6 +4,7 @@
 # Properties: 
 ## Reference Class object
 
+
 #' @importFrom lme4 fixef
 #' @export
 fixef.pglmmObj = function(object){
@@ -29,7 +30,7 @@ sigma.pglmmObj = function(object){
   out = list()
   out[[grp]] = object$sigma
   if(family == "gaussian"){
-    out[["Residual Variance"]] = scale
+    out[["Residual StdDev"]] = sqrt(scale)
   }else if(family == "negbin"){
     out[["phi"]] = scale
   }
@@ -83,6 +84,11 @@ family.pglmmObj = function(object){
 nobs.pglmmObj = function(object){
   nrow(object$data$X)
 }
+
+# @export
+# ngrps.pglmmObj = function(object){
+#   nlevels(object$data$group[[1]])
+# }
 
 
 reOnly <- function(f, response=FALSE) {
@@ -186,7 +192,7 @@ fitted.pglmmObj = function(object, fixed.only = T){
   
   mu = invLink(family = object$family, eta)
   
-  return(mu)
+  return(as.numeric(mu))
   
 }
 
@@ -266,7 +272,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     
   } # End if-else is.null(newdata)
   
-  if(class(pred) %in% c("dgeMatrix","matrix")){
+  if(class(pred) %in% c("Matrix","matrix")){
     if(is.null(rownames(data))){
       rownames(pred) = seq_len(nrow(data))
     }else{
@@ -332,7 +338,7 @@ residuals.pglmmObj = function(object, type = c("deviance","pearson","response","
   }
   
   attr(res, "residual type") = type
-  return(res)
+  return(as.numeric(res))
 }
 
 ################################################################### 
@@ -444,7 +450,8 @@ prt_resids = function(resids, type = "Pearson", digits) {
 }
 
 #' @export
-summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "deviance"){
+summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), 
+                            resid_type = switch(object$family$family, gaussian = "pearson", "deviance")){
   # ToDo: Add in (best) lambda values, BIC, logLik
   
   # Title
@@ -611,14 +618,24 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
         }
       }
       U = U_red
+      U_cols = colnames(U)
+      var_names = vars_string
+    }else{
+      vars_all = str_sub(U_cols, start = 1, end = (str_locate(U_cols, ":")[,1]-1))
+      vars_all2 = str_remove(str_remove(vars_all, "[(]"), "[)]")
+      var_names = vars_all2[seq(from = 1, by = d, length.out = length(vars_all2) / d)]
     }
-  }
+    
+  } # End if(any(vars) == "all")
+  
+  
   
   # If include intercept, convert to recognized form "Intercept"
   if(any(vars != "all")){
     v_int = c("Intercept","intercept","Int","int")
     v_intTRUE = vars %in% v_int[-1]
     vars[v_intTRUE] = "Intercept"
+    var_names = vars
   }
   
   if((any(grps == "all")) & (any(vars == "all"))){
@@ -626,7 +643,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     var_num = ncol(U) / d
     U_keep = U
     grp_names = levels(object$data$group[[1]])
-    var_names = colnames(ranef(object)[[1]])
+    # var_names = colnames(ranef(object)[[1]])
     
   }else if((any(grps == "all")) & (any(vars != "all"))){
     d = nlevels(object$data$group[[1]])
@@ -634,34 +651,39 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     # Concatenate [)]?, var_name, [)]?, and :
     var_cat = str_c("[(]?",vars,"[)]?",":")
     for(v in var_cat){
-      if(var_cat[1] == v){
+      if(v == var_cat[1]){
         U_keep = U[,str_detect(U_cols, v)]
       }else{
         U_keep = cbind(U_keep, U[,str_detect(U_cols, v)])
       }
     }
     grp_names = levels(object$data$group[[1]])
-    var_names = vars
+    # var_names = vars
     
   }else if((any(vars == "all")) & (any(grps != "all"))){
     d = length(grps)
     var_num = ncol(U) / nlevels(object$data$group[[1]])
     # Concatenate :, grp_name, and $ to :grp_name$
     grp_cat = str_c(":",grps,"$")
+    cols_U_keep0 = NULL
     for(g in grp_cat){
-      if(grp_cat[1] == g){
+      if(g == grp_cat[1]){
         U_keep0 = U[,str_detect(U_cols, g)]
+        cols_U_keep0 = U_cols[str_detect(U_cols, g)]
       }else{
         U_keep0 = cbind(U_keep0, U[,str_detect(U_cols, g)])
+        cols_U_keep0 = c(cols_U_keep0, U_cols[str_detect(U_cols, g)])
       }
     }
+    U_keep0 = as.matrix(U_keep0)
+    colnames(U_keep0) = cols_U_keep0
     grp_names = grps
-    var_names = colnames(ranef(object)[[1]])
+    # var_names = colnames(ranef(object)[[1]])
     U_keep = matrix(0, nrow = nrow(U_keep0), ncol = ncol(U_keep0))
-    cols_U_keep = numeric(length = ncol(U_keep0))
+    cols_U_keep = character(length = ncol(U_keep0))
     for(v in 1:length(var_names)){
       U_keep[,(1+(v-1)*d):(v*d)] = U_keep0[,seq(from = v, by = var_num, length.out = d)]
-      cols_U_keep[(1+(v-1)*d):(v*d)] = colnames(U_keep0)[seq(from = v, by = var_num, length.out = d)]
+      cols_U_keep[(1+(v-1)*d):(v*d)] = cols_U_keep0[seq(from = v, by = var_num, length.out = d)]
     }
     colnames(U_keep) = cols_U_keep
     
@@ -687,7 +709,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     }
     U_keep = U_keep2
     grp_names = grps
-    var_names = vars
+    # var_names = vars
   }
   
   if(numeric.grps){
@@ -769,7 +791,10 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
 #' @import ggplot2 
 #' @method plot pglmmObj
 #' @export
-plot.pglmmObj = function(object, x = fitted(object), y = residuals(object, type = "deviance"),
+plot.pglmmObj = function(object, x = fitted(object, fixed.only = F), 
+                         y = switch(object$family$family,
+                                    gaussian = residuals(object, type = "pearson"),
+                                    residuals(object, type = "deviance")),
                          x_label = "Fitted Values", y_label = NULL){
   
   if(length(x) != length(y)){

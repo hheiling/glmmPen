@@ -27,7 +27,7 @@
 #' @export
 glmm = function(formula, data = NULL, family = "binomial", covar = c("unstructured","independent"),
                 offset = NULL, na.action = na.omit, 
-                optim_options = optimControl(), adapt_RW_options = adaptControl(),
+                optim_options = "recommend", adapt_RW_options = adaptControl(),
                 trace = 0, tuning_options = lambdaControl(), ...){
   
   # Check that (...) arguments are subsets of glmmPen arguments
@@ -228,7 +228,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                    offset = NULL, na.action = na.omit, 
                    fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                   optim_options = optimControl(), adapt_RW_options = adaptControl(),
+                   optim_options = "recommend", adapt_RW_options = adaptControl(),
                    trace = 0, tuning_options = selectControl(), BICq_posterior = NULL){
   # Things to address / Questions to answer:
   ## Specify what fit_dat output will be
@@ -252,11 +252,12 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   # Check BICq_posterior format is appropriate
   checkBICqPost(BICq_posterior)
   
-  if(class(optim_options) != "optimControl"){
-    stop("optim_options must be of class 'optimControl', see optimControl documentation")
-  }
   if(class(adapt_RW_options) != "adaptControl"){
     stop("adapt_RW_options must be of class 'adaptControl', see adaptControl documentation")
+  }
+  
+  if(!is.list(tuning_options) | !inherits(tuning_options, "pglmmControl")){
+    stop("tuning_option parameter must be a list of type lambdaControl() or selectControl()")
   }
   
   # Convert formula and data to useful forms to plug into fit_dat
@@ -273,6 +274,22 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   # Select output of interest from fD_out0, adjust formatting of Z matrix, and
   #   perform additional checks and restrictions
   fD_out = fD_adj(out = fD_out0)
+  
+  # Check that response type matches family
+  if(family == "binomial"){
+    if(all(fD_out$y %in% c(1,2))){
+      fD_out$y = fD_out$y - 1
+    }
+    if(!all(fD_out$y %in% c(0,1))){
+      stop("response must be binary for the binomial family")
+    }
+  }else if(family == "poisson"){
+    if(!all(floor(fD_out$y) == fD_out$y)){
+      stop("response must be integer counts for the poisson family")
+    }else if(any(fD_out$y < 0)){
+      stop("response must be non-negative integer counts for the poisson family")
+    }
+  }
   
   # If offset = NULL, then set offset as arbitrary vector of 0s
   if(is.null(model.offset(fD_out$frame))){
@@ -317,16 +334,28 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   ## formula, data, any other items included in glmmPen function call
   call = match.call(expand.dots = F)
   
-  # rho = environment()
-  if(!is.list(tuning_options) | !inherits(tuning_options, "pglmmControl")){
-    stop("tuning_option parameter must be a list of type lambdaControl() or selectControl()")
-  }
   
   if(inherits(tuning_options, "lambdaControl")){
     lambda0 = tuning_options$lambda0
     lambda1 = tuning_options$lambda1
     if(lambda0 < 0 | lambda1 < 0){
       stop("lambda0 and lambda1 cannot be negative")
+    }
+    
+    if(is.character(optim_options)){
+      if(optim_options != "recommend"){
+        stop("optim_options must be either the character string 'recommend' or object of class 'optimControl' created from 'optimControl()'")
+      }else{
+        optim_options = optim_recommend(family, ncol(fD_out$Z)/nlevels(fD_out$group), select = F)
+      }
+    }else if(class(optim_options) != "optimControl"){
+      stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
+    }
+    
+    if(optim_options$var_start == "recommend"){
+      var_start = var_init(data_input, fam_fun)
+      cat("recommended starting variance: ", var_start, "\n")
+      optim_options$var_start = var_start
     }
     
     # Extract variables from optimControl
@@ -348,19 +377,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     
     # Call fit_dat function
     # fit_dat_B function found in "/R/fit_dat_MstepB.R" file
-    
-    # Default arguments:
-    # dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
-    # family = "binomial", offset_fit = NULL,
-    # trace = 0, penalty = c("MCP","SCAD","lasso"),
-    # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
-    # group_X = 0:(ncol(dat$X)-1),
-    # nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2, mcc = 3,
-    # nMC_report = 5000, u_init = NULL, coef_old = NULL, 
-    # ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
-    # M = 10^4, sampler = c("stan","random_walk","independence"),
-    # adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-    # var_start = 0.5, max_cores = 1, checks_complete = F
     
     fit = fit_dat_B(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
                     conv_EM = conv_EM, conv_CD = conv_CD,
@@ -406,15 +422,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     }
     
     BIC_option = tuning_options$BIC_option
+    pre_screen = tuning_options$pre_screen
     
-    # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
-    # penalty, lambda0_range, lambda1_range,
-    # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-    # trace = 0, u_init = NULL, coef_old = NULL, 
-    # BICq_calc = T,
-    # adapt_RW_options = adaptControl(),
-    # optim_options = optimControl(), BICq_posterior
-    
+     
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -423,7 +433,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                              optim_options = optim_options, covar = covar,
                              BICq_calc = (tuning_options$BIC_option == "BICq"),
                              BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                             checks_complete = T)
+                             checks_complete = T, pre_screen = pre_screen)
     
     fit = fit_select$out
     
@@ -431,7 +441,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     coef_results = fit_select$coef
     # Unstandardize coefficient results
     beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
-    beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X)], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
+    beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=F], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
     for(i in 1:nrow(beta_results)){
       beta_results[,-1] = coef_results[,2:ncol(data_input$X)] / std_out$X_scale
     }
@@ -450,6 +460,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
     }
     colnames(optim_results) = colnames(selection_results)
+    
+    optim_options = fit_select$optim_options
   }
   
   
@@ -485,7 +497,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
 
 
 #' @importFrom ncvreg std
-#' @export
 XZ_std = function(fD_out, group_num){
   # Standardize X - ncvreg::std method
   X = fD_out$X

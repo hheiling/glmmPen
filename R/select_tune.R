@@ -22,7 +22,6 @@
 #'  
 #' @importFrom stringr str_c
 #' @importFrom bigmemory attach.big.matrix describe write.big.matrix read.big.matrix
-#' @export
 select_tune = function(dat, offset = NULL, family, covar = c("unstructured","independent"), 
                        group_X = 0:(ncol(dat$X)-1),
                        penalty, lambda0_range, lambda1_range,
@@ -30,7 +29,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                        trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
                        BIC_option = c("BICh","BIC","BICq","BICNgrp"), BICq_calc = T, 
-                       BICq_posterior = NULL, checks_complete = F){
+                       BICq_posterior = NULL, checks_complete = F, pre_screen = T){
   
   # Input modification and restriction for family
   family_info = family_export(family)
@@ -38,23 +37,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   link = family_info$link
   link_int = family_info$link_int # Recoded link as integer
   family = family_info$family
-  
-  # Extract variables from optimControl
-  conv_EM = optim_options$conv_EM
-  conv_CD = optim_options$conv_CD
-  nMC_burnin = optim_options$nMC_burnin
-  nMC = optim_options$nMC
-  nMC_max = optim_options$nMC_max
-  nMC_report = optim_options$nMC_report
-  maxitEM = optim_options$maxitEM
-  maxit_CD = optim_options$maxit_CD
-  M = optim_options$M
-  t = optim_options$t
-  mcc = optim_options$mcc
-  # covar = optim_options$covar
-  sampler = optim_options$sampler
-  var_start = optim_options$var_start
-  max_cores = optim_options$max_cores
   
   if(length(BIC_option) > 1){
     BIC_option = BIC_option[1]
@@ -87,6 +69,68 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   if(is.null(offset)){
     offset = rep(0, length(dat$y))
   }
+  
+  if((covar == "unstructured") & (ncol(dat$Z)/nlevels(dat$group) >= 11)){
+    warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation",
+            immediate. = T)
+    covar = "independent"
+  }
+  
+  if(is.character(optim_options)){ # "recommend"
+    var_start = var_init(data = dat, fam_fun = fam_fun)
+    sampler = "stan"
+  }else if(inherits(optim_options, "optimControl")){
+    var_start = optim_options$var_start
+    if(var_start == "recommend"){
+      var_start = var_init(data = dat, fam_fun = fam_fun)
+    }
+    sampler = optim_options$sampler
+  }
+  
+  # Pre-screening step
+  ## If number of random effects in model (including intercept) is 11 or more
+  ## Note: since random effects are subset of fixed effects, fixed effects necessarily 11 or more
+  if((ncol(dat$Z)/nlevels(dat$group) >= 11) & (pre_screen == T)){
+    cat("begin prescreening procedure \n")
+    out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
+                        penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 
+                        group_X = group_X, sampler = sampler, 
+                        adapt_RW_options = adapt_RW_options, covar = covar,
+                        var_start = var_start, max_cores = max_cores, 
+                        checks_complete = checks_complete)
+    cat("end prescreening procedure \n")
+    ranef_keep = out_pre$ranef_keep
+    coef_pre = out_pre$coef_pre
+    u_pre = out_pre$u_pre
+  }else{
+    ranef_keep = rep(1, times = ncol(dat$Z)/nlevels(dat$group))
+    coef_pre = NULL 
+    u_pre = NULL
+  }
+  
+  if(is.character(optim_options)){
+    if(optim_options == "recommend"){
+      optim_options = optim_recommend(family, sum(ranef_keep), select = T)
+    }
+  }
+  # Save var_start
+  optim_options$var_start = var_start
+  
+  # Extract variables from optimControl
+  conv_EM = optim_options$conv_EM
+  conv_CD = optim_options$conv_CD
+  nMC_burnin = optim_options$nMC_burnin
+  nMC = optim_options$nMC
+  nMC_max = optim_options$nMC_max
+  nMC_report = optim_options$nMC_report
+  maxitEM = optim_options$maxitEM
+  maxit_CD = optim_options$maxit_CD
+  M = optim_options$M
+  t = optim_options$t
+  mcc = optim_options$mcc
+  sampler = optim_options$sampler
+  # var_start = optim_options$var_start
+  max_cores = optim_options$max_cores
   
   # If need to calculate full model for BICq calculation
   ## Use minimum lambda in range of lambda
@@ -127,11 +171,12 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
-                          coef_old = NULL, u_init = NULL, ufull_describe = NULL,
+                          coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
                           maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start,
-                          max_cores = max_cores, checks_complete = checks_complete))
+                          max_cores = max_cores, checks_complete = checks_complete,
+                          ranef_keep = ranef_keep))
       
       if(is.character(out)){
         print("Issue with full model fit, no BICq calculation will be completed")
@@ -139,6 +184,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       }else{
         ufull_big = attach.big.matrix(out$u_big)
         write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
+        ufull_describe = out$u_big
       }
       
     }else{ # if fitfull_needed = F
@@ -179,7 +225,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       if((i == 1) & (j == 1)){
         # start from the initial values input (or NULL values)
         coef_old0 = coef_old
-        uold = u_init
+        uold = u_init # Should be null
       }else if((i == 1) & (j != 1)){ # changed from if(i != 1 & j == 1)
         # if re-starting fixed effects penalty loop but moving on to next random effects
         # penalty parameter, take the previous j result for i = 1
@@ -189,8 +235,18 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       }else{
         # take the previous values
         coef_old0 = out$coef
-        uold = out$u
+        uold = out$u_init
         rm(out)
+      }
+      
+      # If had divergence issues or NA results in past (lambda0,lambda1) combination,
+      # then initialized next combination with NULL results (initialize from scratch
+      # instead of from last model)
+      if(!is.null(coef_old0)){
+        if(any(is.na(coef_old0)) | any(abs(coef_old0) > 10^5)){
+          coef_old0 = NULL
+          uold = NULL
+        }
       }
       
       gc()
@@ -207,7 +263,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start,
-                          max_cores = max_cores, checks_complete = checks_complete))
+                          max_cores = max_cores, checks_complete = checks_complete,
+                          ranef_keep = ranef_keep))
       
 
       if(is.character(out)) next
@@ -215,7 +272,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       # for restarting the next j for i = 1
       if(i == 1){
         coef_oldj0 = out$coef
-        uj0 = out$u 
+        uj0 = out$u_init
       }
       
       if(BIC_option == "BICh"){
@@ -294,7 +351,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
-  return(list(results = res, out = fout, coef = coef))
+  return(list(results = res, out = fout, coef = coef, optim_options = optim_options))
   
 }
 

@@ -108,6 +108,37 @@ checkXmatrix = function(X){
 }
 
 # Edited version of lme4 package function glFormula
+# Convert formula and data options into y, X, Z, and group
+# lme4 inspiration: https://github.com/lme4/lme4/blob/master/R/modular.R
+
+#' Extracting Useful Vectors and Matrices from Formula and Data Information
+#' 
+#' Takes the model \code{formula} and an optional data frame and converts them into y, X, Z, and group output.
+#' 
+#' @param formula a two-sided linear formula object describing both the fixed-effects and 
+#' random-effects part of the model, with the response on the left of a ~ operator and the terms, 
+#' sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
+#' ("|") separating expression for design matrices from grouping factors. \code{formula} should be 
+#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
+#' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
+#' The offset must be specified outside of the formula in the 'offset' argument.
+#' @param data an optional data frame containing the variables named in \code{formula}. Although 
+#' \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
+#' omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).
+#' @param na.action a function that indicates what should happen when the data contain NAs. The default
+#' option \code{na.omit} removes observations with any missing values in any of the variables
+#' 
+#' @return a list with the following elements:
+#' \item{y}{a numeric vector of the response variable}
+#' \item{X}{a model matrix with the fixed covariates}
+#' \item{Z}{a sparse model matrix for the random effects}
+#' \item{group}{a factor vector of the grouping variable}
+#' \item{cnms}{a vector of column names of the random effects}
+#' \item{group_name}{character name of the group variable}
+#' \item{flist}{a list of grouping factors using inf the random-effects terms}
+#' \item{frame}{a model frame including all fixed and random covariates, the response, and the 
+#' grouping variable}
+#' 
 #' @importFrom lme4 factorize mkReTrms nobars subbars findbars
 glFormula_edit <- function(formula, data=NULL, family,
                            subset, weights, na.action, offset,

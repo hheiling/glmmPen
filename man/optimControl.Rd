@@ -10,16 +10,16 @@ optimControl(
   conv_EM = 0.001,
   conv_CD = 1e-04,
   nMC_burnin = 250,
-  nMC_start = 1000,
-  nMC_max = 10^4,
+  nMC_start = 250,
+  nMC_max = 5000,
   nMC_report = 5000,
-  maxitEM = 100,
+  maxitEM = 50,
   maxit_CD = 200,
   M = 10000,
   t = 2,
-  mcc = 3,
+  mcc = 2,
   sampler = c("stan", "random_walk", "independence"),
-  var_start = 1,
+  var_start = "recommend",
   max_cores = 1
 )
 }
@@ -58,8 +58,8 @@ the most recent coefficient estimate and the coefficient estimate from t EM iter
 Positive integer, default equals 2.}
 
 \item{mcc}{the number of times the convergence critera must be met before the algorithm is
-seen as having converged. (mcc for 'meet condition counter'). Default set to 3. Value retricted 
-to be no less than 3.}
+seen as having converged. (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+to be no less than 2.}
 
 \item{sampler}{character string specifying whether the posterior draws of the random effects
 should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 

@@ -33,6 +33,8 @@
 #' observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
 #' a full model; a small penalty is used for the fixed and/or random effects if the number of 
 #' effects is 10 or greater. 
+#' @param pre_screen logical value indicating if pre-screening of random effects should be performed
+#' during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing penalization parameter values, presented either as an individual set or as a range of
@@ -53,7 +55,7 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 #' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
-                         BIC_option = c("BICh","BIC","BICq","BICNgrp")){
+                         BIC_option = c("BICh","BIC","BICq","BICNgrp"), pre_screen = T){
   
   # Perform input checks
   
@@ -105,9 +107,12 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     stop("nlambda must be at least 2")
   }
   
-  structure(list(lambda0_seq = lambda0_seq,
-                 lambda1_seq = lambda1_seq,
-                 nlambda = nlambda, BIC_option = BIC_option),
+  if (!is.logical(pre_screen)) {
+    stop("'pre_screen' must be a logical value (T or F)")
+  }
+  
+  structure(list(lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
+                 nlambda = nlambda, BIC_option = BIC_option, pre_screen = pre_screen),
             class = c("selectControl", "pglmmControl"))
 }
 
@@ -170,8 +175,8 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
 #' Positive integer, default equals 2.
 #' @param mcc the number of times the convergence critera must be met before the algorithm is
-#' seen as having converged. (mcc for 'meet condition counter'). Default set to 3. Value retricted 
-#' to be no less than 3.
+#' seen as having converged. (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+#' to be no less than 2.
 #' @param sampler character string specifying whether the posterior draws of the random effects
 #' should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 #' incorporating an adaptive random walk sampler ("random_walk") or an
@@ -184,10 +189,11 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' 
 #' @export
 optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
-                        nMC_burnin = 250, nMC_start = 1000, nMC_max = 10^4, nMC_report = 5000,
-                        maxitEM = 100, maxit_CD = 200, M = 10000, t = 2, mcc = 3,
+                        nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
+                        maxitEM = 50, maxit_CD = 200, 
+                        M = 10000, t = 2, mcc = 2,
                         sampler = c("stan","random_walk","independence"), 
-                        var_start = 1.0, max_cores = 1){
+                        var_start = "recommend", max_cores = 1){
   
   # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
   
@@ -205,20 +211,27 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
     nMC_burnin = 100
   }
   if(nMC_max < nMC_start){
-    stop("nMC_max should not be smaller than nMC_start \n")
+    stop("nMC_max cannot be smaller than nMC_start")
   }
   
-  if(var_start <= 0){
-    stop("var_start must be a positive numeric value")
+  if(is.character(var_start)){
+    if(var_start != "recommend"){
+      stop("var_start must either be 'recommend' or a positive numeric constant")
+    }
+  }else{
+    if(var_start <= 0){
+      stop("var_start must be a positive numeric value")
+    }
   }
+  
   if((max_cores < 1) | (max_cores) %% 1 != 0){
     stop("max_cores must be a positive integer")
   }
   
   sampler = checkSampler(sampler)
   
-  if(mcc < 3){
-    stop("mcc must be at least 3")
+  if(mcc < 2){
+    stop("mcc must be at least 2")
   }
   
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
@@ -229,3 +242,41 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
             class = "optimControl")
 }
 
+
+# q = number of random effects (including random intercept)
+# select: TRUE if running the selection algorithm
+optim_recommend = function(family, q, select = T){
+  
+  if (family %in% c("binomial","poisson")) {
+    # Default options
+    optim_options = optimControl()
+  }else if (family == "gaussian") {
+    # increase maxitEM
+    optim_options = optimControl()
+    optim_options$maxitEM = 100
+  }
+  
+  if (q <= 11) {
+    # For selection, decrease nMC_max to improve time
+    ## Note: During selection, will initialize with good starting points, so
+    ## larger nMC_max not needed for convergence
+    # Otherwise, keep everything else the same
+    if (select == T) {
+      optim_options$nMC_max = 2500
+    }
+  }else if(q <= 25){
+    # Decrease nMC
+    optim_options = optimControl()
+    optim_options$nMC_burnin = 100
+    optim_options$nMC_max = 1000
+  }else{
+    # Decrease nMC even more
+    optim_options = optimControl()
+    optim_options$nMC_burnin = 100
+    optim_options$nMC = 100
+    optim_options$nMC_max = 500
+  }
+  
+  return(optim_options)
+  
+}

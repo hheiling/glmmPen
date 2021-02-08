@@ -11,7 +11,7 @@ glmm(
   covar = c("unstructured", "independent"),
   offset = NULL,
   na.action = na.omit,
-  optim_options = optimControl(),
+  optim_options = "recommend",
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = lambdaControl(),
