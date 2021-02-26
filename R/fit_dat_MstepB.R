@@ -452,7 +452,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     # }
     
     if(trace >= 1){
-      print("Updated fixed effects:")
+      print("Fixed effects (scaled X):")
       print(coef[1:ncol(X)])
     }
     
@@ -593,7 +593,8 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   if(EM_converged == 0){
-    warning("glmmPen algorithm did not converge within maxit_EM iterations, conv = ", round(diff[i],6), immediate. = T)
+    warning("glmmPen algorithm did not converge within maxitEM iterations, conv = ", round(diff[i],6), 
+            "\n Consider increasing maxitEM iterations or nMC_max in optimControl()", immediate. = T)
   }
   
   # Another E step for loglik calculation (number draws = M)
@@ -692,7 +693,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     out$coef_naive = fit_naive
   }
   if(EM_converged == 0){
-    out$warnings = "glmmPen algorithm did not converge within maxit_EM iterations"
+    out$warnings = "glmmPen algorithm did not converge within maxit_EM iterations, consider increasing maxitEM or nMC_max in optimControl()"
   }
   
   

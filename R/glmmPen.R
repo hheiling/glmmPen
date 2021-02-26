@@ -402,6 +402,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
     }
     
+    ranef_keep = NULL
+    
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
       lambda0_range = LambdaRange(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
@@ -445,12 +447,14 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     for(i in 1:nrow(beta_results)){
       beta_results[,-1] = coef_results[,2:ncol(data_input$X)] / std_out$X_scale
     }
-    colnames(beta_results) = c(coef_names$fixed)
+    # colnames(beta_results) = c(coef_names$fixed)
     
     gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results)]
-    colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
+    # colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
     
     selection_results = cbind(resultsA,beta_results,gamma_results)
+    colnames(selection_results) = c(colnames(resultsA), coef_names$fixed, 
+                                    str_c("Gamma",0:(ncol(gamma_results)-1)))
     
     if(BIC_option == "BICh"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
@@ -462,6 +466,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     colnames(optim_results) = colnames(selection_results)
     
     optim_options = fit_select$optim_options
+    ranef_keep = fit_select$ranef_keep
   }
   
   
@@ -480,7 +485,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                        offset = offset, frame = fD_out$frame, 
                        sampling = sampling, std_out = std_out, 
                        selection_results = selection_results, optim_results = optim_results,
-                       penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, fixef_noPen = fixef_noPen,
+                       penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
+                       fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
                        control_options = list(optim_options = optim_options, tuning_options = tuning_options,
                                               adapt_RW_options = adapt_RW_options)))
   

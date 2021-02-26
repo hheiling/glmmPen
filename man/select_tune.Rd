@@ -25,7 +25,8 @@ select_tune(
   BICq_calc = T,
   BICq_posterior = NULL,
   checks_complete = F,
-  pre_screen = T
+  pre_screen = T,
+  ranef_keep = NULL
 )
 }
 \arguments{

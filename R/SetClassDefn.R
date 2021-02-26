@@ -80,8 +80,8 @@ pglmmObj = setRefClass("pglmmObj",
                 
                   p = ncol(X)
                   beta = x$coef[1:p]
-                  center = x$std_out$X_center
-                  scale_std = x$std_out$X_scale
+                  center = std_info$X_center
+                  scale_std = std_info$X_scale
                   beta[1] = beta[1] - sum(center*beta[-1]/scale_std)
                   beta[-1] = beta[-1] / scale_std
                 names(beta) = x$coef_names$fixed
@@ -125,8 +125,16 @@ pglmmObj = setRefClass("pglmmObj",
                 results_all <<- x$selection_results
                 results_optim <<- x$optim_results
                 
+                if(nrow(results_all) == 1){ # glmm, not glmmPen
+                  prescreen_ranef = NULL
+                }else{
+                  prescreen_ranef = x$ranef_keep
+                  names(prescreen_ranef) = x$coef_names$random
+                }
+                
                 penalty_info <<- list(penalty = x$penalty, gamma_penalty = x$gamma_penalty, 
-                                      alpha = x$alpha, fixef_noPen = x$fixef_noPen)
+                                      alpha = x$alpha, fixef_noPen = x$fixef_noPen,
+                                      prescreen_ranef = prescreen_ranef)
                 optinfo <<- list(iter = x$EM_iter, conv = x$EM_conv, warnings = x$warnings,
                                  control_options = x$control_options$optim_options)
                 control_info <<- x$control_options

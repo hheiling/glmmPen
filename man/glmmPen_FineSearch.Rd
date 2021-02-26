@@ -12,7 +12,7 @@ values, and performs model selection on this finer grid search.}
 glmmPen_FineSearch(
   object,
   tuning_options = selectControl(),
-  idx_range = 1,
+  idx_range = 2,
   optim_options = NULL,
   adapt_RW_options = NULL,
   trace = 0,

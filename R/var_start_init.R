@@ -11,7 +11,7 @@ var_init = function(data, fam_fun){
     int_only = glmer(formula = y ~ 1 + (1 | grp), family = fam_fun)
   }
   
-  var_start = VarCorr(int_only)$grp[[1]] * 2
+  var_start = VarCorr(int_only)$grp[[1]] * 2.0
   
   # Protect against case when variance estimate above is 0 or very small
   if(var_start < 0.01){

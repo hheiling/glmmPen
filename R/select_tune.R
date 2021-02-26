@@ -29,7 +29,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                        trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
                        BIC_option = c("BICh","BIC","BICq","BICNgrp"), BICq_calc = T, 
-                       BICq_posterior = NULL, checks_complete = F, pre_screen = T){
+                       BICq_posterior = NULL, checks_complete = F, pre_screen = T, ranef_keep = NULL){
   
   # Input modification and restriction for family
   family_info = family_export(family)
@@ -103,7 +103,9 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     coef_pre = out_pre$coef_pre
     u_pre = out_pre$u_pre
   }else{
-    ranef_keep = rep(1, times = ncol(dat$Z)/nlevels(dat$group))
+    if(is.null(ranef_keep)){
+      ranef_keep = rep(1, times = ncol(dat$Z)/nlevels(dat$group))
+    }
     coef_pre = NULL 
     u_pre = NULL
   }
@@ -210,8 +212,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   ## BIC_critold: record of largest BIC-type critera so far during selection
   BIC_crit = BIC_critold = Inf
   
-  res = matrix(0, n1*n2, 10)
-  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
+  res = matrix(0, nrow = n1*n2, ncol = 11)
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef","EM_iter")
   
   coef = NULL
   coef_oldj0 = NULL
@@ -312,8 +314,13 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       res[(j-1)*n1+i,6] = BICNgrp
       res[(j-1)*n1+i,7] = out$ll
       res[(j-1)*n1+i,8] = sum(out$coef[2:ncol(dat$X)] !=0)
-      res[(j-1)*n1+i,9] = sum(diag(out$sigma) !=0)
+      if(length(diag(out$sigma)) > 1){
+        res[(j-1)*n1+i,9] = sum(diag(out$sigma[-1]) !=0)
+      }else{
+        res[(j-1)*n1+i,9] = 0
+      }
       res[(j-1)*n1+i,10] = sum(out$coef !=0)
+      res[(j-1)*n1+i,11] = out$EM_iter
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])
       
@@ -351,7 +358,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
-  return(list(results = res, out = fout, coef = coef, optim_options = optim_options))
+  return(list(results = res, out = fout, coef = coef, optim_options = optim_options, 
+              ranef_keep = ranef_keep))
   
 }
 

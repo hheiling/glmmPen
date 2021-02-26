@@ -254,6 +254,7 @@ optim_recommend = function(family, q, select = T){
     # increase maxitEM
     optim_options = optimControl()
     optim_options$maxitEM = 100
+    # opimt_options$nMC_max = 7500
   }
   
   if (q <= 11) {

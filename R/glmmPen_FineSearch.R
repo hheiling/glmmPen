@@ -66,7 +66,7 @@
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #' 
 #' @export
-glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_range = 1,
+glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_range = 2,
                               optim_options = NULL, adapt_RW_options = NULL, 
                               trace = 0, BICq_posterior = NULL){
   
@@ -76,15 +76,32 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     stop("object must be of class 'pglmmObj', output from the glmmPen function")
   }
   
+  if(!inherits(tuning_options, "selectControl")){
+    stop("tuning_options must be of class 'selectControl', see selectControl documentation")
+  }
+  
   if(is.null(optim_options)){
     cat("Using optimization parameters stored in pglmmObj object from past selection \n")
     optim_options = object$control_info$optim_options
+  }else{
+    if(is.character(optim_options)){ # "recommend"
+      if(optim_options != "recommend"){
+        stop("optim_options must be of class 'optimControl' from optimControl() or the character string 'recommend'")
+      }
+    }else if(!inherits(optim_options, "optimControl")){
+      stop("optim_options must be of class 'optimControl' from optimControl() or the character string 'recommend'")
+    }
   }
+  
   if(is.null(adapt_RW_options)){
     if(optim_options$sampler == "random_walk"){
       cat("Using adaptive random walk parameters stored in pglmmObj object from past selection \n")
     }
     adapt_RW_options = object$control_info$adapt_RW_options
+  }else{
+    if(class(adapt_RW_options) != "adaptControl"){
+      stop("adapt_RW_options must be of class 'adaptControl', see adaptControl documentation")
+    }
   }
   
   y = object$data$y 
@@ -126,16 +143,6 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     stop("alpha cannot equal 0. Pick a small value > 0 instead (e.g. 0.001) \n");
   }
   
-  if(class(optim_options) != "optimControl"){
-    stop("optim_options must be of class 'optimControl', see optimControl documentation")
-  }
-  if(class(adapt_RW_options) != "adaptControl"){
-    stop("adapt_RW_options must be of class 'adaptControl', see adaptControl documentation")
-  }
-  if(!inherits(tuning_options, "selectControl")){
-    stop("tuning_options must be of class 'selectControl', see selectControl documentation")
-  }
-  
   if((floor(idx_range) != idx_range) | (idx_range <= 0)){
     stop("idx_range must be a positive integer")
   }
@@ -155,6 +162,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     stop("BIC-ICQ not calculated in previous coarse grid search \n",
          "  Selection option BIC_option = 'BICq' not appropriate")
   }
+  
+  # pre_screen = tuning_options$pre_screen
   
   opt_res = select_coarse[which.min(select_coarse[,crit]),]
   
@@ -219,29 +228,29 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     }
   }
   
-  # Default select_tune arguments:
-  # dat, offset = NULL, family, group_X = 0:(ncol(dat$X)-1),
+  ranef_keep = object$penalty_info$prescreen_ranef
+  names(ranef_keep) = NULL
+  
+  # dat, offset = NULL, family, covar = c("unstructured","independent"), 
+  # group_X = 0:(ncol(dat$X)-1),
   # penalty, lambda0_range, lambda1_range,
   # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-  # trace = 0, u_init = NULL, coef_old = NULL, BICq_calc = T,
+  # trace = 0, u_init = NULL, coef_old = NULL, 
   # adapt_RW_options = adaptControl(),optim_options = optimControl(), 
-  # BICq_posterior = NULL
+  # BIC_option = c("BICh","BIC","BICq","BICNgrp"), BICq_calc = T, 
+  # BICq_posterior = NULL, checks_complete = F, pre_screen = T
   
-  fit_select = select_tune(dat = data_input, offset = offset, family = family, group_X = group_X, 
+  fit_select = select_tune(dat = data_input, offset = offset, family = family, 
+                           covar = object$call$covar, group_X = group_X, 
                            lambda0_range = lambda0_seq, lambda1_range = lambda1_seq,
                            penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                           trace = trace, u_init = object$posterior_draws,
+                           trace = trace, u_init = NULL,
                            coef_old = coef_old, BICq_calc = (tuning_options$BIC_option == "BICq"),
                            adapt_RW_options = adapt_RW_options, 
-                           optim_options = optim_options, BICq_posterior = BICq_posterior)
+                           optim_options = optim_options, BICq_posterior = BICq_posterior,
+                           checks_complete = T, pre_screen = F, ranef_keep = ranef_keep)
   
-  if(tuning_options$BIC_option == "BICh"){
-    fit = fit_select$out[["BICh"]]
-  }else if(tuning_options$BIC_option == "BIC"){
-    fit = fit_select$out[["BIC"]]
-  }else if(tuning_options$BIC_option == "BICq"){
-    fit = fit_select$out[["BICq"]]
-  }
+  fit = fit_select$out
   
   resultsA = fit_select$results
   coef_results = fit_select$coef
@@ -267,6 +276,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   }
   colnames(optim_results) = colnames(selection_results)
   
+  optim_options = fit_select$optim_options
   
   sampling = switch(optim_options$sampler, stan = "Stan", 
                     random_walk = "Metropolis-within-Gibbs Adaptive Random Walk Sampler",
@@ -274,13 +284,14 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   
   call = match.call(expand.dots = F)
   
-  output = c(fit, list(call = call, formula = object$formula, y = y,
+  output = c(fit, list(call = call, formula = object$formula, y = y, fixed_vars = object$fixed_vars,
                        X = X, Z_std = Z_std, group = group,
                        coef_names = list(fixed = names(object$fixef), random = colnames(object$sigma)), 
                        family = object$family, offset = offset, frame = object$data$frame, 
                        sampling = sampling, std_out = object$data$std_info, 
                        selection_results = selection_results, optim_results = optim_results,
-                       penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, fixef_noPen = fixef_noPen,
+                       penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
+                       fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
                        control_options = list(optim_options = optim_options, tuning_options = tuning_options)))
   
   out_object = pglmmObj$new(output)
