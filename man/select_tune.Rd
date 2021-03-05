@@ -31,17 +31,14 @@ select_tune(
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
-Z (model matrix for the random effects), and group (vector whose value indicates 
+Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
 the study, batch, or other group identity to which on observation belongs)}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
 argument is \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the response). If the data argument specifies a data.frame, the offset
-argument should specify the name of a column in the data.frame. 
-Currently, the formula does not allow specification of an offset.
-#' @param na.action a function that indicates what should happen when the data contain NAs. Only the 
-options \code{na.omit} and \code{na.pass} are recognized by this function.}
+argument should specify the name of a column in the data.frame.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
@@ -51,12 +48,14 @@ with canonical links only.}
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure (covar switched to "independent").}
+independent covariance structure and \code{covar} is switched to "independent".}
 
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
 \item{penalty}{character describing the type of penalty to use in the variable selection procedure.
-Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
+Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
+matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
+random effects coefficients.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
@@ -71,10 +70,11 @@ See Details for more information about output provided when trace = 0, 1, or 2.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
 
-\item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
-that specifies optimization parameters.}
+\item{optim_options}{a character string "recommend" or a list of class "optimControl" created 
+from function \code{\link{optimControl}} that specifies optimization parameters. See the 
+documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
 Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
@@ -97,10 +97,11 @@ See 'Details' section for additional details.}
 \item{checks_complete}{boolean value indicating whether the function has been called within
 \code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
 performs additional checks on the input data. If false, assumes data input checks have 
-already been performed}
+already been performed. For package testing purposes only.}
 
 \item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
-during selection when the number random effect predictors is 10 or more. Default \code{TRUE}.}
+during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
+Pre-screening not performed when the number of random effect predictors is 9 or less.}
 }
 \value{
 A list with the following elements:

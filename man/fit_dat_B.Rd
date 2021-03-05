@@ -18,16 +18,16 @@ fit_dat_B(
   alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
   group_X = 0:(ncol(dat$X) - 1),
-  nMC_burnin = 500,
-  nMC = 5000,
-  nMC_max = 20000,
+  nMC_burnin = 250,
+  nMC = 250,
+  nMC_max = 5000,
   t = 2,
-  mcc = 3,
+  mcc = 2,
   nMC_report = 5000,
   u_init = NULL,
   coef_old = NULL,
   ufull_describe = NULL,
-  maxitEM = 100,
+  maxitEM = 50,
   maxit_CD = 250,
   M = 10^4,
   sampler = c("stan", "random_walk", "independence"),
@@ -41,7 +41,7 @@ fit_dat_B(
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
-Z (model matrix for the random effects), and group (vector whose value indicates 
+Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
 the study, batch, or other group identity to which on observation belongs)}
 
 \item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
@@ -50,7 +50,10 @@ the study, batch, or other group identity to which on observation belongs)}
 covariance parameters}
 
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
-EM algorithm. Default is 0.001.}
+EM algorithm. Default is 0.001. EM algorithm is considered to have converge if the average Euclidean 
+distance between the current coefficient estimates and the coefficient estimates from 
+\code{t} EM iterations back is less than \code{conv_EM} \code{mcc} times in a row.
+See \code{t} and \code{mcc} for more details.}
 
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
@@ -60,14 +63,16 @@ Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poiss
 with canonical links only.}
 
 \item{offset_fit}{This can be used to specify an a priori known component to be included in the 
-linear predictor during fitting. This should be NULL or a numeric vector of length equal to the 
+linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
 number of cases.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
 
 \item{penalty}{character describing the type of penalty to use in the variable selection procedure.
-Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
+Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
+matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
+random effects coefficients.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
@@ -80,19 +85,25 @@ Default is 4.0 for SCAD and 3.0 for MCP.}
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
 \item{nMC_burnin}{positive integer specifying the number of posterior draws to use as
-burnin for each E step in the EM algorithm. Default 250. Function will not allow \code{nMC_burnin}
+burnin for each E step in the EM algorithm. Default 250 when the number of random effects 
+predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 to be less than 100.}
 
-\item{nMC}{a positive integer for the initial number of Monte Carlo draws}
+\item{nMC}{a positive integer for the initial number of Monte Carlo draws. See the \code{nMC_start}
+argument in \code{\link{optimControl}} for more details.}
 
-\item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws}
+\item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws used
+in each step of the EM algorithm. When the number of random effect predictors is 10 or less, 
+Default is set to 5000 when no selection is performed and 2500 when selection is performed.
+Default is set to 1000 when the number of random effect predictors is between 11 and 24;
+Default is set to 500 when the number of random effect predictors is 25 or more.}
 
 \item{t}{the convergence criteria is based on the average Euclidean distance between 
-the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
+the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
 Positive integer, default equals 2.}
 
 \item{mcc}{the number of times the convergence critera must be met before the algorithm is
-seen as having converged. (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
 to be no less than 2.}
 
 \item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
@@ -102,36 +113,46 @@ matrix (not a big.matrix). Therefore, depending on the number of random effect c
 and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
 \code{nMC_report} by (q*d) does not cause memory issues on your operating system.}
 
-\item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. Default equals 100.}
+\item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
+Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
 
 \item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
-coordinate descent algorithms used within each EM iteration. Default equals 250.}
+coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.}
 
 \item{M}{positive integer specifying the number of posterior draws to use within the 
-Pajor log-likelihood calculation}
+Pajor log-likelihood calculation. Default (and minimum allowed value) set to 10,000.}
 
 \item{sampler}{character string specifying whether the posterior draws of the random effects
 should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 incorporating an adaptive random walk sampler ("random_walk") or an
-independence sampler ("independence").}
+independence sampler ("independence"). If using the random walk sampler, see \code{\link{adaptControl}}
+for some additional control structure parameters.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure (covar switched to "independent").}
+independent covariance structure and \code{covar} is switched to "independent".}
 
-\item{var_start}{positive number specifying the starting values to initialize the variance
-of the covariance matrix. Default set to 1.0.}
+\item{var_start}{either the character string "recommend" or a positive number specifying the 
+starting values to initialize the variance of the covariance matrix. Default "recommend" first
+fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
+random intercept variance estimate from this model is then multiplied by 2 and used as the 
+starting variance.}
+
+\item{max_cores}{integer describing the number of cores available for computation. If 
+\code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
+parallel computation using multiple cores is used to calculate the Stan MCMC samples within
+each E step.}
 
 \item{checks_complete}{boolean value indicating whether the function has been called within
 \code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
 performs additional checks on the input data. If false, assumes data input checks have 
-already been performed}
+already been performed. For package testing purposes only.}
 }
 \value{
 a list with the following elements:

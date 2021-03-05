@@ -11,7 +11,8 @@ adaptControl(batch_length = 100, offset = 0)
 \arguments{
 \item{batch_length}{positive integer specifying the number of posterior draws to collect
 before the proposal variance is adjusted based on the acceptance rate of the last 
-\code{batch_length} accepted posterior draws}
+\code{batch_length} accepted posterior draws. Default is set to 100. Batch length restricted
+to be no less than 50.}
 
 \item{offset}{non-negative integer specifying an offset value for the increment of the proposal
 variance adjustment. Optionally used to ensure the required diminishing adaptation condition. 

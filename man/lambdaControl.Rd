@@ -36,7 +36,8 @@ a full model; a small penalty is used for the fixed and/or random effects if the
 effects is 10 or greater.}
 
 \item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
-during selection when the number random effect predictors is 10 or more. Default \code{TRUE}.}
+during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
+Pre-screening not performed when the number of random effect predictors is 9 or less.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
@@ -54,7 +55,7 @@ grid search using \code{\link{glmmPen}}, the range will be calculated in the sam
 small portion of max, range is composed of \code{nlambda} values spread evenly on the log scale.
 For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
-finer grid search. The new max and min lambda values are the lambda values two 
+finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
 positions away from the best lambda in the original lambda sequences for the fixed and random
 effects.
 

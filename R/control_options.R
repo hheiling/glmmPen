@@ -12,7 +12,7 @@
 #' small portion of max, range is composed of \code{nlambda} values spread evenly on the log scale.
 #' For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 #' from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
-#' finer grid search. The new max and min lambda values are the lambda values two 
+#' finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
 #' positions away from the best lambda in the original lambda sequences for the fixed and random
 #' effects.
 #' 
@@ -35,6 +35,7 @@
 #' effects is 10 or greater. 
 #' @param pre_screen logical value indicating if pre-screening of random effects should be performed
 #' during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
+#' Pre-screening not performed when the number of random effect predictors is 9 or less.
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing penalization parameter values, presented either as an individual set or as a range of
@@ -122,7 +123,8 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
 #' 
 #' @param batch_length positive integer specifying the number of posterior draws to collect
 #' before the proposal variance is adjusted based on the acceptance rate of the last 
-#' \code{batch_length} accepted posterior draws
+#' \code{batch_length} accepted posterior draws. Default is set to 100. Batch length restricted
+#' to be no less than 50.
 #' @param offset non-negative integer specifying an offset value for the increment of the proposal
 #' variance adjustment. Optionally used to ensure the required diminishing adaptation condition. 
 #' Default set to 0.
@@ -136,7 +138,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
 #' @export
 adaptControl = function(batch_length = 100, offset = 0){
   
-  if(batch_length < 10){
+  if(batch_length < 50){
     stop("batch_length must be at least 10")
   }
   if(floor(batch_length)!=batch_length){
@@ -152,37 +154,62 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
 #' 
 #' @param conv_EM a non-negative numeric convergence criteria for the convergence of the 
-#' EM algorithm. Default is 0.001.
+#' EM algorithm. Default is 0.001. EM algorithm is considered to have converge if the average Euclidean 
+#' distance between the current coefficient estimates and the coefficient estimates from 
+#' \code{t} EM iterations back is less than \code{conv_EM} \code{mcc} times in a row.
+#' See \code{t} and \code{mcc} for more details.
 #' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
 #' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.
 #' @param nMC_burnin positive integer specifying the number of posterior draws to use as
-#' burnin for each E step in the EM algorithm. Default 250. Function will not allow \code{nMC_burnin}
-#' to be less than 100.
-#' @param nMC_start a positive integer for the initial number of Monte Carlo draws. 
-#' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws
+#' burnin for each E step in the EM algorithm. Default 250 when the number of random effects 
+#' predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
+#' to be less than 100. 
+#' @param nMC_start a positive integer for the initial number of Monte Carlo draws. Default 250 when 
+#' the number of random effects predictors is less than 25; default 100 otherwise.
+#' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws used
+#' in each step of the EM algorithm. When the number of random effect predictors is 10 or less, 
+#' Default is set to 5000 when no selection is performed and 2500 when selection is performed.
+#' Default is set to 1000 when the number of random effect predictors is between 11 and 24;
+#' Default is set to 500 when the number of random effect predictors is 25 or more.
 #' @param nMC_report positive integer specifying number of Monte Carlo posterior draws to return
 #' when the function ends. Default set to the minimum allowed value: 5,000. 
 #' Warning: the returned draws are formatted as a regular
 #' matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
 #' and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
 #' \code{nMC_report} by (q*d) does not cause memory issues on your operating system.
-#' @param maxitEM a positive integer for the maximum number of allowed EM iterations. Default equals 100.
+#' @param maxitEM a positive integer for the maximum number of allowed EM iterations. 
+#' Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.
 #' @param maxit_CD a positive integer for the maximum number of allowed interations for the
-#' coordinate descent algorithms used within each EM iteration. Default equals 250.
+#' coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.
 #' @param M positive integer specifying the number of posterior draws to use within the 
-#' Pajor log-likelihood calculation
+#' Pajor log-likelihood calculation. Default (and minimum allowed value) set to 10,000.
 #' @param t the convergence criteria is based on the average Euclidean distance between 
-#' the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
+#' the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
 #' Positive integer, default equals 2.
 #' @param mcc the number of times the convergence critera must be met before the algorithm is
-#' seen as having converged. (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+#' seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
 #' to be no less than 2.
 #' @param sampler character string specifying whether the posterior draws of the random effects
 #' should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 #' incorporating an adaptive random walk sampler ("random_walk") or an
-#' independence sampler ("independence"). 
-#' @param var_start positive number specifying the starting values to initialize the variance
-#' of the covariance matrix. Default set to 1.0. 
+#' independence sampler ("independence"). If using the random walk sampler, see \code{\link{adaptControl}}
+#' for some additional control structure parameters.
+#' @param var_start either the character string "recommend" or a positive number specifying the 
+#' starting values to initialize the variance of the covariance matrix. Default "recommend" first
+#' fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
+#' random intercept variance estimate from this model is then multiplied by 2 and used as the 
+#' starting variance. 
+#' @param max_cores integer describing the number of cores available for computation. If 
+#' \code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
+#' parallel computation using multiple cores is used to calculate the Stan MCMC samples within
+#' each E step.
+#' 
+#' @details When the \code{optim_options} arugment in \code{\link{glmm}} and \code{\link{glmmPen}}
+#' is set to "recommend", the default settings discussed in the given \code{optimControl} arguments are
+#' used. These default settings depend on both the family of the data structure and the number 
+#' of random effects predictors specified for use. If the user specifies 
+#' \code{optim_options = optimControl()} with any argument specifications, no additional
+#' adjustments will be performed on the arguments based on family or random effect predictors. 
 #' 
 #' @return Function returns a list (inheriting from class "\code{optimControl}") 
 #' containing fit and optimization criteria values used in optimization routine.

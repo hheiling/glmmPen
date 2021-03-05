@@ -25,18 +25,27 @@ optimControl(
 }
 \arguments{
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
-EM algorithm. Default is 0.001.}
+EM algorithm. Default is 0.001. EM algorithm is considered to have converge if the average Euclidean 
+distance between the current coefficient estimates and the coefficient estimates from 
+\code{t} EM iterations back is less than \code{conv_EM} \code{mcc} times in a row.
+See \code{t} and \code{mcc} for more details.}
 
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
 
 \item{nMC_burnin}{positive integer specifying the number of posterior draws to use as
-burnin for each E step in the EM algorithm. Default 250. Function will not allow \code{nMC_burnin}
+burnin for each E step in the EM algorithm. Default 250 when the number of random effects 
+predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 to be less than 100.}
 
-\item{nMC_start}{a positive integer for the initial number of Monte Carlo draws.}
+\item{nMC_start}{a positive integer for the initial number of Monte Carlo draws. Default 250 when 
+the number of random effects predictors is less than 25; default 100 otherwise.}
 
-\item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws}
+\item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws used
+in each step of the EM algorithm. When the number of random effect predictors is 10 or less, 
+Default is set to 5000 when no selection is performed and 2500 when selection is performed.
+Default is set to 1000 when the number of random effect predictors is between 11 and 24;
+Default is set to 500 when the number of random effect predictors is 25 or more.}
 
 \item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
 when the function ends. Default set to the minimum allowed value: 5,000. 
@@ -45,29 +54,39 @@ matrix (not a big.matrix). Therefore, depending on the number of random effect c
 and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
 \code{nMC_report} by (q*d) does not cause memory issues on your operating system.}
 
-\item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. Default equals 100.}
+\item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
+Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
 
 \item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
-coordinate descent algorithms used within each EM iteration. Default equals 250.}
+coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.}
 
 \item{M}{positive integer specifying the number of posterior draws to use within the 
-Pajor log-likelihood calculation}
+Pajor log-likelihood calculation. Default (and minimum allowed value) set to 10,000.}
 
 \item{t}{the convergence criteria is based on the average Euclidean distance between 
-the most recent coefficient estimate and the coefficient estimate from t EM iterations back.
+the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
 Positive integer, default equals 2.}
 
 \item{mcc}{the number of times the convergence critera must be met before the algorithm is
-seen as having converged. (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
 to be no less than 2.}
 
 \item{sampler}{character string specifying whether the posterior draws of the random effects
 should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 incorporating an adaptive random walk sampler ("random_walk") or an
-independence sampler ("independence").}
+independence sampler ("independence"). If using the random walk sampler, see \code{\link{adaptControl}}
+for some additional control structure parameters.}
 
-\item{var_start}{positive number specifying the starting values to initialize the variance
-of the covariance matrix. Default set to 1.0.}
+\item{var_start}{either the character string "recommend" or a positive number specifying the 
+starting values to initialize the variance of the covariance matrix. Default "recommend" first
+fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
+random intercept variance estimate from this model is then multiplied by 2 and used as the 
+starting variance.}
+
+\item{max_cores}{integer describing the number of cores available for computation. If 
+\code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
+parallel computation using multiple cores is used to calculate the Stan MCMC samples within
+each E step.}
 }
 \value{
 Function returns a list (inheriting from class "\code{optimControl}") 
@@ -77,4 +96,12 @@ containing fit and optimization criteria values used in optimization routine.
 Control of Penalized Generalized Linear Mixed Model Fitting
 
 Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
+}
+\details{
+When the \code{optim_options} arugment in \code{\link{glmm}} and \code{\link{glmmPen}}
+is set to "recommend", the default settings discussed in the given \code{optimControl} arguments are
+used. These default settings depend on both the family of the data structure and the number 
+of random effects predictors specified for use. If the user specifies 
+\code{optim_options = optimControl()} with any argument specifications, no additional
+adjustments will be performed on the arguments based on family or random effect predictors.
 }

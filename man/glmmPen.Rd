@@ -24,16 +24,15 @@ glmmPen(
 )
 }
 \arguments{
-\item{formula}{a two-sided linear formula object describing both the fixed-effects and 
-random-effects part of the model, with the response on the left of a ~ operator and the terms, 
+\item{formula}{a two-sided linear formula object describing both the fixed effects and 
+random effects part of the model, with the response on the left of a ~ operator and the terms, 
 sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
-("|") separating expression for design matrices from grouping factors. \code{formula} should be 
+("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
 of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
 will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
 The offset must be specified outside of the formula in the 'offset' argument.}
 
-\item{data}{an optional data frame containing the variables named in \code{formula}. Although 
-\code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
+\item{data}{an optional data frame containing the variables named in \code{formula}. If \code{data} is 
 omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
@@ -44,16 +43,16 @@ with canonical links only.}
 ("unstructured") or diagonal with no covariances between variables ("independent").
 Default is "unstructured", but if the number of random effects (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure (covar switched to "independent").}
+independent covariance structure and \code{covar} is switched to "independent".}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
 argument is \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the response). If the data argument specifies a data.frame, the offset
-argument should specify the name of a column in the data.frame. 
-Currently, the formula does not allow specification of an offset.
-#' @param na.action a function that indicates what should happen when the data contain NAs. Only the 
-options \code{na.omit} and \code{na.pass} are recognized by this function.}
+argument should specify the name of a column in the data.frame.}
+
+\item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
+option \code{na.omit} are recognized by this function.}
 
 \item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
@@ -61,7 +60,9 @@ penalized, 1 indicates that it can be penalized. Order should correspond to the 
 fixed effects given in the formula.}
 
 \item{penalty}{character describing the type of penalty to use in the variable selection procedure.
-Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
+Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
+matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
+random effects coefficients.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
@@ -71,24 +72,24 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
 
-\item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
-that specifies optimization parameters.}
+\item{optim_options}{a character string "recommend" or a list of class "optimControl" created 
+from function \code{\link{optimControl}} that specifies optimization parameters. See the 
+documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" or "independence".}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
 
 \item{tuning_options}{a list of class selectControl or lambdaControl resulting from 
 \code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
-If the user wants to run the algorithm using one specific set of
-penalty parameters \code{lambda0} and \code{lambda1}, then use \code{lambdaControl()}. 
-If no penalization is desired, use this setting with \code{lambda0} = \code{lambda1} = 0.
-If the user wants to run the algorithm over multiple possible \code{lambda0} and \code{lambda1},
-then use \code{selectControl{}}. See the \code{\link{lambdaControl}} and \code{\link{selectControl}}
-documentation for details}
+When function \code{glmm} is used,the algorithm may be run using one specific set of
+penalty parameters \code{lambda0} and \code{lambda1} by specifying such values in \code{lambdaControl()}. 
+The default for \code{glmm} is to run the model fit with no penalization (\code{lambda0} = \code{lambda1} = 0).
+When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
+See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
 the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
@@ -107,7 +108,7 @@ available (e.g. \code{methods(class = "pglmmObj")})
 Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 }
 \details{
-If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 
+\code{BICq_posterior}: If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 
 to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
 process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
 lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
@@ -125,10 +126,11 @@ is specified). The algorithm will save 10^4 posterior draws automatically.
 
 Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-from t iterations back EM_diff, and number of non-zero coefficients Non0 Coef). The value of 1
+from t iterations back EM_conv, and number of non-zero coefficients Non0 Coef). The value of 1
 additionally outputs the updated coefficients, updated covariance matrix values, and the
 number of coordinate descent iterations used for the M step for each
-EM iteration. The value of 2 outputs all of the above plus gibbs acceptance rate information
+EM iteration. If Stan is not used as the E-step sampling mechanism, 
+the value of 2 outputs all of the above plus gibbs acceptance rate information
 for the adaptive random walk and independence samplers and the updated proposal standard deviation
 for the adaptive random walk.
 }

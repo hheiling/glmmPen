@@ -8,17 +8,18 @@
 #' @inheritParams lambdaControl
 #' @inheritParams glmmPen
 #' @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
-#' Z (model matrix for the random effects), and group (vector whose value indicates 
+#' Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
 #' the study, batch, or other group identity to which on observation belongs)
 #' @param offset_fit This can be used to specify an a priori known component to be included in the 
-#' linear predictor during fitting. This should be NULL or a numeric vector of length equal to the 
+#' linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
 #' number of cases. 
 #' @param group_X vector describing the grouping of the covariates in the model matrix.
-#' @param nMC a positive integer for the initial number of Monte Carlo draws
+#' @param nMC a positive integer for the initial number of Monte Carlo draws. See the \code{nMC_start}
+#' argument in \code{\link{optimControl}} for more details.
 #' @param checks_complete boolean value indicating whether the function has been called within
 #' \code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
 #' performs additional checks on the input data. If false, assumes data input checks have 
-#' already been performed
+#' already been performed. For package testing purposes only.
 #' 
 #' @return a list with the following elements:
 #' \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
@@ -47,15 +48,14 @@
 #' @importFrom bigmemory attach.big.matrix describe as.big.matrix
 #' @importFrom mvtnorm dmvnorm
 #' @importFrom Matrix Matrix
-#' @export
 fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
                      family = "binomial", offset_fit = NULL,
                      trace = 0, penalty = c("MCP","SCAD","lasso"),
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
-                     nMC_burnin = 500, nMC = 5000, nMC_max = 20000, t = 2, mcc = 3,
+                     nMC_burnin = 250, nMC = 250, nMC_max = 5000, t = 2, mcc = 2,
                      nMC_report = 5000, u_init = NULL, coef_old = NULL, 
-                     ufull_describe = NULL, maxitEM = 100, maxit_CD = 250,
+                     ufull_describe = NULL, maxitEM = 50, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
                      var_start = 1.0, max_cores = 1, checks_complete = F,
