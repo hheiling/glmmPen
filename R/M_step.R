@@ -1,220 +1,51 @@
 
-# group_X and group_Z: no penalization for covariates with 0 as group value (e.g. intercept)
+#################################################################################################
+# Coordinate Descent (ungrouped) for fixed effects only
+#################################################################################################
 
-#' @export
-M_step = function(y, X, family, coef, offset = NULL,
-                  group_X = 0:(ncol(X)-1), 
-                  maxit = 250, maxit_CD = 250, conv = 0.0001, fit_type,
-                  penalty = c("MCP","SCAD","lasso"), lambda,
-                  gamma = switch(penalty[1], SCAD = 3.7, 3.0), alpha = 1.0){
-  
-  if (!is.double(y)) {
-    tmp <- try(y <- as.double(y), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
-  }
-  
-  if(!is.matrix(X)){
-    stop("X must be a matrix \n")
-  }else if(typeof(X)=="integer") storage.mode(X) <- "double"
+CD = function(y, X, family, link_int, offset,
+              coef_init, maxit_CD = 250, conv = 0.0001,
+              penalty, lambda, gamma, alpha = 1.0, penalty_factor, trace = 0){
   
   p = ncol(X)
   N = length(y)
   
-  if(nrow(X) != N){
-    stop("the dimension of X and y do not match\n")
-  }
+  # Coding of link_ink:
+  # logit = 10, probit = 11, cloglog = 12
+  # log = 20, sqrt = 21 identity = 30, inverse = 31
   
-  if(!is.null(offset)){
-    if((!is.numeric(offset)) | (length(offset) != N)){
-      stop("offset must be a numeric vector of the same length as y\n")
-    }
-  }else{
-    offset    = rep(0.0, times = N)
-  }
+  penalty_params = c(lambda, gamma, alpha)
   
-  # if(family == "binomial"){
-  #   if((! is.numeric(nTotal)) || length(nTotal) != N){
-  #     strWarn = "For binomial family, nTotal must be a numeric vector"
-  #     stop(strWarn, "of the same length as y\n")
-  #   }
-  # }
+  dims = c(p, N, conv, maxit_CD)
   
-  familyR = family$family
-  linkR = family$link
+  coef_new = glm_fit(y, X, dims, coef_init, offset, family, link_int, penalty, penalty_params, penalty_factor, trace)
   
-  if(!(familyR %in% c("binomial","poisson","gaussian","Gamma"))){
-    stop("invalid family \n")
-  }
-  if(!(linkR %in% c("logit","log","identity","inverse"))){
-    stop("invalid link \n")
-  }
-  
-  # Re-code link as integer
-  ## All link_int will have two digits
-  ## First digit corresponds to family that link is canonical for
-  ## 1 = binomial, 2 = poisson, 3 = gaussian, 4 = gamma
-  ## Second digit is arbitrary enumeration of links
-  if(linkR == "logit"){
-    link_int = 10
-  }else if(linkR == "probit"){
-    link_int = 11
-  }else if(linkR == "cloglog"){
-    link_int = 12
-  }else if(linkR == "log"){
-    link_int = 20
-  }else if(linkR == "identity"){
-    link_int = 30
-  }else if(linkR == "inverse"){
-    link_int = 40
-  }
-  
-  penalty = penalty[1]
-  
-  if(!(penalty %in% c("lasso","MCP","SCAD"))){
-    stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
-  }
-  
-  if(penalty == "MCP" & gamma <= 1){
-    stop("gamma must be > 1 when using MCP penalty")
-  }else if(penalty == "SCAD" & gamma <= 2){
-    stop("gama must be > 2 when using SCAD penalty")
-  }else if(!is.double(gamma)){
-    tmp <- try(gamma <- as.double(gamma), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("gamma must be numeric or able to be coerced to numeric", call.=FALSE)
-  }
-  
-  if (!is.double(alpha)) {
-    tmp <- try(alpha <- as.double(alpha), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("alpha must be numeric or able to be coerced to numeric", call.=FALSE)
-  }else if(alpha == 0.0){
-    stop("alpha cannot equal 0. Pick a small value > 0 instead (e.g. 0.001) \n");
-  }
-  
-  penalty_params = c(gamma, alpha)
-  
-  if(length(group_X) != ncol(X)){
-    stop("length of group_X must equal number columns of X \n")
-  }else if(!is.integer(group_X)){
-    tmp <- try(group_X <- as.integer(group_X), silent = T)
-    if(inherits(tmp, "try_error")) stop("group_X must be a vector of integers \n")
-  }
-  
-  # J_X = number groups in X matrix
-  J_X = length(unique(group_X)) 
-  if((max(group_X) - min(group_X) + 1) != J_X){ # Assume min(group_X) == 0 (for intercept)
-    stop("group_X must be comprised of consecutive integers \n")
-  }
-  # Size of groups in X
-  K_X = numeric(J_X)
-  for(j in unique(group_X)){
-    K_X[j+1] = sum(group_X == j) # Adjust by one since 0 included
-  }
-  
-  dims = c(p, N, conv, maxit, maxit_CD, J_X)
-  
-  coef_new = glm_fit(y, X, dims, coef, offset, familyR, link_int, fit_type, group_X, K_X, penalty, lambda, penalty_params)
-  
-  return(coef_new)
+  return(as.numeric(coef_new))
 }
 
+
+#################################################################################################
+# Grouped Coordinate Descent for fixed and random effects
 #################################################################################################
 
 # Eventually implement the following:
-## Add lambda0 and lambda1 (for fixed and random -- grouped case)
 ## In fit_dat or glmmPen, check that group_X made of subsequent integers
 ## Change Z to be sparse (fit_dat and glmmPen)
 
 # init: if this is the first attempt at a fit (using initial coef)
-#' @export
-M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
+# family: character describing which family
+# link_int: integer summarizing with link to use (see coding in fit_dat_B())
+M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offset, phi,
                   maxit_CD = 250, conv_CD = 0.0001,
                   init, group_X = 0:(ncol(X)-1), covgroup,
-                  penalty = c("MCP","SCAD","lasso"), lambda0, lambda1,
-                  gamma = switch(penalty[1], SCAD = 4.0, 3.0), alpha = 1.0,
-                  fit_type = 1){
-  
-  if (!is.double(y)) {
-    tmp <- try(y <- as.double(y), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
-  }
-  
-  if(!is.matrix(X)){
-    stop("X must be a matrix \n")
-  }else if(typeof(X)=="integer") storage.mode(X) <- "double"
+                  penalty, lambda0, lambda1, gamma, alpha = 1.0, trace){
   
   if(!is.matrix(Z)){
-    stop("X must be a matrix \n")
-  }else if(typeof(X)=="integer") storage.mode(X) <- "double"
+    stop("Z must be a matrix \n")
+  }else if(typeof(Z)=="integer") storage.mode(Z) <- "double"
   
   p = ncol(X)
   N = length(y)
-  
-  if(nrow(X) != N){
-    stop("the dimension of X and y do not match\n")
-  }
-  
-  if(!is.null(offset)){
-    if((!is.numeric(offset)) | (length(offset) != N)){
-      stop("offset must be a numeric vector of the same length as y\n")
-    }
-  }else{
-    offset = rep(0.0, times = N)
-  }
-  
-  if(!is.factor(group)){
-    group <- factor(group)
-  }
-  
-  familyR = family$family
-  linkR = family$link
-  
-  if(!(familyR %in% c("binomial","poisson","gaussian","Gamma"))){
-    stop("invalid family \n")
-  }
-  if(!(linkR %in% c("logit","log","identity","inverse"))){
-    stop("invalid link \n")
-  }
-  
-  # Re-code link as integer
-  ## All link_int will have two digits
-  ## First digit corresponds to family that link is canonical for
-  ## 1 = binomial, 2 = poisson, 3 = gaussian, 4 = gamma
-  ## Second digit is arbitrary enumeration of links
-  if(linkR == "logit"){
-    link_int = 10
-  }else if(linkR == "probit"){
-    link_int = 11
-  }else if(linkR == "cloglog"){
-    link_int = 12
-  }else if(linkR == "log"){
-    link_int = 20
-  }else if(linkR == "identity"){
-    link_int = 30
-  }else if(linkR == "inverse"){
-    link_int = 40
-  }
-  
-  penalty = penalty[1]
-  
-  if(!(penalty %in% c("lasso","MCP","SCAD"))){
-    stop("penalty ", penalty, " not available, must choose 'lasso', 'MCP', or 'SCAD' \n")
-  }
-  
-  if(penalty == "MCP" & gamma <= 1){
-    stop("gamma must be > 1 when using MCP penalty")
-  }else if(penalty == "SCAD" & gamma <= 2){
-    stop("gama must be > 2 when using SCAD penalty")
-  }else if(!is.double(gamma)){
-    tmp <- try(gamma <- as.double(gamma), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("gamma must be numeric or able to be coerced to numeric", call.=FALSE)
-  }
-  
-  if (!is.double(alpha)) {
-    tmp <- try(alpha <- as.double(alpha), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("alpha must be numeric or able to be coerced to numeric", call.=FALSE)
-  }else if(alpha == 0.0){
-    stop("alpha cannot equal 0. Pick a small value > 0 instead (e.g. 0.001) \n");
-  }
   
   penalty_params = c(lambda0, lambda1, gamma, alpha)
   
@@ -239,17 +70,14 @@ M_stepB = function(y, X, Z, u_address, M, J, group, family, coef, offset = NULL,
   
   dims = c(p, N, d, q, M, J_XZ, conv_CD, maxit_CD)
   
-  if(fit_type == 1){
-    coef_new = grp_CD_XZ_B1(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 2){
-    coef_new = grp_CD_XZ_B2(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 3){
-    coef_new = grp_CD_XZ_B1_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else if(fit_type == 4){
-    coef_new = grp_CD_XZ_B2_std(y, X, Z, group, u_address, J, dims, coef, offset, familyR, link_int, init, XZ_group, K, penalty, penalty_params)
-  }else{
-    stop("fit_type", fit_type, "not available \n")
-  }
+  # const arma::vec& y, const arma::mat& X, const arma::mat& Z,
+  # const arma::vec& group, 
+  # SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
+  # arma::vec beta, const arma::vec& offset,
+  # const char* family, int link, int init, double phi,
+  # const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
+  # const char* penalty, arma::vec params
+  coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
   
   return(as.numeric(coef_new))
 }

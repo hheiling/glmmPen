@@ -5,28 +5,57 @@
 \title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 Minimization (MCECM)}
 \usage{
-select_tune(dat, offset = NULL, family, group_X = 0:(ncol(dat$X) - 1),
-  penalty, lambda0_range, lambda1_range, alpha = 1,
-  gamma_penalty = switch(penalty[1], SCAD = 4, 3), returnMC = T,
-  trace = 0, ufull = NULL, coeffull = NULL,
-  adapt_RW_options = adaptControl(), optim_options = optimControl())
+select_tune(
+  dat,
+  offset = NULL,
+  family,
+  covar = c("unstructured", "independent"),
+  group_X = 0:(ncol(dat$X) - 1),
+  penalty,
+  lambda0_range,
+  lambda1_range,
+  alpha = 1,
+  gamma_penalty = switch(penalty[1], SCAD = 4, 3),
+  trace = 0,
+  u_init = NULL,
+  coef_old = NULL,
+  adapt_RW_options = adaptControl(),
+  optim_options = optimControl(),
+  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
+  BICq_calc = T,
+  BICq_posterior = NULL,
+  checks_complete = F,
+  pre_screen = T,
+  ranef_keep = NULL
+)
 }
 \arguments{
 \item{dat}{a list object specifying y (response vector), X (model matrix of all covariates), 
-Z (model matrix for the random effects), and group (vector whose value indicates 
-the study, batch, or other group identity to which on observation belongs), with each row an 
-observation}
+Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
+the study, batch, or other group identity to which on observation belongs)}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
-linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
-number of cases. Currently, the formula does not allow specification of an offset.}
+linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
+argument is \code{NULL}, this should be a numeric vector of length equal to the 
+number of cases (the response). If the data argument specifies a data.frame, the offset
+argument should specify the name of a column in the data.frame.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-For \code{fit_dat_B} this can be a character string naming a family function or a family function. 
-See \code{family} options in the Details section.}
+Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+with canonical links only.}
 
-\item{penalty}{character descripting the type of penalty to use in the variable selection procedure.
-Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty.}
+\item{covar}{character string specifying whether the covariance matrix should be unstructured
+("unstructured") or diagonal with no covariances between variables ("independent").
+Default is "unstructured", but if the number of random effects (not including the intercept) is 
+greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
+independent covariance structure and \code{covar} is switched to "independent".}
+
+\item{group_X}{vector describing the grouping of the covariates in the model matrix.}
+
+\item{penalty}{character describing the type of penalty to use in the variable selection procedure.
+Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
+matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
+random effects coefficients.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
@@ -36,17 +65,43 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
 
-\item{returnMC}{logical, should \code{nMC_report} Monte Carlo draws be returned? Default \code{TRUE}.}
-
-\item{trace}{an integer specifying print output to include as function runs. Default value is 0 
-(details ...)}
+\item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
+See Details for more information about output provided when trace = 0, 1, or 2.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
-Ignored if \code{\link{optimControl}} parameter \code{MwG_sampler} is set to "independence"}
+Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
 
-\item{optim_options}{a list of class "optimControl" created from function \code{\link{optimControl}}
-that specifies optimization parameters.}
+\item{optim_options}{a character string "recommend" or a list of class "optimControl" created 
+from function \code{\link{optimControl}} that specifies optimization parameters. See the 
+documentation for \code{\link{optimControl}} for more details on defaults.}
+
+\item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
+Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
+observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+a full model; a small penalty is used for the fixed and/or random effects if the number of 
+effects is 10 or greater.}
+
+\item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
+best model.}
+
+\item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
+the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+These full model posterior draws will be used in BIC-ICQ calculations if these calculations
+are requested. The name of the file should include a .txt extension. If this argument is
+specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
+will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
+See 'Details' section for additional details.}
+
+\item{checks_complete}{boolean value indicating whether the function has been called within
+\code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
+performs additional checks on the input data. If false, assumes data input checks have 
+already been performed. For package testing purposes only.}
+
+\item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
+during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
+Pre-screening not performed when the number of random effect predictors is 9 or less.}
 }
 \value{
 A list with the following elements:

@@ -4,31 +4,29 @@
 \alias{adaptControl}
 \title{Control of Metropolis-within-Gibbs Adaptive Random Walk Sampling Procedure
 
-Constructs control structure for the adaptive random walk Metropolis-within-Gibbs sampling procedure.}
+Controls the adaptive random walk Metropolis-within-Gibbs sampling procedure.}
 \usage{
-adaptControl(batch_length = 100, offset = 8000,
-  burnin_batchnum = 1000)
+adaptControl(batch_length = 100, offset = 0)
 }
 \arguments{
 \item{batch_length}{positive integer specifying the number of posterior draws to collect
 before the proposal variance is adjusted based on the acceptance rate of the last 
-\code{batch_length} posterior draws}
+\code{batch_length} accepted posterior draws. Default is set to 100. Batch length restricted
+to be no less than 50.}
 
-\item{offset}{positive integer specifying an offset value for the increment of the proposal
-variance adjustment. Used to ensure the required diminishing adaptation condition. Default 8500.
+\item{offset}{non-negative integer specifying an offset value for the increment of the proposal
+variance adjustment. Optionally used to ensure the required diminishing adaptation condition. 
+Default set to 0.
 \verb{
 increment = min(0.01, 1 / sqrt(batch*batch_length + offset))
 }}
-
-\item{burnin_batchnum}{positive integer specifying the maximum number of batches (of length
-\code{batch_length}) during which the proposal variance can be adjusted. Default 1,000.}
 }
 \value{
-The *Control functions return a list (inheriting from class "\code{adaptControl}") 
+Function returns a list (inheriting from class "\code{adaptControl}") 
 containing parameter specifications for the adaptive random walk sampling procedure.
 }
 \description{
 Control of Metropolis-within-Gibbs Adaptive Random Walk Sampling Procedure
 
-Constructs control structure for the adaptive random walk Metropolis-within-Gibbs sampling procedure.
+Controls the adaptive random walk Metropolis-within-Gibbs sampling procedure.
 }

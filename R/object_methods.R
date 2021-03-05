@@ -4,25 +4,49 @@
 # Properties: 
 ## Reference Class object
 
-# @method fixef pglmmObj
+
+#' @importFrom lme4 fixef
 #' @export
 fixef.pglmmObj = function(object){
   object$fixef
 }
 
-# @method ranef pglmmObj
+#' @importFrom lme4 ranef
 #' @export
 ranef.pglmmObj = function(object){
   object$ranef
 }
 
-coefGlmmPen = function(object){
+#' @importFrom stats sigma
+#' @export
+sigma.pglmmObj = function(object){
+  
+  fam_fun = object$family
+  family = fam_fun$family
+  # Return covariance matrix of the random effects and any scale parameters
+  group = object$data$group
+  grp = names(group)
+  scale = object$scale[[1]]
+  out = list()
+  out[[grp]] = object$sigma
+  if(family == "gaussian"){
+    out[["Residual StdDev"]] = sqrt(scale)
+  }else if(family == "negbin"){
+    out[["phi"]] = scale
+  }
+  
+  return(out)
+}
+
+#' @importFrom stats coef
+#' @export
+coef.pglmmObj = function(object){
   # Find combined coefficients
   ## Borrowed code elements from coef.merMod in lme4
   
   fixef = data.frame(rbind(object$fixef), check.names = F)
   ranef = object$ranef
-  group = object$group
+  group = object$data$group
   
   # check for variables in RE but missing from FE, fill in zeros in FE accordingly
   refnames = unlist(lapply(ranef,colnames))
@@ -41,7 +65,7 @@ coefGlmmPen = function(object){
     if (!all(nmsi %in% names(fixef))){
       stop("unable to align random and fixed effects")
     }
-    for (nm in nmsi) {
+    for(nm in nmsi) {
       output[[i]][[nm]] <- output[[i]][[nm]] + refi[,nm]
     }
   }
@@ -49,10 +73,6 @@ coefGlmmPen = function(object){
   return(output)
   
 }
-
-#' @importFrom stats coef
-#' @export
-coef.pglmmObj = coefGlmmPen
 
 #' @importFrom stats family
 #' @export
@@ -62,12 +82,14 @@ family.pglmmObj = function(object){
 
 #' @export
 nobs.pglmmObj = function(object){
-  nrow(object$X)
+  nrow(object$data$X)
 }
 
-# ngprs = function(object){
-#   
+# @export
+# ngrps.pglmmObj = function(object){
+#   nlevels(object$data$group[[1]])
 # }
+
 
 reOnly <- function(f, response=FALSE) {
   # Copied from lme4 source code (predict.R)
@@ -79,7 +101,7 @@ reOnly <- function(f, response=FALSE) {
 #' @export
 formula.pglmmObj = function(object, fixed.only = F, random.only = F){
   form = object$formula
-  frame = object$frame
+  frame = object$data$frame
   if(fixed.only && random.only){
     stop("cannot specify both 'fixed.only' and 'random.only")
   }
@@ -98,7 +120,7 @@ formula.pglmmObj = function(object, fixed.only = F, random.only = F){
 #' @importFrom stats model.frame
 #' @export
 model.frame.pglmmObj = function(object, fixed.only = F){
-  frame = object$frame
+  frame = object$data$frame
   # Borrowed some code from lme4
   if(fixed.only){
     form = formula(object, fixed.only = T)
@@ -114,23 +136,19 @@ model.frame.pglmmObj = function(object, fixed.only = F){
 #   bars = findbars(object$formula)
 #   ref = ranef(object)
 #   vars.random = lapply(ref, function(j) colnames(j))
-#   frame_rand = lapply(bars, function(j) object$frame[as.factor(vars.random[[j]])])
+#   frame_rand = lapply(bars, function(j) object$data$frame[as.factor(vars.random[[j]])])
 #   return(frame_rand)
 # }
 
 #' @importFrom stats model.matrix
 #' @export
-model.matrix.pglmmObj = function(object, type = c("fixed", "random", "randomListRaw")) {
-  # if(length(type) > 1){
-  #   warning("only the first element of 'type' will be used")
-  # }
+model.matrix.pglmmObj = function(object, type = c("fixed", "random")) {
+  
   switch(type[1],
-         "fixed" = object$X,
-         "random" = Matrix(object$Z, sparse = T),
-         "randomListRaw" = stop("'randomListRaw' option not available at this time"))
+         "fixed" = object$data$X,
+         "random" = Matrix(object$data$Z_std, sparse = T))
 }
 
-#' @export
 etaCalc = function(X, Z, beta, U){
 
   if(class(U) == "numeric"){ # U = vector instead of matrix; highly unlikely
@@ -144,7 +162,6 @@ etaCalc = function(X, Z, beta, U){
   return(eta)
 }
 
-#' @export
 invLink = function(family, eta){
   fam = family$family
   # Inverse link functions (canonical links only)
@@ -163,75 +180,99 @@ invLink = function(family, eta){
 
 #' @importFrom stats fitted
 #' @export
-fitted.pglmmObj = function(object){
-  ## ToDo: add names/rownames (from X?)
-  ## ToDo: Take into account potential offset (in etaCalc)
+fitted.pglmmObj = function(object, fixed.only = T){
   
-  eta = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), U = object$posterior_draws)
-  mu = invLink(family = family(object), eta)
+  offset = object$data$offset
   
-  return(mu)
+  if(fixed.only){
+    eta = object$data$X %*% matrix(object$fixef, ncol = 1) + offset
+  }else{
+    eta = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, U = object$posterior_draws) + offset
+  }
+  
+  mu = invLink(family = object$family, eta)
+  
+  return(as.numeric(mu))
   
 }
 
-#' @importFrom stats predict
+#' @importFrom stats predict drop.terms reformulate
+#' @importFrom lme4 nobars
 #' @export
 predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
-                            fixed.only = F, na.action = na.pass){
+                            fixed.only = T, na.action = na.pass){
   ## Other arguments used by lme4: re.form, random.only = F, allow.new.levels = F, newparams = NULL
   
-  if(!is.null(newdata) && class(newdata) != "data.frame"){
+  if((!is.null(newdata)) & (class(newdata) != "data.frame")){
     stop("newdata must be a dataframe")
   }
   
   if(is.null(newdata)){
-    if(!fixed.only){
+    # Calculate prediction result for original data
+    if(!fixed.only){ # fixed.only = F
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
-                    link = etaCalc(X = object$X, Z = object$Z, beta = fixef(object), 
+                    link = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, 
                                    U = object$posterior_draws),
-                    response = fitted(object))
-    }else{ # Fixed.only = T
-      eta = object$X %*% fixef(object)
+                    response = fitted(object, fixed.only = fixed_only))
+    }else{ # fixed.only = T
+      eta = object$data$X %*% object$fixef
       pred = switch(type[1],
                     link = eta,
-                    response = invLink(family = family(object), eta = eta))
+                    response = invLink(family = object$family, eta = eta))
     }
     
-    data = object$X
+    data = object$data$X
     
-  }else{
-    
-    fD_out = formulaData(formula = formula(object), data = newdata, na.action = na.action)
+  }else{ # Calculate prediction for newdata
     if(!fixed.only){
-      # Assume only one group
-      if(nlevels(fD_out$group) != nlevels(object$group[[1]])){
-        levs_orig = levels(object$group[[1]])
-        levs_new = levels(fD_out$group)
-        # Columns of Z and object$posterior_draws organized first by vars, then by group within vars
-        present_levs = as.numeric(levs_new %in% levs_orig)
-        keep_cols = rep(present_levs, each = ncol(object$Z)/nlevels(object$group[[1]]))
-        U = object$posterior_draws[,keep_cols]
-      }else{
-        U = object$posterior_draws
-      }
-      eta = etaCalc(fD_out$X, fD_out$Z, beta = fixef(object), U = U)
-      pred = switch(type[1], 
-                    link = eta,
-                    response = invLink(family = family(object), eta = eta))
-      
-    }else{ # fixed.only = T
-      eta = fD_out$X %*% fixef(object)
-      pred = switch(type[1], 
-                    link = eta,
-                    response = invLink(family = family(object), eta = eta))
+      stop("prediction using random effects not appropriate for new data")
     }
+    
+    fixef = object$fixef
+    
+    # Make sure newdata has relevant variables needed for prediction
+    # fixed_vars: names of the fixed effects used in analysis (from get_all_vars(fixed_formula[-2],data))
+    fixed_vars = object$fixed_vars
+    # If NA terms in var_names, this indicates that formula was specified using a matrix
+    #   (e.g. formula = y ~ X + (X | group)) instead of specified using either the names of column
+    #   names of a data frame or named vectors
+    if(!any(is.na(fixed_vars))){
+      if(!(fixed_vars %in% colnames(newdata))){
+        cat("newdata must have the following variables: \n",
+            fixed_vars, "\n")
+        stop("newdata must have the variables listed in 'fixed_vars' from pglmmObj object")
+      }
+      
+      formula_fixed = nobars(object$formula)
+      formula_fixed = formula_fixed[-2] # remove response
+      
+      # Create model.matrix using newdata and fixed effects formula with non-zero fixed effects
+      X = model.matrix(formula_fixed, data = newdata)
+      
+    }else{ # if any(is.na(fixed_vars))
+      # Check that number of columns of newdata matches number of fixed effects
+      cat("it is assumed that the columns of newdata match the order of the fixef coefficients")
+      # Ignoring intercept (model always contains intercept), check that number of variables in
+      # newdata match number of variables in the fixed effects coefficients
+      if(ncol(newdata) != (length(fixef)-1)){ 
+        stop("number of newdata columns ", ncol(newdata),
+             " does not match the number of fixed effects coefficients in fixef (ignoring intercept) ",
+             (length(fixef)-1))
+      }
+    } # End if-else any(is.na(fixed_vars))
+    
+    X = cbind(1, as.matrix(newdata))
+    eta = X %*% fixef
+    pred = switch(type[1], 
+                  link = eta,
+                  response = invLink(family = object$family, eta = eta))
+    
     
     data = newdata
     
-    # In future, create code for option else(!is.null(re.form))
-  }
+  } # End if-else is.null(newdata)
   
-  if(class(pred) %in% c("dgeMatrix","matrix")){
+  if(class(pred) %in% c("Matrix","matrix")){
     if(is.null(rownames(data))){
       rownames(pred) = seq_len(nrow(data))
     }else{
@@ -248,48 +289,56 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
   return(pred)
 }
 
-var_hat = function(family, mu, sig2 = NULL){
+
+# Function for residuals.pglmmObj
+var_hat = function(family, mu, sig2 = NULL, phi = NULL){
   if(family == "binomial"){
     v_hat = mu*(1-mu)
   }else if(family == "poisson"){
     v_hat = mu
   }else if(family == "gaussian"){
     v_hat = sig2
+  }else if(family == "negbin"){
+    v_hat = mu + phi * mu^2 
   }
   return(v_hat)
 }
 
-ll = function(family, mu, y, v = NULL){
-  if(family == "binomial"){
-    llik = dbinom(y, size = 1, prob = mu, log = T)
-  }else if(family == "poisson"){
-    llik = dpois(y, lambda = mu, log = T)
-  }else if(family == "gaussian"){
-    llik = dnorm(y, mean = mu, sd = sqrt(v), log = T)
-  }
-  return(llik)
-}
-
-#' @importFrom stats predict
 #' @export
 residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working")){
   # What is working response?
-  Y = object$y
+  y = object$data$y
   mu = Matrix::as.matrix(fitted(object))
   type = match.arg(type)
+  fam = family(object)
+  family = fam$family
+  sig2 = object$scale$Gaus_sig2 # Residual error variance only used if family = gaussian
+  phi = object$scale$phi # Only used if family = negbin
   
-  if(type == "deviance"){
-    res = sign(Y - mu)*sqrt(-2*(ll(family(object), mu, Y)))
+  if(type == "deviance"){ # reference: mcemGLM package
+    if(family == "binomial"){
+      res = ifelse(y, 1, -1) * sqrt(-2*(y * log(mu) + (1 - y) * log(1 - mu)))
+    }else if(family == "poisson"){
+      res = sign(y - mu) * sqrt(2 * ifelse(y > 0, y * log(y/mu), 0) - 2 * (y - mu))
+    }else if(family == "gaussian"){
+      res = (y - mu) / sqrt(sig2)
+    }else if(family == "negbin"){
+      # Note: a0 from mcemGLM = 1/phi
+      stop("family not available")
+      res = sign(y - mu) * sqrt(2 * (ifelse(y > 0, y * log(y/mu), 0)) - 2 * (y + 1/phi) * log((y + 1/phi)/(mu + 1/phi)))
+    }else{
+      stop("family not available")
+    }
   }else if(type == "pearson"){
-    res = (Y - mu) / sqrt(var_hat(family(object), mu))
+    res = (y - mu) / sqrt(var_hat(family, mu, sig2, phi))
   }else if(type == "response"){
-    res = Y - mu
-  }else{
-    res = (Y - mu) / mu
+    res = y - mu
+  }else{ # working residuals
+    res = (y - mu) / mu
   }
   
   attr(res, "residual type") = type
-  return(res)
+  return(as.numeric(res))
 }
 
 ################################################################### 
@@ -297,13 +346,7 @@ residuals.pglmmObj = function(object, type = c("deviance","pearson","response","
 
 prt_family = function(object){
   f = object$family
-  if(is.character(f)){
-    fam = get(f, mode = "function")
-    family = fam()
-  }else if(is.function(f)){
-    family = f()
-  }
-  cat(" Family:", family$family, paste(" (", family$link, ")"), fill = T)
+  cat(" Family:", f$family, paste(" (", f$link, ")"), fill = T)
 }
 
 prt_call <- function(object) {
@@ -322,7 +365,7 @@ prt_call <- function(object) {
 }
 
 prt_fixef = function(object, digits){
-  if(length(fef <- fixef(object)) > 0) {
+  if(length(fef <- object$fixef) > 0) {
     cat("Fixed Effects:\n")
     print.default(format(fef, digits = digits),
                   print.gap = 2L, quote = FALSE)
@@ -334,8 +377,8 @@ prt_ranef = function(object, digits = 4){
   # Create character matrix
   cnms = c("Group","Name","Variance")
   # Assume only one group
-  group = object$group[[1]] 
-  group_name = names(object$group)
+  group = object$data$group[[1]] 
+  group_name = names(object$data$group)
   ref = lapply(ranef(object), function(x) colnames(x))
   ref_names = ref[[1]]
   sigma = object$sigma
@@ -351,7 +394,7 @@ prt_ranef = function(object, digits = 4){
 
 prt_nobsgrps = function(object){
   cat(sprintf("Number Observations: %i,  groups: %s, %i \n", 
-              nobs(object), names(object$group), nlevels(object$group[[1]])))
+              nobs(object), names(object$data$group), nlevels(object$data$group[[1]])))
 }
 
 #' @export 
@@ -380,8 +423,8 @@ summary_ranef = function(object, digits = 4){
   # Create character matrix
   cnms = c("Group","Name","Variance","Std.Dev.")
   # Assume only one group
-  group = object$group[[1]] 
-  group_name = names(object$group)
+  group = object$data$group[[1]] 
+  group_name = names(object$data$group)
   ref = lapply(ranef(object), function(x) colnames(x))
   ref_names = ref[[1]]
   sigma = object$sigma
@@ -406,9 +449,9 @@ prt_resids = function(resids, type = "Pearson", digits) {
   cat("\n")
 }
 
-
 #' @export
-summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "deviance"){
+summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), 
+                            resid_type = switch(object$family$family, gaussian = "pearson", "deviance")){
   # ToDo: Add in (best) lambda values, BIC, logLik
   
   # Title
@@ -432,18 +475,113 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), resid_type = "
   cat("\n")
 }
 
+# @export
+# posterior_draws = function(object, sampler = c("stan","random_walk","independence"), nMC = 10^4,
+#                            nMC_burnin = 250){
+#   
+#   if(length(sampler) > 1){
+#     sampler = sampler[1]
+#   }
+#   if(!(sampler %in% c("stan","random_walk","independence"))){
+#     stop("sampler must be 'stan', 'random_walk', or 'independence'")
+#   }
+#   
+#   # Converge group factor into a numeric factor
+#   group = as.factor(as.numeric(object$data$group[[1]]))
+#   d = nlevels(group)
+#   
+#   sigma = object$sigma
+#   # Specify which random effect variables are non-zero 
+#   ranef_idx = which(diag(sigma) > 0)
+#   
+#   # Adjust Z to incorporate the cholesky composition of the sigma matrix
+#   gamma = t(chol(sigma))
+#   Z_std = object$data$Z_std
+#   Znew2 = Z_std
+#   for(i in 1:d){
+#     Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i, seq(i, ncol(Z), by = d)] %*% gamma
+#   }
+#   
+#   family = object$family$family
+#   # if(family == "gaussian"){
+#   #   sig_g =
+#   # }
+#     
+#   # Needed arguments for E_step function
+#   # coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, link, phi, sig_g,
+#   # sampler, d, uold, proposal_SD, batch, batch_length,
+#   # offset_increment, trace, num_cores
+#   draws = E_step(coef = object$fixef, ranef_idx = ranef_idx, y = object$data$y, X = object$data$X,
+#                  Znew2 = Znew2, group = group, nMC = nMC, nMC_burnin = nMC_burnin,
+#                  family = family, link = object$family$link,
+#                  sampler = sampler, d = d)
+# }
+
+#' @export
+logLik.pglmmObj = function(object){ 
+  
+  results_optim = object$results_optim
+  ll_elem = which(colnames(results_optim) == "LogLik")
+  
+  ll = results_optim[ll_elem]
+  names(ll) = "logLik"
+  
+  return(ll)
+
+}
+
+
+# @method extractBIC pglmmObj
+#' @importFrom stringr str_detect
+#' @export
+extractBIC = function(object){ # extractBIC.pglmmObj
+  
+  results_optim = object$results_optim
+  BIC_elem = which(str_detect(colnames(results_optim), "BIC"))
+  BIC_names = colnames(results_optim[,BIC_elem, drop = F])
+  BIC_out = results_optim[,BIC_elem]
+  names(BIC_out) = BIC_names
+  
+  return(BIC_out)
+  
+}
+
+#' @title Plot Diagnostics for MCMC Posterior Draws of the Random Effects
+#' 
+#' @description Provides graphical diagnostics of the random effect posterior draws from the (best) model.
+#' Availabile diagnostics include the sample path, histograms, cummulative sums, and autocorrelation.
+#' 
+#' @param object an object of class \code{pglmmObj} output from either \code{\link{glmmPen}} 
+#' or \code{\link{glmmPen_FineSearch}}.
+#' @param plots a character string or a vector of character strings specifying which graphical
+#' diagnostics to provide. 
+#' @param grps a character string or a vector of character strings specifying which groups 
+#' should have diagnostics provided. The names of the groups match the input group factor levels.
+#' Default is set to 'all' for all groups.
+#' @param vars a character string or a vector of character strings specifying which variables
+#' should have diagnostics provided. Tip: can find the names of the random effect variables in
+#' the output sigma matrix found in the \code{pglmmObj} object. Default is set to
+#' 'all', which picks all variables with non-zero random effects. 
+#' @param numeric.grps if TRUE, specifies that the groups factor should be converted to numeric 
+#' values. This option could be used to ensure that the organization of the groups is in the 
+#' proper numeric order.
+#' @param bin_width optional binwidth argument for \code{geom_histogram} from the \code{ggplot2} 
+#' package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth.
+#' 
+#' @return a list of ggplot graphics, each faceted by group and random effect variable. 
+#' Type of plots specified in the \code{plots} argument.
+#' 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
-# @method plot_mcmc pglmmObj
+#' @import ggplot2 
 #' @export 
 plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
-                     grps = "all", vars = "all", numeric.grps = F){ #plot_mcmc.pglmmObj
-  # ToDo: Remove cols from U associated with vars with zero variance?
+                     grps = "all", vars = "all", numeric.grps = F, bin_width = NULL){ #plot_mcmc.pglmmObj
   
-  if(object$sampling != "Gibbs Sampling"){
-    stop("The plots in plot_mcmc are only relevant when Gibbs sampling is used; \n
-         Rejection sampling was used in this case")
+  if(class(object) != "pglmmObj"){
+    stop("'object' must be an object of class pglmmObj output from the glmmPen function")
   }
+  
   if(!is.vector(grps) | !is.vector(vars)){
     stop("specified grps and vars must be vectors")
   }
@@ -461,8 +599,8 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
   U_cols = colnames(U)
   # colnames organization = var_name:grp_name
   
-  if(vars == "all"){
-    d = nlevels(object$group[[1]])
+  if(any(vars == "all")){
+    d = nlevels(object$data$group[[1]])
     non0 = (diag(object$sigma) != 0)
     non0cols = rep(non0, each = d)
     U_non0 = U[,non0cols]
@@ -480,57 +618,72 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
         }
       }
       U = U_red
+      U_cols = colnames(U)
+      var_names = vars_string
+    }else{
+      vars_all = str_sub(U_cols, start = 1, end = (str_locate(U_cols, ":")[,1]-1))
+      vars_all2 = str_remove(str_remove(vars_all, "[(]"), "[)]")
+      var_names = vars_all2[seq(from = 1, by = d, length.out = length(vars_all2) / d)]
     }
-  }
+    
+  } # End if(any(vars) == "all")
+  
+  
   
   # If include intercept, convert to recognized form "Intercept"
-  if(vars != "all"){
+  if(any(vars != "all")){
     v_int = c("Intercept","intercept","Int","int")
     v_intTRUE = vars %in% v_int[-1]
     vars[v_intTRUE] = "Intercept"
+    var_names = vars
   }
   
-  if(grps == "all" && vars == "all"){
-    d = nlevels(object$group[[1]])
+  if((any(grps == "all")) & (any(vars == "all"))){
+    d = nlevels(object$data$group[[1]])
     var_num = ncol(U) / d
     U_keep = U
-    grp_names = levels(object$group[[1]])
-    var_names = colnames(ranef(object)[[1]])
+    grp_names = levels(object$data$group[[1]])
+    # var_names = colnames(ranef(object)[[1]])
     
-  }else if(grps == "all" && vars != "all"){
-    d = nlevels(object$group[[1]])
+  }else if((any(grps == "all")) & (any(vars != "all"))){
+    d = nlevels(object$data$group[[1]])
     var_num = length(vars)
     # Concatenate [)]?, var_name, [)]?, and :
     var_cat = str_c("[(]?",vars,"[)]?",":")
     for(v in var_cat){
-      if(var_cat[1] == v){
+      if(v == var_cat[1]){
         U_keep = U[,str_detect(U_cols, v)]
       }else{
         U_keep = cbind(U_keep, U[,str_detect(U_cols, v)])
       }
     }
-    grp_names = levels(object$group[[1]])
-    var_names = vars
+    grp_names = levels(object$data$group[[1]])
+    # var_names = vars
     
-  }else if(vars == "all" && grps != "all"){
+  }else if((any(vars == "all")) & (any(grps != "all"))){
     d = length(grps)
-    var_num = ncol(U) / nlevels(object$group[[1]])
+    var_num = ncol(U) / nlevels(object$data$group[[1]])
     # Concatenate :, grp_name, and $ to :grp_name$
     grp_cat = str_c(":",grps,"$")
+    cols_U_keep0 = NULL
     for(g in grp_cat){
-      if(grp_cat[1] == g){
+      if(g == grp_cat[1]){
         U_keep0 = U[,str_detect(U_cols, g)]
+        cols_U_keep0 = U_cols[str_detect(U_cols, g)]
       }else{
         U_keep0 = cbind(U_keep0, U[,str_detect(U_cols, g)])
+        cols_U_keep0 = c(cols_U_keep0, U_cols[str_detect(U_cols, g)])
       }
     }
+    U_keep0 = as.matrix(U_keep0)
+    colnames(U_keep0) = cols_U_keep0
     grp_names = grps
-    var_names = colnames(ranef(object)[[1]])
+    # var_names = colnames(ranef(object)[[1]])
     U_keep = matrix(0, nrow = nrow(U_keep0), ncol = ncol(U_keep0))
-    cols_U_keep = numeric(length = ncol(U_keep0))
+    cols_U_keep = character(length = ncol(U_keep0))
     for(v in 1:length(var_names)){
       U_keep[,(1+(v-1)*d):(v*d)] = U_keep0[,seq(from = v, by = var_num, length.out = d)]
-      cols_U_keep[(1+(v-1)*d):(v*d)] = colnames(U_keep0)[seq(from = v, by = var_num, length.out = d)]
+      cols_U_keep[(1+(v-1)*d):(v*d)] = cols_U_keep0[seq(from = v, by = var_num, length.out = d)]
     }
     colnames(U_keep) = cols_U_keep
     
@@ -556,7 +709,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     }
     U_keep = U_keep2
     grp_names = grps
-    var_names = vars
+    # var_names = vars
   }
   
   if(numeric.grps){
@@ -584,7 +737,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     plots_return$sample_path = plot_sp
   }
   if("histogram" %in% type){
-    hist_U = ggplot(U_plot) + geom_histogram(mapping = aes(x = value)) + 
+    hist_U = ggplot(U_plot) + geom_histogram(mapping = aes(x = value), binwidth = bin_width) + 
       facet_grid(var_names ~ grp_names) + xlab("draws")
     
     plots_return$histogram = hist_U
@@ -600,7 +753,8 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     U_long = melt(U_t, id = "t")
     U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
                         grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = var_num)) 
-    plot_cumsum = ggplot(U_plot) + geom_smooth(mapping = aes(x = t, y = value), color = "black") +
+    plot_cumsum = ggplot(U_plot) + 
+      geom_path(mapping = aes(x = t, y = value), color = "black") +
       geom_hline(yintercept = 0, linetype = "dashed") +
       facet_grid(var_names ~ grp_names) + xlab("iteration t") + ylab("Cumulative Sum")
     
@@ -633,10 +787,15 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
   
 }
 
+#' @importFrom stringr str_c str_to_title
+#' @import ggplot2 
 #' @method plot pglmmObj
 #' @export
-plot.pglmmObj = function(object, x = fitted(object), y = residuals(object, type = "deviance"),
-                      x_label = "Fitted Values", y_label = NULL){
+plot.pglmmObj = function(object, x = fitted(object, fixed.only = F), 
+                         y = switch(object$family$family,
+                                    gaussian = residuals(object, type = "pearson"),
+                                    residuals(object, type = "deviance")),
+                         x_label = "Fitted Values", y_label = NULL){
   
   if(length(x) != length(y)){
     stop("x and y need to be of same length")

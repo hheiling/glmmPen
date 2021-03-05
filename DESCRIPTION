@@ -2,7 +2,7 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.4.8.6
+Version: 1.5.0.8
 Date: 2018-10-26
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
@@ -14,14 +14,44 @@ Description: Fits penalized high and low dimensional generalized linear mixed mo
     Supports fitting of logistic regression models and MCP penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
-Imports: stringr, reshape2, ggplot2, ncvreg, Matrix, grpreg
-Depends: irr, mvtnorm, ROCR, inline, bigalgebra, Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
-LinkingTo: Rcpp, RcppArmadillo, bigmemory, BH, RcppDist
-RoxygenNote: 6.1.0.9000
+Imports: 
+    ggplot2,
+    Matrix,
+    methods,
+    ncvreg,
+    reshape2,
+    rstan (>= 2.18.1),
+    rstantools (>= 2.0.0),
+    stringr,
+    mvtnorm,
+    MASS
+Depends: 
+    lme4,
+    BH (>= 1.66.0),
+    bigmemory,
+    R (>= 3.6.0),
+    Rcpp (>= 0.12.0),
+    RcppArmadillo,
+    RcppEigen (>= 0.3.3.3.0)
+LinkingTo: 
+    BH (>= 1.66.0),
+    bigmemory,
+    Rcpp (>= 0.12.0),
+    RcppArmadillo,
+    RcppDist,
+    RcppEigen (>= 0.3.3.3.0),
+    rstan (>= 2.18.1),
+    StanHeaders (>= 2.18.0)
+RoxygenNote: 7.1.1
 NeedsCompilation: yes
 Packaged: 2019-01-25 20:03:59 UTC; hheiling
 Author: Hillary Heiling [aut, cre],
   Naim Rashid [aut],
   Quefeng Li [aut]
 Suggests: 
-    testthat
+    testthat,
+    knitr,
+    rmarkdown
+Biarch: true
+SystemRequirements: GNU make
+VignetteBuilder: knitr
