@@ -9,8 +9,8 @@ prescreen = function(dat, family, offset_fit, trace = 0,
                      var_start, max_cores, checks_complete){
   
   
-  lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2)
-  lam_min = lam_MaxMin[2]
+  lam_MaxMin = LambdaRange(dat$X[,-1,drop=F], dat$y, family = family, nlambda = 2, lambda.min = 0.001)
+  lam_min = lam_MaxMin[1]
   lam0 = lam_min
   lam1 = lam_min
   
@@ -39,7 +39,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   M = nMC_max
   
   
-  # Fit 'full' model
+  # Fit 'full' model (small penalty for fixed and random effects)
   out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
                       nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
                       family = family, offset_fit = offset_fit, group_X = group_X,
@@ -71,7 +71,6 @@ prescreen = function(dat, family, offset_fit, trace = 0,
       }
     }
   }
-  # ranef_keep[which(diag(sigma) > 0)] = 1
   
   return(list(ranef_keep = ranef_keep, coef_pre = out$coef, u_pre = out$u_init))
   

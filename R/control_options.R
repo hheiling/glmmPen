@@ -9,7 +9,10 @@
 #' automatically calculated. For an initial
 #' grid search using \code{\link{glmmPen}}, the range will be calculated in the same manner as 
 #' \code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
-#' small portion of max, range is composed of \code{nlambda} values spread evenly on the log scale.
+#' small portion of max (\code{lambda.min}*(lambda max)), range is composed of 
+#' \code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
+#' values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
+#' running from max lambda to min lambda).
 #' For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 #' from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
 #' finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
@@ -36,6 +39,11 @@
 #' @param pre_screen logical value indicating if pre-screening of random effects should be performed
 #' during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
 #' Pre-screening not performed when the number of random effect predictors is 9 or less.
+#' @param lambda.min numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
+#' ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
+#' a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
+#' \code{lambda.min} specifiex this fraction. Default value is set to \code{NULL}, which
+#' automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing penalization parameter values, presented either as an individual set or as a range of
@@ -56,7 +64,8 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 #' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
-                         BIC_option = c("BICh","BIC","BICq","BICNgrp"), pre_screen = T){
+                         BIC_option = c("BICh","BIC","BICq","BICNgrp"), 
+                         lambda.min = NULL, pre_screen = T){
   
   # Perform input checks
   
@@ -79,8 +88,8 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
       stop("lambda0_seq cannot be negative")
     }
     for(i in 2:length(lambda0_seq)){
-      if(lambda0_seq[i] > lambda0_seq[i-1]){
-        stop("lambda0_seq must be a sequence of descending order (max value to min value)")
+      if(lambda0_seq[i-1] > lambda0_seq[i]){
+        stop("lambda0_seq must be a sequence of ascending order (min value to max value)")
       }
     }
   }
@@ -92,15 +101,12 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
       stop("lambda1_seq cannot be negative")
     }
     for(i in 2:length(lambda1_seq)){
-      if(lambda1_seq[i] > lambda1_seq[i-1]){
-        stop("lambda1_seq must be a sequence of descending order (max value to min value)")
+      if(lambda1_seq[i-1] > lambda1_seq[i]){
+        stop("lambda1_seq must be a sequence of ascending order (min value to max value)")
       }
     }
   }
   
-  # if(!all(floor(x)==x)){ # if any of the above values not integers
-  #   stop("batch_length and burnin_batchnum must be integers")
-  # }
   if(!(floor(nlambda) == nlambda)){
     stop("nlambda must be an integer")
   }
@@ -112,8 +118,14 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     stop("'pre_screen' must be a logical value (T or F)")
   }
   
+  if(!is.null(lambda.min)){
+    if(!is.numeric(lambda.min)){stop("lambda.min must be numeric")}
+    if((lambda.min >= 1) | (lambda.min <=0 )){stop("lambda.min must be a fraction between 0 and 1")}
+  }
+  
   structure(list(lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
-                 nlambda = nlambda, BIC_option = BIC_option, pre_screen = pre_screen),
+                 nlambda = nlambda, BIC_option = BIC_option, 
+                 lambda.min = lambda.min, pre_screen = pre_screen),
             class = c("selectControl", "pglmmControl"))
 }
 

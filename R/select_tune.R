@@ -45,26 +45,26 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     stop("BIC_option must be 'BICh', 'BIC', 'BICq', or 'BICNgrp'")
   }
   
-  # Calculate loglik for saturated model (mu set to y; n parameters, one per observation)
-  if((family == "binomial") & (link == "logit")){
-    sat_ll = 0
-  }else if((family == "poisson") & (link == "log")){
-    sat_ll = 0
-    y = dat$y
-    for(i in 1:length(y)){
-      if(y[i] > 0){
-        sat_ll = sat_ll + dpois(x = y[i], lambda = y[i], log = T)
-      }
-    }
-  }else if((family == "gaussian") & (link == "identity")){
-    # Will not look at model saturation for gaussian family
-    sat_ll = 0
-  }else{
-    print(fam_fun)
-    stop("specified family and link combination not available \n")
-  }
-  # Set null deviance arbitrarily to 1 for the moment
-  nullDev = 1.0
+  # # Calculate loglik for saturated model (mu set to y; n parameters, one per observation)
+  # if((family == "binomial") & (link == "logit")){
+  #   sat_ll = 0
+  # }else if((family == "poisson") & (link == "log")){
+  #   sat_ll = 0
+  #   y = dat$y
+  #   for(i in 1:length(y)){
+  #     if(y[i] > 0){
+  #       sat_ll = sat_ll + dpois(x = y[i], lambda = y[i], log = T)
+  #     }
+  #   }
+  # }else if((family == "gaussian") & (link == "identity")){
+  #   # Will not look at model saturation for gaussian family
+  #   sat_ll = 0
+  # }else{
+  #   print(fam_fun)
+  #   stop("specified family and link combination not available \n")
+  # }
+  # # Set null deviance arbitrarily to 1 for the moment
+  # nullDev = 1.0
   
   if(is.null(offset)){
     offset = rep(0, length(dat$y))
@@ -162,8 +162,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     if(fitfull_needed){
       # For high dimensions (number of fixed or random effects >= 10 not including intercept), 
       # find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
-      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2)
-      lam_min = lam_MaxMin[2]
+      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2, lambda.min = 0.001)
+      lam_min = lam_MaxMin[1]
       if(ncol(dat$X) >= 11) lam0 = lam_min else lam0 = 0
       if(ncol(dat$Z)/nlevels(dat$group) >= 11) lam1 = lam_min else lam1 = 0
       # Fit 'full' model
@@ -174,7 +174,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
-                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
+                          maxitEM = maxitEM + 50, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start,
                           max_cores = max_cores, checks_complete = checks_complete,
@@ -215,11 +215,23 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   res = matrix(0, nrow = n1*n2, ncol = 11)
   colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef","EM_iter")
   
-  coef = NULL
-  coef_oldj0 = NULL
-  uj0 = NULL
+  # If available, initialize first model with 'full' model from BIC-ICQ calculation
+  if(BICq_calc){
+    if(fitfull_needed){
+      if(!is.character(out)){
+        coef_old = out$coef
+        coef_oldj0 = coef_old
+        uj0 = out$u_init
+      }
+    }
+  }else{
+    coef_oldj0 = NULL
+    uj0 = NULL
+  }
   
-  saturated = FALSE
+  coef = NULL
+  
+  # saturated = FALSE
   fout = list()
   
   for(j in 1:n2){ # random effects
@@ -324,35 +336,35 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])
       
-      # Check for model saturation in binomial and poisson case
-      if(family %in% c("binomial","poisson")){
-        
-        ## set null deviance as deviance for model with fixed and random intercepts only
-        ## This assumes lambda.max is the first element of the lambda0 and lambda1 sequences
-        ## This assumption not valid if users specify their own lambda0/1 sequences
-        ## Idea: fit random intercept model using lme4 and use the given log-lik for the null model
-        if((i==1) & (j==1)){
-          nullDev = 2*(sat_ll - out$ll)
-        }
-        
-        ## Calculate deviance
-        Dev = 2*(sat_ll - out$ll)
-        if(is.finite(Dev)){
-          if(Dev / nullDev < 0.01){
-            print("Reached model saturation")
-            saturated = TRUE
-            break
-          }
-        }
-        
-      }
+      # # Check for model saturation in binomial and poisson case
+      # if(family %in% c("binomial","poisson")){
+      #   
+      #   ## set null deviance as deviance for model with fixed and random intercepts only
+      #   ## This assumes lambda.max is the first element of the lambda0 and lambda1 sequences
+      #   ## This assumption not valid if users specify their own lambda0/1 sequences
+      #   ## Idea: fit random intercept model using lme4 and use the given log-lik for the null model
+      #   if((i==1) & (j==1)){
+      #     nullDev = 2*(sat_ll - out$ll)
+      #   }
+      #   
+      #   ## Calculate deviance
+      #   Dev = 2*(sat_ll - out$ll)
+      #   if(is.finite(Dev)){
+      #     if(Dev / nullDev < 0.01){
+      #       print("Reached model saturation")
+      #       saturated = TRUE
+      #       break
+      #     }
+      #   }
+      #   
+      # } End if-else for model saturation check
       
       
     } # End i loop for lambda0_range
     
-    if(saturated){
-      break
-    }
+    # if(saturated){
+    #   break
+    # }
     
   } # end j loop for lambda1_range
   

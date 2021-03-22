@@ -408,7 +408,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
       lambda0_range = LambdaRange(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
-                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen)
+                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
+                                  lambda.min = tuning_options$lambda.min)
     }else{
       lambda0_range = tuning_options$lambda0_seq
       if(!is.numeric(lambda0_range) | any(lambda0_range < 0)){
@@ -416,7 +417,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       }
     }
     if(is.null(tuning_options$lambda1_seq)){
-      lambda1_range = lambda0_range
+      lambda1_range = LambdaRange(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
+                                  lambda.min = tuning_options$lambda.min)
     }else{
       lambda1_range = tuning_options$lambda1_seq
       if(!is.numeric(lambda1_range) | any(lambda1_range < 0)){
@@ -569,16 +572,20 @@ LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
   }
   
   if(is.null(lambda.min)){
-    lambda.min = ifelse(n>p, 0.001, 0.05)
+    # lambda.min = ifelse(n>p, 0.001, 0.05)
+    lambda.min = ifelse(n>p, 0.01, 0.05)
   }
   
   if(is.null(penalty.factor)){
     penalty.factor = rep(1, p)
   }
   
-  # lambda = calcLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+  # setupLambda from ncvreg package
+  ## Order: from max lambda to min lambda
   lambda = setupLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+  # reverse the order of the lambda - from min lambda to max lambda
+  lambda_rev = lambda[order(lambda)]
   
-  return(lambda)
+  return(lambda_rev)
   
 }
