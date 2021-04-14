@@ -13,11 +13,12 @@ using namespace arma;
 
 // Update the residuals as specified in the grpreg and ncvreg paper (to speed things up)
 // Assume no orthogonalization/standardization needed for random effects
+// Faster version of grp_CD_XZ: Don't update residuals after every update to the random effects
 
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
 
 // [[Rcpp::export]]
-arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
+arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
                     const arma::vec& group, 
                     SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
                     arma::vec beta, const arma::vec& offset,
@@ -107,6 +108,9 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
   arma::mat A_c(M,H);
   arma::rowvec shift_fef(N);
   arma::vec shift_ref(M);
+  
+  arma::vec zeta_ref(H);
+  arma::uvec idx_ref = find(XZ_group >= J_X); // index values for all random effects
   
   arma::uvec covgroup = XZ_group.subvec(p,p+H-1) - XZ_group(p); // Group index for random effects
   arma::vec K_vec = arma::conv_to<arma::vec>::from(K); // Size of groups
@@ -261,16 +265,16 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
     } // End j for loop for fixed effects
     
     // ----------------------------------------------------------------------------------//
-    // Calculate zetaj for random intercept
+    // Calculate zetaj for random effect coefficients
     // Will not penalize random intercept
     // ----------------------------------------------------------------------------------//
     
-    // Identify covariates belonging to random intercept (group j = J_X)
-    arma::uvec idxj = find(XZ_group == J_X);
-    Kj = idxj.n_elem;
+    // Identify covariates belonging to random effects (group j >= J_X)
+    arma::uvec idx_ref = find(XZ_group >= J_X); // index values for all random effects
     
-    // Calculate zetaj vector (initialize as zero, then sum components of interest)
-    arma::vec zetaj(Kj); zetaj.zeros();
+    // Calculate zeta_ref vector (initialize as zero, then sum components of interest)
+    // This will be used to identify zetaj for all random effects
+    zeta_ref.zeros();
     
     for(k=0;k<d;k++){
       // Rows of Z to use
@@ -289,31 +293,30 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
       for(i=0;i<n_k;i++){
         Zki = Zk.row(i);
         A = kron(u, Zki) * J_q;
-        Xj = A.cols(idxj - p);
-        zetaj = zetaj + Xj.t() * resid.col(ids(i));
-        
+        zeta_ref = zeta_ref + A.t() * resid.col(ids(i));
       } // End i for loop
       
     } // End k for loop
     
     // Finish calc of zetaj
-    zetaj = zetaj / (N*M) + beta.elem(idxj);
+    zeta_ref = zeta_ref / (N*M) + beta.elem(idx_ref);
     
-    // L2 norm of zetaj
-    // if(idxj.n_elem == 1){
-    //   zetaj_L2 = as_scalar(zetaj);
-    // }else{
-    //   zetaj_L2 = sqrt(sum(zetaj % zetaj));
-    // }
+    // ----------------------------------------------------------------------------------//
+    // Element-wise update of random effects effects betaj
+    // First: update random intercept (no penalization on random intercept)
+    // Then update all other random effects.
+    // ----------------------------------------------------------------------------------//
+    
+    // Identify covariates belonging to random intercept (group j = J_X)
+    arma::uvec idxj = find(XZ_group == J_X);
+    Kj = idxj.n_elem;
+    arma::vec zetaj = zeta_ref(idxj - p);
     
     // Update beta (no penalization)
     beta.elem(idxj) = zetaj;
     
-    r = J_X;
-    
-    // ----------------------------------------------------------------------------------//
-    // Element-wise update of random effects effects betaj
-    // ----------------------------------------------------------------------------------//
+    // Identify index and zetaj for each of the remaining random effects
+    // Update betaj
     
     for(j=(J_X+1); j<J_XZ; j++){
       
@@ -334,64 +337,8 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
         continue;
       }
       
-      // if(sum(beta.elem(idxj)) == 0){
-      //   // Random effects coefficient senarios:
-      //   // *Initialized coefficients at start of M step*
-      //   // Start of full MCECM algorithm:
-      //   //  If ranef_keep for the jth random effect is set to 0, the random effect is prescreened out
-      //   //  and should remain 0 for entire MCECM algorithm
-      //   // Middle of MCECM algorithm:
-      //   //  If random effect coefficient penalized to 0 in past round of MCECM algorithm, then
-      //   //  continue to keep random effect coefficient penalized to 0
-      //   // *Within M step*
-      //   // If random effect coefficient penalized to 0 in past round of M step, keep penalized to 0
-      //   // in future rounds of the M step
-      //   continue;
-      // }
-      
-      //----------------------------------------------------------------------------------//
-      // Update eta and resid from last updated beta (group r)
-      // Calculate zetaj for current group j
-      //----------------------------------------------------------------------------------//
-      
-      // Find index of covariates corresponding to previous j in sequence (r)
-      arma::uvec idxr = find(XZ_group == r);
-      
-      // Calculate zetaj vector (initialize as zero, then sum components of interest)
-      arma::vec zetaj(Kj); zetaj.zeros();
-      
-      
-      for(k=0;k<d;k++){
-        // Rows of Z to use
-        arma::uvec ids = find(group == (k+1));
-        // Index of appropriate columns for Z and u
-        for(f=0;f<q;f++){
-          col_idx(f) = k + f*d;
-        }
-        
-        arma::mat Zk = Z.submat(ids, col_idx);
-        n_k = ids.n_elem;
-        arma::mat Xj(n_k, Kj); Xj.zeros();
-        
-        u = post.cols(col_idx);
-        
-        for(i=0;i<n_k;i++){
-          Zki = Zk.row(i);
-          A = kron(u, Zki) * J_q;
-          shift_ref = A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr));
-          // Update random effects component of eta for each individual
-          eta.col(ids(i)) += shift_ref;
-          // Update residuals
-          resid.col(ids(i)) -+ shift_ref;
-          // Calculate zetaj
-          Xj = A.cols(idxj - p);
-          zetaj = zetaj + Xj.t() * resid.col(ids(i));
-          
-        } // End i for loop
-        
-      } // End k for loop
-      
-      zetaj = zetaj / (N*M) + beta.elem(idxj);
+      // Identify correct elements of zeta_ref for zetaj
+      arma::vec zetaj = zeta_ref.elem(idxj - p);
       
       // L2 norm of zetaj
       if(idxj.n_elem == 1){
@@ -415,20 +362,16 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
         beta.elem(idxj) = bj * (zetaj / zetaj_L2);
       }
       
-      // Save r as the most recent updated j
-      r = j;
-      
-    } // End j for loop
+    } // End j for loop (end update to random effects coefficients)
+    
     
     // ----------------------------------------------------------------------------------//
-    // Update eta with last betaj update (r = last j updated)
+    // Update eta with last betaj random effect update 
     // Recalculate residuals using updated eta
     // Recalculate nu (if necessary)
     // ----------------------------------------------------------------------------------//
     
-    // Find index of covariates corresponding to previous j in sequence (r)
-    arma::uvec idxr = find(XZ_group == r);
-    
+    // Update eta
     for(k=0;k<d;k++){
       // Rows of Z to use
       arma::uvec ids = find(group == (k+1));
@@ -446,7 +389,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
         Zki = Zk.row(i);
         A = kron(u, Zki) * J_q;
         // Update random effects component of eta for each individual
-        eta.col(ids(i)) += A.cols(idxr - p) * (beta.elem(idxr) - beta0.elem(idxr));
+        eta.col(ids(i)) += A * (beta.elem(idx_ref) - beta0.elem(idx_ref));
       } // End i for loop
       
     } // End k for loop
@@ -464,7 +407,7 @@ arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
       nu = 0.0;
     }
     
-    // Re-calculate residuals from updated eta, update nu 
+    // Re-calculate residuals from updated eta; update nu if necessary
     for(i=0;i<N;i++){
       tmp_out = resid_nu_i(y(i), eta.col(i), family, link, nu, phi);
       resid.col(i) = tmp_out.subvec(0,M-1);

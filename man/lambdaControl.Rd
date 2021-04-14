@@ -11,7 +11,8 @@ selectControl(
   lambda0_seq = NULL,
   lambda1_seq = NULL,
   nlambda = 10,
-  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
+  BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
+  logLik_calc = switch(BIC_option[1], BICq = F, T),
   lambda.min = NULL,
   pre_screen = T
 )
@@ -30,11 +31,18 @@ calculated. See 'Details' section for more details on these default calculations
 Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
 
 \item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
-Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
+effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-a full model; a small penalty is used for the fixed and/or random effects if the number of 
-effects is 10 or greater.}
+observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
+groups).}
+
+\item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
+calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
+If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
+\code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
 
 \item{lambda.min}{numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
 ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 

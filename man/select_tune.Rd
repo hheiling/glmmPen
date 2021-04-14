@@ -21,8 +21,9 @@ select_tune(
   coef_old = NULL,
   adapt_RW_options = adaptControl(),
   optim_options = optimControl(),
-  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
+  BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
   BICq_calc = T,
+  logLik_calc = switch(BIC_option[1], BICq = F, T),
   BICq_posterior = NULL,
   checks_complete = F,
   pre_screen = T,
@@ -77,14 +78,21 @@ from function \code{\link{optimControl}} that specifies optimization parameters.
 documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
-Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
+effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-a full model; a small penalty is used for the fixed and/or random effects if the number of 
-effects is 10 or greater.}
+observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
+groups).}
 
 \item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
 best model.}
+
+\item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
+calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
+If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
+\code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
 the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.

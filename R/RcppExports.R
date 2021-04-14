@@ -9,6 +9,10 @@ grp_CD_XZ <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, 
     .Call('_glmmPen_grp_CD_XZ', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, phi, XZ_group, K, penalty, params, trace)
 }
 
+grp_CD_XZ_fast <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, phi, XZ_group, K, penalty, params, trace) {
+    .Call('_glmmPen_grp_CD_XZ_fast', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, phi, XZ_group, K, penalty, params, trace)
+}
+
 soft_thresh <- function(zeta, lambda) {
     .Call('_glmmPen_soft_thresh', PACKAGE = 'glmmPen', zeta, lambda)
 }

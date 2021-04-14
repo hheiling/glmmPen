@@ -347,7 +347,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       if(optim_options != "recommend"){
         stop("optim_options must be either the character string 'recommend' or object of class 'optimControl' created from 'optimControl()'")
       }else{
-        optim_options = optim_recommend(family, ncol(fD_out$Z)/nlevels(fD_out$group), select = F)
+        optim_options = optim_recommend(family, ncol(fD_out$Z)/nlevels(data_input$group), select = F)
       }
     }else if(class(optim_options) != "optimControl"){
       stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
@@ -365,7 +365,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     nMC_burnin = optim_options$nMC_burnin
     nMC = optim_options$nMC
     nMC_max = optim_options$nMC_max
-    nMC_report = optim_options$nMC_report
+    # nMC_report = optim_options$nMC_report
     maxitEM = optim_options$maxitEM
     maxit_CD = optim_options$maxit_CD
     M = optim_options$M
@@ -376,6 +376,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     var_start = optim_options$var_start
     max_cores = optim_options$max_cores
     
+    
     # Call fit_dat function
     # fit_dat_B function found in "/R/fit_dat_MstepB.R" file
     
@@ -383,19 +384,13 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                     conv_EM = conv_EM, conv_CD = conv_CD,
                     family = fam_fun, offset_fit = offset, trace = trace, 
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                    nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
+                    nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                     t = t, mcc = mcc, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, var_start = var_start, max_cores = max_cores, checks_complete = T)
+                    covar = covar, var_start = var_start, logLik_calc = F,
+                    max_cores = max_cores, checks_complete = T, fastM = T)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
-    # c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
-    optim_results = c(fit$lambda0, fit$lambda1, fit$BICh, fit$BIC, fit$BICq, fit$BICNgrp, fit$ll,
-                      sum(fit$coef[2:ncol(data_input$X)] != 0),
-                      sum(diag(fit$sigma) != 0),
-                      sum(fit$coef != 0))
-    optim_results = matrix(optim_results, nrow = 1)
-    colnames(optim_results) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef")
     
     # If relevant, save posterior draws for later BIC-ICQ calculations
     if(!is.null(BICq_posterior)){
@@ -429,14 +424,14 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     
     BIC_option = tuning_options$BIC_option
     pre_screen = tuning_options$pre_screen
+    logLik_calc = tuning_options$logLik_calc
     
-     
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
                              lambda0_range = lambda0_range, lambda1_range = lambda1_range,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              group_X = group_X, trace = trace,
                              adapt_RW_options = adapt_RW_options, 
-                             optim_options = optim_options, covar = covar,
+                             optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                              BICq_calc = (tuning_options$BIC_option == "BICq"),
                              BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
                              checks_complete = T, pre_screen = pre_screen)
@@ -465,7 +460,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     }else if(BIC_option == "BIC"){
       optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
     }else if(BIC_option == "BICq"){
-      optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
+      optim_results = matrix(selection_results[which.min(selection_results[,"BICq"]),], nrow = 1)
+    }else if(BIC_option == "BICNgrp"){
+      optim_results = matrix(selection_results[which.min(selection_results[,"BICNgrp"]),], nrow = 1)
     }
     colnames(optim_results) = colnames(selection_results)
     
@@ -482,18 +479,57 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     gamma_penalty = NULL
   }
   
-  # Format Output - create pglmmObj object
-  output = c(fit, list(formula = formula, y = fD_out$y, fixed_vars = fD_out$fixed_vars,
-                       X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
-                       coef_names = coef_names, family = fam_fun,
-                       offset = offset, frame = fD_out$frame, 
-                       sampling = sampling, std_out = std_out, 
-                       selection_results = selection_results, optim_results = optim_results,
-                       penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
-                       fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
-                       control_options = list(optim_options = optim_options, tuning_options = tuning_options,
-                                              adapt_RW_options = adapt_RW_options)))
+  # If final model has relatively low random effect dimensions, perform another E step
+  ## Use results to calculate logLik and posterior draws, and save draws for MCMC diagnostics
+  ## If final model has too many random effects, the calculation of this last E step
+  ## with the necessarily large number of draws will be too computationally burdensome, so
+  ## we will output NA values and allow the user to calculate these values after the model fit.
   
+  Estep_out = list(u0 = NULL, u_init = fit$u_init, 
+                   post_modes = rep(NA, times = ncol(data_input$Z)),
+                   post_out = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)),
+                   ll = NA, BICh = NA, BIC = NA, BICNgrp = NA)
+  
+  q_final = sum(diag(fit$sigma) > 0)
+  if(q_final <= 51){
+    
+    Estep_out = E_step_final(dat = data_input, fit = fit, optim_options = optim_options, 
+                             fam_fun = fam_fun, extra_calc = T, 
+                             adapt_RW_options = adapt_RW_options, trace = trace)
+  }
+  
+  # optim_results:
+  if(inherits(tuning_options, "lambdaControl")){
+    
+    optim_results = c(fit$lambda0, fit$lambda1, Estep_out$BICh, Estep_out$BIC, fit$BICq,
+                      Estep_out$BICNgrp, Estep_out$ll,
+                      sum(fit$coef[2:ncol(data_input$X)] != 0),
+                      sum(diag(fit$sigma[-1,-1,drop=F]) !=0),
+                      sum(fit$coef != 0))
+    optim_results = matrix(optim_results, nrow = 1)
+    colnames(optim_results) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp",
+                                "LogLik","Non0 Fixef","Non0 Ranef","Non0 Coef")
+    
+  }else if(inherits(tuning_options, "selectControl")){
+    optim_results[,c("BICh","BIC","BICNgrp","LogLik")] = c(Estep_out$BICh, Estep_out$BIC, 
+                                                           Estep_out$BICNgrp, Estep_out$ll)
+    
+  }
+  
+  
+  # Format Output - create pglmmObj object
+  output = c(fit, 
+             list(Estep_out = Estep_out, formula = formula, y = fD_out$y, fixed_vars = fD_out$fixed_vars,
+                   X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
+                   coef_names = coef_names, family = fam_fun,
+                   offset = offset, frame = fD_out$frame, 
+                   sampling = sampling, std_out = std_out, 
+                   selection_results = selection_results, optim_results = optim_results,
+                   penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
+                   fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
+                   control_options = list(optim_options = optim_options, tuning_options = tuning_options,
+                                          adapt_RW_options = adapt_RW_options)))
+
   if(inherits(tuning_options, "lambdaControl")){
     return(output)
   }else if(inherits(tuning_options, "selectControl")){

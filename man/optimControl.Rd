@@ -14,7 +14,7 @@ optimControl(
   nMC_max = 5000,
   nMC_report = 5000,
   maxitEM = 50,
-  maxit_CD = 200,
+  maxit_CD = 100,
   M = 10000,
   t = 2,
   mcc = 2,
@@ -47,13 +47,6 @@ Default is set to 5000 when no selection is performed and 2500 when selection is
 Default is set to 1000 when the number of random effect predictors is between 11 and 24;
 Default is set to 500 when the number of random effect predictors is 25 or more.}
 
-\item{nMC_report}{positive integer specifying number of Monte Carlo posterior draws to return
-when the function ends. Default set to the minimum allowed value: 5,000. 
-Warning: the returned draws are formatted as a regular
-matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
-and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
-\code{nMC_report} by (q*d) does not cause memory issues on your operating system.}
-
 \item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
 Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
 
@@ -61,7 +54,7 @@ Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian fa
 coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.}
 
 \item{M}{positive integer specifying the number of posterior draws to use within the 
-Pajor log-likelihood calculation. Default (and minimum allowed value) set to 10,000.}
+Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.}
 
 \item{t}{the convergence criteria is based on the average Euclidean distance between 
 the most recent coefficient estimates and the coefficient estimates from t EM iterations back.

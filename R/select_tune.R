@@ -28,8 +28,10 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                        trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
-                       BIC_option = c("BICh","BIC","BICq","BICNgrp"), BICq_calc = T, 
-                       BICq_posterior = NULL, checks_complete = F, pre_screen = T, ranef_keep = NULL){
+                       BIC_option = c("BICq","BICh","BIC","BICNgrp"), BICq_calc = T, 
+                       logLik_calc = switch(BIC_option[1], BICq = F, T),
+                       BICq_posterior = NULL, checks_complete = F, pre_screen = T, 
+                       ranef_keep = NULL){
   
   # Input modification and restriction for family
   family_info = family_export(family)
@@ -87,14 +89,24 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     sampler = optim_options$sampler
   }
   
+  
+  
+  # 'Full' model: fit model with 'minimum' penalty
+  # 'minimum penalty': lambda.min * (lambda max)
+  if((ncol(dat$Z)/nlevels(dat$group) <= 11)){ # number random effects (including intercept)
+    lambda.min = 0.001
+  }else{
+    lambda.min = 0.01
+  }
+  
   # Pre-screening step
-  ## If number of random effects in model (including intercept) is 11 or more
-  ## Note: since random effects are subset of fixed effects, fixed effects necessarily 11 or more
-  if((ncol(dat$Z)/nlevels(dat$group) >= 11) & (pre_screen == T)){
+  ## If number of random effects in model (including intercept) is 6 or more
+  ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
+  if((ncol(dat$Z)/nlevels(dat$group) >= 6) & (pre_screen == T)){
     cat("begin prescreening procedure \n")
     out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 
-                        group_X = group_X, sampler = sampler, 
+                        lambda.min = lambda.min, group_X = group_X, sampler = sampler, 
                         adapt_RW_options = adapt_RW_options, covar = covar,
                         var_start = var_start, max_cores = max_cores, 
                         checks_complete = checks_complete)
@@ -124,7 +136,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   nMC_burnin = optim_options$nMC_burnin
   nMC = optim_options$nMC
   nMC_max = optim_options$nMC_max
-  nMC_report = optim_options$nMC_report
+  # nMC_report = optim_options$nMC_report
   maxitEM = optim_options$maxitEM
   maxit_CD = optim_options$maxit_CD
   M = optim_options$M
@@ -161,32 +173,37 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     
     if(fitfull_needed){
       # For high dimensions (number of fixed or random effects >= 10 not including intercept), 
-      # find a small penalty to use for full model: the minimum of the lambda range used by ncvreg
-      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2, lambda.min = 0.001)
+      # find a small penalty to use for full model (lambda.min * lambda max)
+      lam_MaxMin = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2, lambda.min = lambda.min)
       lam_min = lam_MaxMin[1]
-      if(ncol(dat$X) >= 11) lam0 = lam_min else lam0 = 0
-      if(ncol(dat$Z)/nlevels(dat$group) >= 11) lam1 = lam_min else lam1 = 0
+      if(ncol(dat$X) >= 6) lam0 = lam_min else lam0 = 0
+      if(ncol(dat$Z)/nlevels(dat$group) >= 6) lam1 = lam_min else lam1 = 0
       # Fit 'full' model
       ## Note: M restricted to be >= 10^4 in optimControl(). Will report M posterior draws from full model
       out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
-                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
+                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
                           maxitEM = maxitEM + 50, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start,
+                          covar = covar, var_start = var_start, logLik_calc = F,
                           max_cores = max_cores, checks_complete = checks_complete,
-                          ranef_keep = ranef_keep))
+                          ranef_keep = ranef_keep, fastM = T))
       
       if(is.character(out)){
         print("Issue with full model fit, no BICq calculation will be completed")
         ufull_describe = NULL
       }else{
-        ufull_big = attach.big.matrix(out$u_big)
+        
+        Estep_out = E_step_final(dat = dat, fit = out, optim_options = optim_options, 
+                                 fam_fun = fam_fun, extra_calc = F, 
+                                 adapt_RW_options = adapt_RW_options, trace = trace)
+        
+        ufull_big = attach.big.matrix(Estep_out$u0)
         write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
-        ufull_describe = out$u_big
+        ufull_describe = Estep_out$u0
       }
       
     }else{ # if fitfull_needed = F
@@ -269,16 +286,16 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       print(sprintf("lambda0 i %i lambda1 j %i", i, j))
       print("------------------------------------------------------------------")
       out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
-                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
+                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
                           maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start,
+                          covar = covar, var_start = var_start, logLik_calc = logLik_calc,
                           max_cores = max_cores, checks_complete = checks_complete,
-                          ranef_keep = ranef_keep))
+                          ranef_keep = ranef_keep, fastM = T))
       
 
       if(is.character(out)) next
@@ -295,9 +312,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         BIC_crit = out$BIC
       }else if(BIC_option == "BICq"){
         BIC_crit = out$BICq
-        if(is.na(BIC_crit)){
-          warning("BIC-ICQ not calculated, using BICh for selection criteria instead",immediate. = T)
-        }
       }else if(BIC_option == "BICNgrp"){
         BIC_crit = out$BICNgrp
       }
@@ -325,13 +339,13 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       res[(j-1)*n1+i,5] = BICq
       res[(j-1)*n1+i,6] = BICNgrp
       res[(j-1)*n1+i,7] = out$ll
-      res[(j-1)*n1+i,8] = sum(out$coef[2:ncol(dat$X)] !=0)
+      res[(j-1)*n1+i,8] = sum(out$coef[2:ncol(dat$X)] !=0) # ignore intercept
       if(length(diag(out$sigma)) > 1){
-        res[(j-1)*n1+i,9] = sum(diag(out$sigma[-1]) !=0)
+        res[(j-1)*n1+i,9] = sum(diag(out$sigma[-1,-1,drop=F]) !=0) # ignore random intercept
       }else{
         res[(j-1)*n1+i,9] = 0
       }
-      res[(j-1)*n1+i,10] = sum(out$coef !=0)
+      res[(j-1)*n1+i,10] = sum(out$coef != 0)
       res[(j-1)*n1+i,11] = out$EM_iter
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])

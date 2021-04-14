@@ -4,52 +4,43 @@
 # just interested in which random effects are left in the model)
 # Skimp on nMC_report and M because posterior modes and logLik will not be used from this model
 prescreen = function(dat, family, offset_fit, trace = 0, 
-                     penalty, alpha, gamma_penalty, group_X,
+                     penalty, alpha, gamma_penalty, lambda.min, group_X,
                      sampler, adapt_RW_options, covar,
                      var_start, max_cores, checks_complete){
   
   
-  lam_MaxMin = LambdaRange(dat$X[,-1,drop=F], dat$y, family = family, nlambda = 2, lambda.min = 0.001)
+  lam_MaxMin = LambdaRange(dat$X[,-1,drop=F], dat$y, family = family, nlambda = 2, 
+                           lambda.min = lambda.min)
   lam_min = lam_MaxMin[1]
   lam0 = lam_min
   lam1 = lam_min
   
-  # Determine nMC ranges (depends on number random effects)
+  # Determine nMC ranges
   q = ncol(dat$Z) / nlevels(dat$group)
-  if(q <= 26){ # 25 random effect predictors + random intercept
-    nMC_burnin = 50
-    nMC = 100
-    nMC_max = 500
-  }else{
-    nMC_burnin = 25
-    nMC = 50
-    nMC_max = 350
-  }
+  nMC_burnin = 100
+  nMC = 100
+  nMC_max = 500
   
   # Other convergence criteria
   conv_EM = 0.001
-  conv_CD = 0.0001
-  maxitEM = 25
+  conv_CD = 0.001
+  maxitEM = 30
   maxit_CD = 100
   t = 2
   mcc = 2
-  # Only interested in what random effects are still present in the model
-  ## Not otherwise interested in accurate logLik or posterior modes (or accurate coefficient estimates)
-  nMC_report = nMC_max
-  M = nMC_max
-  
   
   # Fit 'full' model (small penalty for fixed and random effects)
   out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
-                      nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max, nMC_report = nMC_report,
+                      nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                       family = family, offset_fit = offset_fit, group_X = group_X,
                       penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                       trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                       coef_old = NULL, u_init = NULL, ufull_describe = NULL,
                       maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
-                      M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                      covar = covar, var_start = var_start,
-                      max_cores = max_cores, checks_complete = checks_complete))
+                      sampler = sampler, adapt_RW_options = adapt_RW_options,
+                      covar = covar, var_start = var_start, logLik_calc = F,
+                      max_cores = max_cores, checks_complete = checks_complete,
+                      fastM = T))
   
   if(is.character(out)){
     stop("Issue with pre-screening step in model selection procedure")

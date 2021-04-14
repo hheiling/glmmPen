@@ -31,11 +31,17 @@
 #' @param nlambda positive integer specifying number of lambda with which to fit a model.
 #' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
 #' @param BIC_option character string specifing the selection criteria used to select the 'best' model.
-#' Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+#' Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+#' a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
+#' effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-#' observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-#' a full model; a small penalty is used for the fixed and/or random effects if the number of 
-#' effects is 10 or greater. 
+#' observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
+#' groups).
+#' @param logLik_calc logical value specifying if the log likelihood (and log-likelihood based 
+#' calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
+#' If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+#' in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
+#' \code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.
 #' @param pre_screen logical value indicating if pre-screening of random effects should be performed
 #' during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
 #' Pre-screening not performed when the number of random effect predictors is 9 or less.
@@ -64,7 +70,8 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 #' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
-                         BIC_option = c("BICh","BIC","BICq","BICNgrp"), 
+                         BIC_option = c("BICq","BICh","BIC","BICNgrp"), 
+                         logLik_calc = switch(BIC_option[1], BICq = F, T), 
                          lambda.min = NULL, pre_screen = T){
   
   # Perform input checks
@@ -73,11 +80,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     BIC_option = BIC_option[1]
   }
   if(!(BIC_option %in% c("BICh","BIC","BICq","BICNgrp"))){
-    stop("BIC_option must be 'BICh', 'BIC', 'BICq', or 'BICNgrp'")
-  }
-  if(BIC_option != "BICq"){
-    warning("BIC-ICQ will not be calculated since 'BICq' not specified for BIC_option", 
-            immediate. = T)
+    stop("BIC_option must be 'BICq', 'BICh', 'BIC', or 'BICNgrp'")
   }
   
   if(!is.null(lambda0_seq)){
@@ -114,6 +117,10 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     stop("nlambda must be at least 2")
   }
   
+  if (!is.logical(logLik_calc)) {
+    stop("'logLik_calc' must be a logical value (T or F)")
+  }
+  
   if (!is.logical(pre_screen)) {
     stop("'pre_screen' must be a logical value (T or F)")
   }
@@ -124,7 +131,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
   }
   
   structure(list(lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
-                 nlambda = nlambda, BIC_option = BIC_option, 
+                 nlambda = nlambda, BIC_option = BIC_option, logLik_calc = logLik_calc,
                  lambda.min = lambda.min, pre_screen = pre_screen),
             class = c("selectControl", "pglmmControl"))
 }
@@ -183,18 +190,12 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' Default is set to 5000 when no selection is performed and 2500 when selection is performed.
 #' Default is set to 1000 when the number of random effect predictors is between 11 and 24;
 #' Default is set to 500 when the number of random effect predictors is 25 or more.
-#' @param nMC_report positive integer specifying number of Monte Carlo posterior draws to return
-#' when the function ends. Default set to the minimum allowed value: 5,000. 
-#' Warning: the returned draws are formatted as a regular
-#' matrix (not a big.matrix). Therefore, depending on the number of random effect covariates (q)
-#' and the number of groups (d), choose \code{nMC_report} such that a matrix of size 
-#' \code{nMC_report} by (q*d) does not cause memory issues on your operating system.
 #' @param maxitEM a positive integer for the maximum number of allowed EM iterations. 
 #' Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.
 #' @param maxit_CD a positive integer for the maximum number of allowed interations for the
 #' coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.
 #' @param M positive integer specifying the number of posterior draws to use within the 
-#' Pajor log-likelihood calculation. Default (and minimum allowed value) set to 10,000.
+#' Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.
 #' @param t the convergence criteria is based on the average Euclidean distance between 
 #' the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
 #' Positive integer, default equals 2.
@@ -229,7 +230,7 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @export
 optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
                         nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
-                        maxitEM = 50, maxit_CD = 200, 
+                        maxitEM = 50, maxit_CD = 100, 
                         M = 10000, t = 2, mcc = 2,
                         sampler = c("stan","random_walk","independence"), 
                         var_start = "recommend", max_cores = 1){
@@ -242,8 +243,11 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   }
   
   # More restrictive checks
-  if(M < 10^4){
-    stop("M must be greater than or equal to 10^4")
+  # if(M < 10^4){
+  #   stop("M must be greater than or equal to 10^4")
+  # }
+  if(M < 5000){
+    stop("M must be greater than or equal to 5000")
   }
   if(nMC_burnin < 100){
     warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
@@ -274,7 +278,7 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   }
   
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
-                 nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report, 
+                 nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report,
                  maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, mcc = mcc,
                  sampler = sampler, var_start = var_start,
                  max_cores = max_cores),
@@ -284,37 +288,32 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
 
 # q = number of random effects (including random intercept)
 # select: TRUE if running the selection algorithm
-optim_recommend = function(family, q, select = T){
+optim_recommend = function(family, q, select){
   
-  if (family %in% c("binomial","poisson")) {
-    # Default options
-    optim_options = optimControl()
-  }else if (family == "gaussian") {
+  optim_options = optimControl()
+  # Default options for family = 'binomial' or 'poisson'
+  if (family == "gaussian") {
     # increase maxitEM
     optim_options = optimControl()
     optim_options$maxitEM = 100
-    # opimt_options$nMC_max = 7500
   }
   
   if (q <= 11) {
     # For selection, decrease nMC_max to improve time
     ## Note: During selection, will initialize with good starting points, so
     ## larger nMC_max not needed for convergence
+    ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
     # Otherwise, keep everything else the same
     if (select == T) {
       optim_options$nMC_max = 2500
+      # optim_options$maxitEM = optim_options$maxitEM + 15
     }
-  }else if(q <= 25){
-    # Decrease nMC
-    optim_options = optimControl()
-    optim_options$nMC_burnin = 100
-    optim_options$nMC_max = 1000
   }else{
-    # Decrease nMC even more
-    optim_options = optimControl()
+    # Decrease nMC
     optim_options$nMC_burnin = 100
     optim_options$nMC = 100
-    optim_options$nMC_max = 500
+    optim_options$nMC_max = 1500
+    optim_options$maxitEM = optim_options$maxitEM + 15
   }
   
   return(optim_options)

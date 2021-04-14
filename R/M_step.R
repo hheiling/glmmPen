@@ -38,7 +38,7 @@ CD = function(y, X, family, link_int, offset,
 M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offset, phi,
                   maxit_CD = 250, conv_CD = 0.0001,
                   init, group_X = 0:(ncol(X)-1), covgroup,
-                  penalty, lambda0, lambda1, gamma, alpha = 1.0, trace){
+                  penalty, lambda0, lambda1, gamma, alpha = 1.0, fastM = T, trace){
   
   if(!is.matrix(Z)){
     stop("Z must be a matrix \n")
@@ -67,6 +67,8 @@ M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offse
   d = nlevels(group)
   # Number of random effect variables
   q = ncol(Z) / d
+  # Number of non-zero random effect variables in previous EM iteration (including random intercept)
+  # q_non0 = sum(diag(sigma) > 0)
   
   dims = c(p, N, d, q, M, J_XZ, conv_CD, maxit_CD)
   
@@ -77,7 +79,12 @@ M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offse
   # const char* family, int link, int init, double phi,
   # const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
   # const char* penalty, arma::vec params
-  coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
+  if(fastM == F){
+    coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
+  }else if(fastM == T){
+    coef_new = grp_CD_XZ_fast(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
+  }
+  # coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
   
   return(as.numeric(coef_new))
 }
