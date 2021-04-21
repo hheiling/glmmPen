@@ -108,7 +108,8 @@ fD_adj = function(out){
   
   ## Make sure colnames random effects subset of colnames of fixed effects model matrix X
   if(sum(!(cnms %in% colnames(X))) > 0){
-    stop("random effects must be a subset of fixed effects")
+    stop("random effects must be a subset of fixed effects: names of random effect variables must be a subset of names of fixed effect variables; \n",
+         "fixef effects: ", paste0(colnames(X), sep=" "), " \n", "random effects: ", paste0(cnms, sep=" "))
   }
   
   if(!any(cnms == "(Intercept)")){
@@ -426,29 +427,95 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     pre_screen = tuning_options$pre_screen
     logLik_calc = tuning_options$logLik_calc
     
-    fit_select = select_tune(dat = data_input, offset = offset, family = family,
-                             lambda0_range = lambda0_range, lambda1_range = lambda1_range,
-                             penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                             group_X = group_X, trace = trace,
-                             adapt_RW_options = adapt_RW_options, 
-                             optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
-                             BICq_calc = (tuning_options$BIC_option == "BICq"),
-                             BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                             checks_complete = T, pre_screen = pre_screen)
+    if(tuning_options$search == "abbrev"){
+      
+      # Fit the following set of models:
+      ## fixed effects penalty: lambda_min
+      ## random effects penalty: all lambda1 values
+      
+      lam_min = min(lambda0_range)
+      
+      print("Start of stage 1 of abbreviated grid search")
+      fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
+                                lambda0_range = lam_min, lambda1_range = lambda1_range,
+                                penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                group_X = group_X, trace = trace,
+                                adapt_RW_options = adapt_RW_options, 
+                                optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
+                                BICq_calc = (BIC_option == "BICq"),
+                                BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
+                                checks_complete = T, pre_screen = pre_screen)
+      print("End of stage 1 of abbreviated grid search")
+      
+      res_pre = fit_fixfull$results
+      coef_pre = fit_fixfull$coef
+      
+      # Choose the best model from the above 'fit_fixfull' models
+      opt_pre = matrix(res_pre[which.min(res_pre[,BIC_option]),], nrow = 1)
+      # optimum penalty parameter on random effects from above first step
+      lam_ref = opt_pre[,2]
+      # Extract coefficient and posterior results from 'best' model from first step
+      coef_old = coef_pre[which(res_pre[,2] == lam_ref),]
+      u_init = fit_fixfull$out$u_init
+      
+      # Extract other relevant info
+      ## pre-screening results
+      ranef_keep = fit_fixfull$ranef_keep
+      ## BIC-ICQ full model results to avoid repeat calculation of full model
+      if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
+        BICq_post_file = "BICq_Posterior_Draws.txt"
+      }else{
+        BICq_post_file = BICq_posterior
+      }
+      
+      # Fit second stage of 'abbreviated' model fit
+      print("Start of stage 2 of abbreviated grid search")
+      fit_select = select_tune(dat = data_input, offset = offset, family = family,
+                               lambda0_range = lambda0_range, lambda1_range = lam_ref,
+                               penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                               group_X = group_X, trace = trace,
+                               coef_old = coef_old, u_init = u_init,
+                               adapt_RW_options = adapt_RW_options, 
+                               optim_options = optim_options, covar = covar, 
+                               logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
+                               BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                               checks_complete = T, pre_screen = F,
+                               ranef_keep = ranef_keep)
+      print("End of stage 1 of abbreviated grid search")
+      
+      resultsA = rbind(fit_fixfull$results, fit_select$results)
+      coef_results = rbind(fit_fixfull$coef, fit_select$coef)
+      
+    }else if(tuning_options$search == "full_grid"){
+      
+      fit_select = select_tune(dat = data_input, offset = offset, family = family,
+                               lambda0_range = lambda0_range, lambda1_range = lambda1_range,
+                               penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                               group_X = group_X, trace = trace,
+                               adapt_RW_options = adapt_RW_options, 
+                               optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
+                               BICq_calc = (tuning_options$BIC_option == "BICq"),
+                               BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
+                               checks_complete = T, pre_screen = pre_screen)
+      
+      resultsA = fit_select$results
+      coef_results = fit_select$coef
+      
+    } # End if-else tuning_options$search == 'abbrev'
     
+    
+    # Extract best model
     fit = fit_select$out
     
-    resultsA = fit_select$results
-    coef_results = fit_select$coef
     # Unstandardize coefficient results
     beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
     beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=F], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
     for(i in 1:nrow(beta_results)){
-      beta_results[,-1] = coef_results[,2:ncol(data_input$X)] / std_out$X_scale
+      beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=F] / std_out$X_scale
     }
     # colnames(beta_results) = c(coef_names$fixed)
     
-    gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results)]
+    gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results),drop=F]
     # colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
     
     selection_results = cbind(resultsA,beta_results,gamma_results)
@@ -468,7 +535,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     
     optim_options = fit_select$optim_options
     ranef_keep = fit_select$ranef_keep
-  }
+    
+  } # End if-else inherits(tuning_options)
   
   
   sampling = switch(optim_options$sampler, stan = "Stan", 

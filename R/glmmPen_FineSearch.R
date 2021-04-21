@@ -198,16 +198,19 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     lambda1_seq = tuning_options$lambda1_seq
   }
   
+  BIC_option = tuning_options$BIC_option
+  
   ## Specify starting coefficient using opt_res results
   ## Note: need to make sure fixed effects adjusted for standardized X
-  coef_unstd = opt_res[which(names(opt_res) == "(Intercept)"):length(opt_res)]
-  coef_fix = coef_unstd[1:ncol(X)]
-  coef_rand = coef_unstd[(ncol(X)+1):length(coef_unstd)]
-  
-  coef_old = numeric(length(coef_fix))
-  coef_old[1] = coef_fix[1] + sum(coef_fix[-1] * std_info$X_center / std_info$X_scale)
-  coef_old[-1] = coef_fix[-1] * std_info$X_scale
-  coef_old = c(coef_old, coef_rand)
+  # coef_unstd = opt_res[which(names(opt_res) == "(Intercept)"):length(opt_res)] 
+  # coef_fix = coef_unstd[1:ncol(X)]
+  # coef_rand = coef_unstd[(ncol(X)+1):length(coef_unstd)]
+  # 
+  # coef_old = numeric(length(coef_fix))
+  # coef_old[1] = coef_fix[1] + sum(coef_fix[-1] * std_info$X_center / std_info$X_scale)
+  # coef_old[-1] = coef_fix[-1] * std_info$X_scale
+  # coef_old = c(coef_old, coef_rand)
+  coef_old = object$Estep_material$coef
   
   fixef_noPen = object$penalty_info$fixef_noPen
   
@@ -245,7 +248,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                            lambda0_range = lambda0_seq, lambda1_range = lambda1_seq,
                            penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                            trace = trace, u_init = NULL,
-                           coef_old = coef_old, BICq_calc = (tuning_options$BIC_option == "BICq"),
+                           coef_old = coef_old, logLik_calc = tuning_options$logLik_calc,
+                           BICq_calc = (tuning_options$BIC_option == "BICq"),
                            adapt_RW_options = adapt_RW_options, 
                            optim_options = optim_options, BICq_posterior = BICq_posterior,
                            checks_complete = T, pre_screen = F, ranef_keep = ranef_keep)
@@ -256,25 +260,49 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   coef_results = fit_select$coef
   # Unstandardize coefficient results
   beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
-  beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X)], MARGIN = 1, FUN = function(x) sum(x * std_info$X_center / std_info$X_scale))
+  beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=F], MARGIN = 1, FUN = function(x) sum(x * std_info$X_center / std_info$X_scale))
   for(i in 1:nrow(beta_results)){
-    beta_results[,-1] = coef_results[,2:ncol(data_input$X)] / std_info$X_scale
+    beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=F] / std_info$X_scale
   }
-  colnames(beta_results) = names(object$fixef)
+  # colnames(beta_results) = c(coef_names$fixed)
   
-  gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results)]
-  colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
+  gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results), drop=F]
+  # colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
+  
+  opt_names = names(opt_res)
+  coef_names = opt_names[which(names(opt_res) == "(Intercept)"):length(opt_res)]
   
   selection_results = cbind(resultsA,beta_results,gamma_results)
+  colnames(selection_results) = c(colnames(resultsA), coef_names)
   
-  if(tuning_options$BIC_option == "BICh"){
+  
+  if(BIC_option == "BICh"){
     optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
-  }else if(tuning_options$BIC_option == "BIC"){
+  }else if(BIC_option == "BIC"){
     optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
-  }else if(tuning_options$BIC_option == "BICq"){
-    optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
+  }else if(BIC_option == "BICq"){
+    optim_results = matrix(selection_results[which.min(selection_results[,"BICq"]),], nrow = 1)
+  }else if(BIC_option == "BICNgrp"){
+    optim_results = matrix(selection_results[which.min(selection_results[,"BICNgrp"]),], nrow = 1)
   }
   colnames(optim_results) = colnames(selection_results)
+  
+  Estep_out = list(u0 = NULL, u_init = fit$u_init, 
+                   post_modes = rep(NA, times = ncol(data_input$Z)),
+                   post_out = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)),
+                   ll = NA, BICh = NA, BIC = NA, BICNgrp = NA)
+  
+  q_final = sum(diag(fit$sigma) > 0)
+  if(q_final <= 51){
+    
+    Estep_out = E_step_final(dat = data_input, fit = fit, optim_options = optim_options, 
+                             fam_fun = object$family, extra_calc = T, 
+                             adapt_RW_options = adapt_RW_options, trace = trace)
+  }
+  
+  # optim_results:
+  optim_results[,c("BICh","BIC","BICNgrp","LogLik")] = c(Estep_out$BICh, Estep_out$BIC, 
+                                                         Estep_out$BICNgrp, Estep_out$ll)
   
   optim_options = fit_select$optim_options
   
@@ -284,7 +312,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   
   call = match.call(expand.dots = F)
   
-  output = c(fit, list(call = call, formula = object$formula, y = y, fixed_vars = object$fixed_vars,
+  output = c(fit, 
+             list(Estep_out = Estep_out, call = call, formula = object$formula, y = y, fixed_vars = object$fixed_vars,
                        X = X, Z_std = Z_std, group = group,
                        coef_names = list(fixed = names(object$fixef), random = colnames(object$sigma)), 
                        family = object$family, offset = offset, frame = object$data$frame, 

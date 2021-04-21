@@ -6,13 +6,12 @@
 #' @description Constructs control structures for penalized mixed model fitting.
 #' 
 #' @details If unspecified, the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
-#' automatically calculated. For an initial
-#' grid search using \code{\link{glmmPen}}, the range will be calculated in the same manner as 
+#' automatically calculated. The sequence will be calculated in the same manner as 
 #' \code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
-#' small portion of max (\code{lambda.min}*(lambda max)), range is composed of 
+#' small portion of max (\code{lambda.min}*(lambda max)), sequence is composed of 
 #' \code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
 #' values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
-#' running from max lambda to min lambda).
+#' running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}.
 #' For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 #' from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
 #' finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
@@ -20,13 +19,25 @@
 #' effects.
 #' 
 #' The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
-#' non-zero penalty parameter combination. However, this is generally not recommended.  
+#' non-zero penalty parameter combination. However, this is generally not recommended. 
+#' 
+#' Abbreviated grid search: The abbreviated grid search proceeds in two stages. In stage 1, the
+#' algorithm fits the following series of models: the fixed effects penalty parameter remains a
+#' fixed value evaluated at the minimum of the fixed effects penalty parameters, and a all
+#' random effects penalty parameters are examined. The 'best' model from this first stage of models
+#' determines the optimum random effect penalty parameter. In stage 2, the algorithm fits the 
+#' following series of models: the random effects penalty parameter remains fixed at the value of
+#' the optimum random effect penalty parameter (from stage 1) and all fixed effects penalty
+#' parameters are considered. The best overall model is the best model from stage 2. This reduces the 
+#' number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). Although this
+#' can drastically increase the time of the algorithm to proceed, the authors found in simulations
+#' that this generally increases the false positive rate by a factor of between 1.5 and 2.
 #' 
 #' @param lambda0 a non-negative numeric penalty parameter for the fixed effects parameters
 #' @param lambda1 a non-negative numeric penalty parameter for the (grouped) random effects
 #' covariance parameters
-#' @param lambda0_seq,lambda1_seq a range of non-negative numeric penalty parameters for the fixed 
-#' and random effect parameters, respectively. If \code{NULL}, then a range will be automatically 
+#' @param lambda0_seq,lambda1_seq a sequence of non-negative numeric penalty parameters for the fixed 
+#' and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
 #' calculated. See 'Details' section for more details on these default calculations.
 #' @param nlambda positive integer specifying number of lambda with which to fit a model.
 #' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
@@ -37,6 +48,10 @@
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 #' observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 #' groups).
+#' @param search character string of "full_grid" or "abbrev" indicating if the search of models over 
+#' the penalty parameter space should be the full grid search (total number of models equals
+#' `nlambda`^2 or length(`lambda0_seq`)*length(`lambda1_seq`)) or an abbreviated grid search.
+#' The abbreviated grid search is described in more detail in the Details section.
 #' @param logLik_calc logical value specifying if the log likelihood (and log-likelihood based 
 #' calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
 #' If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
@@ -52,8 +67,7 @@
 #' automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
-#' containing penalization parameter values, presented either as an individual set or as a range of
-#' possible values.
+#' containing parameter values that determine settings for variable selection.
 #' 
 #' @export
 lambdaControl = function(lambda0 = 0, lambda1 = 0){
@@ -70,6 +84,7 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 #' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
+                         search = c("full_grid","abbrev"),
                          BIC_option = c("BICq","BICh","BIC","BICNgrp"), 
                          logLik_calc = switch(BIC_option[1], BICq = F, T), 
                          lambda.min = NULL, pre_screen = T){
@@ -87,15 +102,19 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     if(!is.numeric(lambda0_seq)){
       stop("lambda0_seq must be numeric")
     }
-    if(any(lambda0_seq) < 0){
+    if(any(lambda0_seq < 0)){
       stop("lambda0_seq cannot be negative")
     }
-    for(i in 2:length(lambda0_seq)){
-      if(lambda0_seq[i-1] > lambda0_seq[i]){
-        stop("lambda0_seq must be a sequence of ascending order (min value to max value)")
+    if(length(lambda0_seq) > 1){
+      for(i in 2:length(lambda0_seq)){
+        if(lambda0_seq[i-1] > lambda0_seq[i]){
+          stop("lambda0_seq must be a sequence of ascending order (min value to max value)")
+        }
       }
     }
-  }
+    
+  } # End if-else !is.null(lambda0_seq)
+  
   if(!is.null(lambda1_seq)){
     if(!is.numeric(lambda1_seq)){
       stop("lambda1_seq must be numeric")
@@ -103,12 +122,14 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     if(any(lambda1_seq < 0)){
       stop("lambda1_seq cannot be negative")
     }
-    for(i in 2:length(lambda1_seq)){
-      if(lambda1_seq[i-1] > lambda1_seq[i]){
-        stop("lambda1_seq must be a sequence of ascending order (min value to max value)")
+    if(length(lambda1_seq) > 1){
+      for(i in 2:length(lambda1_seq)){
+        if(lambda1_seq[i-1] > lambda1_seq[i]){
+          stop("lambda1_seq must be a sequence of ascending order (min value to max value)")
+        }
       }
     }
-  }
+  } # End if-else !is.null(lambda1_seq)
   
   if(!(floor(nlambda) == nlambda)){
     stop("nlambda must be an integer")
@@ -121,6 +142,10 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     stop("'logLik_calc' must be a logical value (T or F)")
   }
   
+  if((BIC_option %in% c("BICh","BIC","BICNgrp")) & (logLik_calc == F)){
+    stop("When 'BIC_option' is BICh, BIC, or BICNgroup, 'logLik_calc' must be TRUE")
+  }
+  
   if (!is.logical(pre_screen)) {
     stop("'pre_screen' must be a logical value (T or F)")
   }
@@ -130,7 +155,13 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     if((lambda.min >= 1) | (lambda.min <=0 )){stop("lambda.min must be a fraction between 0 and 1")}
   }
   
-  structure(list(lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
+  if(length(search) > 1) search = search[1]
+  if(!(search %in% c("full_grid","abbrev"))){
+    stop("'search' must be either 'full_grid' or 'abbrev'")
+  }
+  
+  
+  structure(list(lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq, search = search,
                  nlambda = nlambda, BIC_option = BIC_option, logLik_calc = logLik_calc,
                  lambda.min = lambda.min, pre_screen = pre_screen),
             class = c("selectControl", "pglmmControl"))
@@ -314,6 +345,10 @@ optim_recommend = function(family, q, select){
     optim_options$nMC = 100
     optim_options$nMC_max = 1500
     optim_options$maxitEM = optim_options$maxitEM + 15
+  }
+  
+  if(select == T){
+    optim_options$conv_EM = 0.0015
   }
   
   return(optim_options)
