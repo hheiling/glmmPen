@@ -27,7 +27,7 @@
 #' @export
 glmm = function(formula, data = NULL, family = "binomial", covar = c("unstructured","independent"),
                 offset = NULL, na.action = na.omit, 
-                optim_options = "recommend", adapt_RW_options = adaptControl(),
+                optim_options = optimControl(), adapt_RW_options = adaptControl(),
                 trace = 0, tuning_options = lambdaControl(), ...){
   
   # Check that (...) arguments are subsets of glmmPen arguments
@@ -230,7 +230,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                    offset = NULL, na.action = na.omit, 
                    fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
-                   optim_options = "recommend", adapt_RW_options = adaptControl(),
+                   optim_options = optimControl(), adapt_RW_options = adaptControl(),
                    trace = 0, tuning_options = selectControl(), BICq_posterior = NULL){
   # Things to address / Questions to answer:
   ## Specify what fit_dat output will be
@@ -261,6 +261,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   if(!is.list(tuning_options) | !inherits(tuning_options, "pglmmControl")){
     stop("tuning_option parameter must be a list of type lambdaControl() or selectControl()")
   }
+  
+  if(class(optim_options) != "optimControl"){
+    stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
+  }
+  
   
   # Convert formula and data to useful forms to plug into fit_dat
   # Code glFormula_edit() edited version of glFormula() from lme4 package
@@ -344,15 +349,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       stop("lambda0 and lambda1 cannot be negative")
     }
     
-    if(is.character(optim_options)){
-      if(optim_options != "recommend"){
-        stop("optim_options must be either the character string 'recommend' or object of class 'optimControl' created from 'optimControl()'")
-      }else{
-        optim_options = optim_recommend(family, ncol(fD_out$Z)/nlevels(data_input$group), select = F)
-      }
-    }else if(class(optim_options) != "optimControl"){
-      stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
-    }
+    # If nMC arguments or maxitEM left as NULL, fill in defaults
+    optim_options = optim_recommend(optim_options = optim_options, family = family, 
+                                    q = ncol(fD_out$Z)/nlevels(data_input$group), select = F)
     
     if(optim_options$var_start == "recommend"){
       var_start = var_init(data_input, fam_fun)
@@ -372,7 +371,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     M = optim_options$M
     t = optim_options$t
     mcc = optim_options$mcc
-    # covar = optim_options$covar
     sampler = optim_options$sampler
     var_start = optim_options$var_start
     max_cores = optim_options$max_cores
@@ -389,7 +387,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                     t = t, mcc = mcc, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                     covar = covar, var_start = var_start, logLik_calc = F,
-                    max_cores = max_cores, checks_complete = T, fastM = T)
+                    max_cores = max_cores, checks_complete = T)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     
@@ -426,6 +424,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     BIC_option = tuning_options$BIC_option
     pre_screen = tuning_options$pre_screen
     logLik_calc = tuning_options$logLik_calc
+    lambda.min.presc = tuning_options$lambda.min.presc
     
     if(tuning_options$search == "abbrev"){
       
@@ -444,7 +443,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                                 optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                                 BICq_calc = (BIC_option == "BICq"),
                                 BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                                checks_complete = T, pre_screen = pre_screen)
+                                checks_complete = T, pre_screen = pre_screen, 
+                                lambda.min.presc = lambda.min.presc, stage1 = T)
       print("End of stage 1 of abbreviated grid search")
       
       res_pre = fit_fixfull$results
@@ -459,8 +459,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       u_init = fit_fixfull$out$u_init
       
       # Extract other relevant info
-      ## pre-screening results
-      ranef_keep = fit_fixfull$ranef_keep
+      ## only consider random effects that are non-zero or above 10^-2 in the optimal random effect model
+      # ranef_keep = fit_fixfull$ranef_keep
+      vars = diag(fit_fixfull$out$sigma)
       ## BIC-ICQ full model results to avoid repeat calculation of full model
       if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
         BICq_post_file = "BICq_Posterior_Draws.txt"
@@ -480,8 +481,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                                logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
                                BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
                                checks_complete = T, pre_screen = F,
-                               ranef_keep = ranef_keep)
-      print("End of stage 1 of abbreviated grid search")
+                               ranef_keep = as.numeric((vars >= 0)), 
+                               lambda.min.presc = lambda.min.presc, stage1 = F)
+      print("End of stage 2 of abbreviated grid search")
       
       resultsA = rbind(fit_fixfull$results, fit_select$results)
       coef_results = rbind(fit_fixfull$coef, fit_select$coef)
@@ -496,7 +498,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                                optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                                BICq_calc = (tuning_options$BIC_option == "BICq"),
                                BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                               checks_complete = T, pre_screen = pre_screen)
+                               checks_complete = T, pre_screen = pre_screen, 
+                               lambda.min.presc = lambda.min.presc, stage1 = F)
       
       resultsA = fit_select$results
       coef_results = fit_select$coef
@@ -534,7 +537,13 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     colnames(optim_results) = colnames(selection_results)
     
     optim_options = fit_select$optim_options
-    ranef_keep = fit_select$ranef_keep
+    
+    if(tuning_options$search == "full_grid"){
+      ranef_keep = fit_select$ranef_keep
+    }else if(tuning_options$search == "abbrev"){
+      ranef_keep = fit_fixfull$ranef_keep
+    }
+    
     
   } # End if-else inherits(tuning_options)
   

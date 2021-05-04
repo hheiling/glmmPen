@@ -84,10 +84,10 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 #' @rdname lambdaControl
 #' @export
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
-                         search = c("full_grid","abbrev"),
+                         search = c("abbrev","full_grid"),
                          BIC_option = c("BICq","BICh","BIC","BICNgrp"), 
                          logLik_calc = switch(BIC_option[1], BICq = F, T), 
-                         lambda.min = NULL, pre_screen = T){
+                         lambda.min = NULL, pre_screen = T, lambda.min.presc = NULL){
   
   # Perform input checks
   
@@ -151,8 +151,12 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
   }
   
   if(!is.null(lambda.min)){
-    if(!is.numeric(lambda.min)){stop("lambda.min must be numeric")}
-    if((lambda.min >= 1) | (lambda.min <=0 )){stop("lambda.min must be a fraction between 0 and 1")}
+    if(!is.numeric(lambda.min)){
+      stop("lambda.min.seq must be numeric")
+    }
+    if((lambda.min >= 1) | (lambda.min <=0 )){
+      stop("lambda.min must be a fraction between 0 and 1")
+    }
   }
   
   if(length(search) > 1) search = search[1]
@@ -160,10 +164,20 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     stop("'search' must be either 'full_grid' or 'abbrev'")
   }
   
+  if(!is.null(lambda.min.presc)){
+    if(!is.numeric(lambda.min.presc)){
+      stop("lambda.min.seq must be numeric")
+    }
+    if((lambda.min.presc >= 1) | (lambda.min.presc <=0 )){
+      stop("lambda.min must be a fraction between 0 and 1")
+    }
+  }
+  
   
   structure(list(lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq, search = search,
                  nlambda = nlambda, BIC_option = BIC_option, logLik_calc = logLik_calc,
-                 lambda.min = lambda.min, pre_screen = pre_screen),
+                 lambda.min = lambda.min, pre_screen = pre_screen, 
+                 lambda.min.presc = lambda.min.presc),
             class = c("selectControl", "pglmmControl"))
 }
 
@@ -259,18 +273,33 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
 #' @export
-optimControl = function(conv_EM = 0.001, conv_CD = 0.0001, 
-                        nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
-                        maxitEM = 50, maxit_CD = 100, 
+optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005, 
+                        nMC_burnin = NULL, nMC_start = NULL, nMC_max = NULL, nMC_report = 5000,
+                        maxitEM = NULL, maxit_CD = 50, 
                         M = 10000, t = 2, mcc = 2,
                         sampler = c("stan","random_walk","independence"), 
                         var_start = "recommend", max_cores = 1){
   
-  # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
+  # conv_EM = 0.0015, conv_CD = 0.0005, 
+  # nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
+  # maxitEM = 50, maxit_CD = 50, 
+  # M = 10000, t = 2, mcc = 2,
+  # sampler = c("stan","random_walk","independence"), 
+  # var_start = "recommend", max_cores = 1
   
-  x = c(nMC_burnin, nMC_start, nMC_max, nMC_report, maxitEM, maxit_CD, M, t, mcc)
+  call = match.call(expand.dots = F)
+  
+  # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
+  args_null = list(nMC_burnin = nMC_burnin, nMC_start = nMC_start, 
+                   nMC_max = nMC_max, maxitEM = maxitEM)
+  x = c(nMC_report, maxitEM, maxit_CD, M, t, mcc)
+  for(a in 1:length(args_null)){
+    if(!is.null(args_null[[a]])){
+      x = c(x, args_null[[a]])
+    }
+  }
   if((!all(floor(x)==x)) | (sum(x <= 0) > 0)){ # if any of the above values not positive integers
-    stop("the nMC arguments, maxit arguments, M, t, and mcc must be positive integers")
+    stop("M, t, mcc, and all entered nMC and maxit arguments must be positive integers")
   }
   
   # More restrictive checks
@@ -280,12 +309,16 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
   if(M < 5000){
     stop("M must be greater than or equal to 5000")
   }
-  if(nMC_burnin < 100){
-    warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
-    nMC_burnin = 100
+  if(!is.null(nMC_burnin)){
+    if(nMC_burnin < 100){
+      warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
+      nMC_burnin = 100
+    }
   }
-  if(nMC_max < nMC_start){
-    stop("nMC_max cannot be smaller than nMC_start")
+  if(!is.null(nMC_max) & !is.null(nMC_start)){
+    if(nMC_max < nMC_start){
+      stop("nMC_max cannot be smaller than nMC_start")
+    }
   }
   
   if(is.character(var_start)){
@@ -319,38 +352,104 @@ optimControl = function(conv_EM = 0.001, conv_CD = 0.0001,
 
 # q = number of random effects (including random intercept)
 # select: TRUE if running the selection algorithm
-optim_recommend = function(family, q, select){
+optim_recommend = function(optim_options, family, q, select){
   
-  optim_options = optimControl()
-  # Default options for family = 'binomial' or 'poisson'
-  if (family == "gaussian") {
-    # increase maxitEM
-    optim_options = optimControl()
-    optim_options$maxitEM = 100
-  }
+  # Default values to use for 'binomial' and 'poisson' families when fitting single model 
+  #   (i.e. not using model selection):
+  # conv_EM = 0.0015, conv_CD = 0.0005, 
+  # nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
+  # maxitEM = 50, maxit_CD = 50, 
+  # M = 10000, t = 2, mcc = 2,
+  # sampler = c("stan","random_walk","independence"), 
+  # var_start = "recommend", max_cores = 1
   
-  if (q <= 11) {
+  # Depending on value of q and whether selection is being performed, adjusted default values
+  if (q <= 11) { # q includes random intercept
     # For selection, decrease nMC_max to improve time
     ## Note: During selection, will initialize with good starting points, so
     ## larger nMC_max not needed for convergence
     ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
     # Otherwise, keep everything else the same
     if (select == T) {
-      optim_options$nMC_max = 2500
-      # optim_options$maxitEM = optim_options$maxitEM + 15
+      if(is.null(optim_options$nMC_max)){
+        optim_options$nMC_max = 2500
+      }
     }
   }else{
     # Decrease nMC
-    optim_options$nMC_burnin = 100
-    optim_options$nMC = 100
-    optim_options$nMC_max = 1500
-    optim_options$maxitEM = optim_options$maxitEM + 15
+    if(is.null(optim_options$nMC_burnin)){
+      optim_options$nMC_burnin = 100
+    }
+    if(is.null(optim_options$nMC)){
+      optim_options$nMC = 100
+    }
+    if(is.null(optim_options$nMC_burnin)){
+      optim_options$nMC_max = 1000
+    }
+    
+  } # End if-else q <= 11
+  
+  # If not special case of large q and/or selection, give default values of nMC args and maxitEM
+  
+  if(is.null(optim_options$nMC_burnin)){
+    optim_options$nMC_burnin = 250
+  }
+  if(is.null(optim_options$nMC)){
+    optim_options$nMC = 250
+  }
+  if(is.null(optim_options$nMC_max)){
+    optim_options$nMC_max = 5000
+  }
+  if(is.null(optim_options$maxitEM)){
+    if(family %in% c("binomial","poisson")){
+      optim_options$maxitEM = 50
+    }else if(family == "gaussian"){
+      optim_options$maxitEM = 50
+    }
   }
   
-  if(select == T){
-    optim_options$conv_EM = 0.0015
+  if(optim_options$nMC_max < optim_options$nMC){
+    stop("in optimControl, nMC_max, ",optim_options$nMC_max," must be less than nMC_start ", optim_options$nMC)
   }
   
   return(optim_options)
   
 }
+
+# optim_recommend = function(family, q, select){
+#   
+#   optim_options = optimControl()
+#   # Default options for family = 'binomial' or 'poisson'
+#   if (family == "gaussian") {
+#     # increase maxitEM
+#     optim_options = optimControl()
+#     optim_options$maxitEM = 100
+#   }
+#   
+#   if (q <= 11) {
+#     # For selection, decrease nMC_max to improve time
+#     ## Note: During selection, will initialize with good starting points, so
+#     ## larger nMC_max not needed for convergence
+#     ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
+#     # Otherwise, keep everything else the same
+#     if (select == T) {
+#       optim_options$nMC_max = 2500
+#       # optim_options$maxitEM = optim_options$maxitEM + 15
+#     }
+#   }else{
+#     # Decrease nMC
+#     optim_options$nMC_burnin = 100
+#     optim_options$nMC = 100
+#     optim_options$nMC_max = 1000
+#     # optim_options$nMC_max = 1500
+#     # optim_options$maxitEM = optim_options$maxitEM + 15
+#     
+#   }
+#   
+#   # if(select == T){
+#   #   optim_options$conv_EM = 0.0015
+#   # }
+#   
+#   return(optim_options)
+#   
+# }

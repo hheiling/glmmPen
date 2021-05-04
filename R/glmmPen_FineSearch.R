@@ -252,7 +252,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                            BICq_calc = (tuning_options$BIC_option == "BICq"),
                            adapt_RW_options = adapt_RW_options, 
                            optim_options = optim_options, BICq_posterior = BICq_posterior,
-                           checks_complete = T, pre_screen = F, ranef_keep = ranef_keep)
+                           checks_complete = T, pre_screen = F, ranef_keep = ranef_keep, stage1 = F)
   
   fit = fit_select$out
   

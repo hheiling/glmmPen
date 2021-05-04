@@ -7,14 +7,14 @@
 Constructs the control structure for the optimization of the penalized mixed model fit algorithm.}
 \usage{
 optimControl(
-  conv_EM = 0.001,
-  conv_CD = 1e-04,
-  nMC_burnin = 250,
-  nMC_start = 250,
-  nMC_max = 5000,
+  conv_EM = 0.0015,
+  conv_CD = 5e-04,
+  nMC_burnin = NULL,
+  nMC_start = NULL,
+  nMC_max = NULL,
   nMC_report = 5000,
-  maxitEM = 50,
-  maxit_CD = 100,
+  maxitEM = NULL,
+  maxit_CD = 50,
   M = 10000,
   t = 2,
   mcc = 2,

@@ -11,11 +11,12 @@ selectControl(
   lambda0_seq = NULL,
   lambda1_seq = NULL,
   nlambda = 10,
-  search = c("full_grid", "abbrev"),
+  search = c("abbrev", "full_grid"),
   BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
   logLik_calc = switch(BIC_option[1], BICq = F, T),
   lambda.min = NULL,
-  pre_screen = T
+  pre_screen = T,
+  lambda.min.presc = NULL
 )
 }
 \arguments{

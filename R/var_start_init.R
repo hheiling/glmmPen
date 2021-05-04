@@ -14,9 +14,7 @@ var_init = function(data, fam_fun){
   var_start = VarCorr(int_only)$grp[[1]] * 2.0
   
   # Protect against case when variance estimate above is 0 or very small
-  if(var_start < 0.01){
-    var_start = 1
-  } 
+  var_start = max(0.5, var_start) 
   
   return(var_start)
 }

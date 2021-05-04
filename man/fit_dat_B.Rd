@@ -36,8 +36,7 @@ fit_dat_B(
   logLik_calc = F,
   max_cores = 1,
   checks_complete = F,
-  ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group))),
-  fastM = T
+  ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group)))
 )
 }
 \arguments{

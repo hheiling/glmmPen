@@ -38,7 +38,7 @@ CD = function(y, X, family, link_int, offset,
 M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offset, phi,
                   maxit_CD = 250, conv_CD = 0.0001,
                   init, group_X = 0:(ncol(X)-1), covgroup,
-                  penalty, lambda0, lambda1, gamma, alpha = 1.0, fastM = T, trace){
+                  penalty, lambda0, lambda1, gamma, alpha = 1.0, trace){
   
   if(!is.matrix(Z)){
     stop("Z must be a matrix \n")
@@ -79,11 +79,7 @@ M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offse
   # const char* family, int link, int init, double phi,
   # const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
   # const char* penalty, arma::vec params
-  if(fastM == F){
-    coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
-  }else if(fastM == T){
-    coef_new = grp_CD_XZ_fast(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
-  }
+  coef_new = grp_CD_XZ_fast(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
   # coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
   
   return(as.numeric(coef_new))

@@ -4,15 +4,21 @@
 # just interested in which random effects are left in the model)
 # Skimp on nMC_report and M because posterior modes and logLik will not be used from this model
 prescreen = function(dat, family, offset_fit, trace = 0, 
-                     penalty, alpha, gamma_penalty, lambda.min, group_X,
+                     penalty, alpha, gamma_penalty, lambda.min, 
+                     lambda0_min, group_X,
                      sampler, adapt_RW_options, covar,
                      var_start, max_cores, checks_complete){
   
   
-  lam_MaxMin = LambdaRange(dat$X[,-1,drop=F], dat$y, family = family, nlambda = 2, 
+  lam_MinMax = LambdaRange(dat$X[,-1,drop=F], dat$y, family = family, nlambda = 2, 
                            lambda.min = lambda.min)
-  lam_min = lam_MaxMin[1]
-  lam0 = lam_min
+  
+  lam_min = lam_MinMax[1]
+  # fixed effects penalty
+  lam0 = min(lam_min, lambda0_min)
+  # random effect penalty - may be larger than fixed effects penalty
+  ## There is a general sparsity assumption for random effects, so we may
+  ## assume a higher penalty on the random effects for a 'full' model
   lam1 = lam_min
   
   # Determine nMC ranges
@@ -22,10 +28,10 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   nMC_max = 500
   
   # Other convergence criteria
-  conv_EM = 0.001
-  conv_CD = 0.001
-  maxitEM = 30
-  maxit_CD = 100
+  conv_EM = 0.0015
+  conv_CD = 0.0005
+  maxitEM = 35
+  maxit_CD = 50
   t = 2
   mcc = 2
   
@@ -39,8 +45,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
                       maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                       sampler = sampler, adapt_RW_options = adapt_RW_options,
                       covar = covar, var_start = var_start, logLik_calc = F,
-                      max_cores = max_cores, checks_complete = checks_complete,
-                      fastM = T))
+                      max_cores = max_cores, checks_complete = checks_complete))
   
   if(is.character(out)){
     stop("Issue with pre-screening step in model selection procedure")
@@ -57,12 +62,14 @@ prescreen = function(dat, family, offset_fit, trace = 0,
       ranef_keep[v] = 1
     }else{
       # Only keep random effect if variance for the random effect sufficiently large
-      if(vars[v] >= 10^-4){
+      if(vars[v] >= 10^-2){
         ranef_keep[v] = 1
       }
     }
   }
   
-  return(list(ranef_keep = ranef_keep, coef_pre = out$coef, u_pre = out$u_init))
+  max_var = max(vars)
+  
+  return(list(ranef_keep = ranef_keep, coef_pre = out$coef, u_pre = out$u_init, max_var = max_var))
   
 }

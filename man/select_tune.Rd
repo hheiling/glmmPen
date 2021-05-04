@@ -27,7 +27,9 @@ select_tune(
   BICq_posterior = NULL,
   checks_complete = F,
   pre_screen = T,
-  ranef_keep = NULL
+  ranef_keep = NULL,
+  lambda.min.presc = NULL,
+  stage1 = F
 )
 }
 \arguments{

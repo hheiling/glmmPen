@@ -59,8 +59,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
                      var_start = 1.0, logLik_calc = F, max_cores = 1, checks_complete = F,
-                     ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group))),
-                     fastM = T){
+                     ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group)))){
   
   ############################################################################################
   # Data input checks
@@ -418,6 +417,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   # Remove initialized big matrix of posterior draws
   u_big = NULL
   
+  # Alternative maxit_CD for when q is large
+  maxit_CD_alt = 25
+  
   ############################################################################################
   # EM Algorithm
   ############################################################################################
@@ -432,19 +434,25 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     # maxit_CD = 250, conv_CD = 0.0001,
     # init, group_X = 0:(ncol(X)-1), covgroup,
     # penalty, lambda0, lambda1, gamma, alpha = 1.0
+    # if(sum(diag(cov) > 0) > 15){
+    #   maxit_CD = 25
+    # }else if(sum(diag(cov) > 0) > 10){
+    #   maxit_CD = 50
+    # }else{
+    #   maxit_CD = 75
+    # }
     if(sum(diag(cov) > 0) > 15){
-      maxit_CD = 25
-    }else if(sum(diag(cov) > 0) > 10){
-      maxit_CD = 50
+      maxit_CD_use = maxit_CD_alt
     }else{
-      maxit_CD = 75
+      maxit_CD_use = maxit_CD
     }
+    
     # print("Start M-step")
     coef = M_step(y=y, X=X, Z=Z, u_address=u0@address, M=nrow(u0), J=J, 
                   group=group, family=family, link_int=link_int, coef=coef, offset=offset_fit,
-                  phi=phi, maxit_CD=maxit_CD, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
+                  phi=phi, maxit_CD=maxit_CD_use, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
                   covgroup=covgroup, penalty=penalty, lambda0=lambda0, lambda1=lambda1, 
-                  gamma=gamma_penalty, alpha=alpha, fastM = fastM, trace=trace)
+                  gamma=gamma_penalty, alpha=alpha, trace=trace)
     # print("End M-step")
     if(family == "gaussian"){
       # if family = 'gaussian', calculate sigma of error term (standard deviation)
