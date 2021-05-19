@@ -11,7 +11,9 @@
 #' small portion of max (\code{lambda.min}*(lambda max)), sequence is composed of 
 #' \code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
 #' values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
-#' running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}.
+#' running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
+#' By default, these sequences are calculated using \code{\link{LambdaSeq}}.
+#' 
 #' For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 #' from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
 #' finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
@@ -38,8 +40,8 @@
 #' covariance parameters
 #' @param lambda0_seq,lambda1_seq a sequence of non-negative numeric penalty parameters for the fixed 
 #' and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
-#' calculated. See 'Details' section for more details on these default calculations.
-#' @param nlambda positive integer specifying number of lambda with which to fit a model.
+#' calculated. See 'Details' section for more details on these default calculations. 
+#' @param nlambda positive integer specifying number of penalty parameters (lambda) with which to fit a model.
 #' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
 #' @param BIC_option character string specifing the selection criteria used to select the 'best' model.
 #' Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
@@ -48,7 +50,7 @@
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 #' observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 #' groups).
-#' @param search character string of "full_grid" or "abbrev" indicating if the search of models over 
+#' @param search character string of "abbrev" (default) or "full_grid" indicating if the search of models over 
 #' the penalty parameter space should be the full grid search (total number of models equals
 #' `nlambda`^2 or length(`lambda0_seq`)*length(`lambda1_seq`)) or an abbreviated grid search.
 #' The abbreviated grid search is described in more detail in the Details section.
@@ -57,14 +59,20 @@
 #' If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
 #' in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
 #' \code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.
-#' @param pre_screen logical value indicating if pre-screening of random effects should be performed
-#' during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
-#' Pre-screening not performed when the number of random effect predictors is 9 or less.
 #' @param lambda.min numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
 #' ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
 #' a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
 #' \code{lambda.min} specifiex this fraction. Default value is set to \code{NULL}, which
 #' automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.
+#' @param pre_screen logical value indicating whether pre-screening should be performed before
+#' model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+#' no pre-screening will be performed. Pre-screening removes random effects from consideration
+#' during the model selection process, which can significantly speed up the algorithm.
+#' @param lambda.min.presc numeric fraction between 0 and 1. During pre-screening and the full
+#' model fit for the BIC-ICQ calculation, the small penalty used on the random effect is
+#' the fraction \code{lambda.min.presc} mulitplied by the maximum penalty parameter that penalizes
+#' all fixed and random effects to 0. If left as \code{NULL}, the default value is 0.01 when the number
+#' of random effects is 10 or less and 0.05 otherwise.
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing parameter values that determine settings for variable selection.
@@ -225,20 +233,25 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
 #' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.
 #' @param nMC_burnin positive integer specifying the number of posterior draws to use as
-#' burnin for each E step in the EM algorithm. Default 250 when the number of random effects 
+#' burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
+#' the following defaults: Default 250 when the number of random effects 
 #' predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 #' to be less than 100. 
-#' @param nMC_start a positive integer for the initial number of Monte Carlo draws. Default 250 when 
-#' the number of random effects predictors is less than 25; default 100 otherwise.
+#' @param nMC_start a positive integer for the initial number of Monte Carlo draws. If set to
+#' \code{NULL}, the algorithm inputs the following defaults: Default 250 when 
+#' the number of random effects predictors is less than or equal to 10; default 100 otherwise.
 #' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws used
-#' in each step of the EM algorithm. When the number of random effect predictors is 10 or less, 
+#' in each step of the EM algorithm. If set to \code{NULL}, the algorithm inputs the following 
+#' defaults: When the number of random effect predictors is 10 or less, 
 #' Default is set to 5000 when no selection is performed and 2500 when selection is performed.
-#' Default is set to 1000 when the number of random effect predictors is between 11 and 24;
-#' Default is set to 500 when the number of random effect predictors is 25 or more.
+#' Default is set to 1000 when the number of random effect predictors is greater than 10.
+#' @param nMC_report a positive integer for the number of posterior draws to save from the final
+#' model. These posterior draws can be used for diagnostic purposes, see \code{\link{plot_mcmc}}
 #' @param maxitEM a positive integer for the maximum number of allowed EM iterations. 
+#' If set to \code{NULL}, then the algorithm inputs the following defaults:
 #' Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.
 #' @param maxit_CD a positive integer for the maximum number of allowed interations for the
-#' coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.
+#' coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.
 #' @param M positive integer specifying the number of posterior draws to use within the 
 #' Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.
 #' @param t the convergence criteria is based on the average Euclidean distance between 
@@ -260,7 +273,8 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @param max_cores integer describing the number of cores available for computation. If 
 #' \code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
 #' parallel computation using multiple cores is used to calculate the Stan MCMC samples within
-#' each E step.
+#' each E step. The package authors do not advise using parallelization in the E step
+#' unless \code{nMC_max} is set to a large number, such as 10^4 or more.
 #' 
 #' @details When the \code{optim_options} arugment in \code{\link{glmm}} and \code{\link{glmmPen}}
 #' is set to "recommend", the default settings discussed in the given \code{optimControl} arguments are

@@ -4,22 +4,18 @@
 # just interested in which random effects are left in the model)
 # Skimp on nMC_report and M because posterior modes and logLik will not be used from this model
 prescreen = function(dat, family, offset_fit, trace = 0, 
-                     penalty, alpha, gamma_penalty, lambda.min, 
-                     lambda0_min, group_X,
+                     penalty, alpha, gamma_penalty, 
+                     lambda0_min, lambda1_min, group_X,
                      sampler, adapt_RW_options, covar,
                      var_start, max_cores, checks_complete){
   
   
-  lam_MinMax = LambdaRange(dat$X[,-1,drop=F], dat$y, family = family, nlambda = 2, 
-                           lambda.min = lambda.min)
-  
-  lam_min = lam_MinMax[1]
   # fixed effects penalty
-  lam0 = min(lam_min, lambda0_min)
-  # random effect penalty - may be larger than fixed effects penalty
-  ## There is a general sparsity assumption for random effects, so we may
-  ## assume a higher penalty on the random effects for a 'full' model
-  lam1 = lam_min
+  lam0 = lambda0_min
+  # random effect penalty 
+  lam1 = lambda1_min
+  
+  print(sprintf("Pre-screening penalty parameters: fixed effects %f, random effects %f", lam0, lam1))
   
   # Determine nMC ranges
   q = ncol(dat$Z) / nlevels(dat$group)
@@ -30,7 +26,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   # Other convergence criteria
   conv_EM = 0.0015
   conv_CD = 0.0005
-  maxitEM = 35
+  maxitEM = 30
   maxit_CD = 50
   t = 2
   mcc = 2

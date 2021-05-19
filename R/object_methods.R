@@ -650,6 +650,9 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
   U = object$posterior_draws
   U_cols = colnames(U)
   # colnames organization = var_name:grp_name
+  if(any(is.na(U))){
+    stop("posterior draws in pglmmObj object are NA. Use function pglmmObj_mod() on object")
+  }
   
   if(any(vars == "all")){
     d = nlevels(object$data$group[[1]])

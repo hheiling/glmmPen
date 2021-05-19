@@ -446,6 +446,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     }else{
       maxit_CD_use = maxit_CD
     }
+    # if(sum(diag(cov) > 0) <= 11){
+    #   maxit_CD_use = maxit_CD
+    # }else{
+    #   maxit_CD_use = maxit_CD_alt
+    # }
     
     # print("Start M-step")
     coef = M_step(y=y, X=X, Z=Z, u_address=u0@address, M=nrow(u0), J=J, 

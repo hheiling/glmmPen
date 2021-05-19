@@ -85,7 +85,8 @@ Default is 4.0 for SCAD and 3.0 for MCP.}
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
 \item{nMC_burnin}{positive integer specifying the number of posterior draws to use as
-burnin for each E step in the EM algorithm. Default 250 when the number of random effects 
+burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
+the following defaults: Default 250 when the number of random effects 
 predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 to be less than 100.}
 
@@ -93,10 +94,10 @@ to be less than 100.}
 argument in \code{\link{optimControl}} for more details.}
 
 \item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws used
-in each step of the EM algorithm. When the number of random effect predictors is 10 or less, 
+in each step of the EM algorithm. If set to \code{NULL}, the algorithm inputs the following 
+defaults: When the number of random effect predictors is 10 or less, 
 Default is set to 5000 when no selection is performed and 2500 when selection is performed.
-Default is set to 1000 when the number of random effect predictors is between 11 and 24;
-Default is set to 500 when the number of random effect predictors is 25 or more.}
+Default is set to 1000 when the number of random effect predictors is greater than 10.}
 
 \item{t}{the convergence criteria is based on the average Euclidean distance between 
 the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
@@ -107,10 +108,11 @@ seen as having converged (mcc for 'meet condition counter'). Default set to 2. V
 to be no less than 2.}
 
 \item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
+If set to \code{NULL}, then the algorithm inputs the following defaults:
 Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
 
 \item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
-coordinate descent algorithms used within the M-step of each EM iteration. Default equals 200.}
+coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.}
 
 \item{M}{positive integer specifying the number of posterior draws to use within the 
 Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.}
@@ -146,7 +148,8 @@ in comparing the best models from BIC-ICQ and other BIC-type selection criteria,
 \item{max_cores}{integer describing the number of cores available for computation. If 
 \code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
 parallel computation using multiple cores is used to calculate the Stan MCMC samples within
-each E step.}
+each E step. The package authors do not advise using parallelization in the E step
+unless \code{nMC_max} is set to a large number, such as 10^4 or more.}
 
 \item{checks_complete}{boolean value indicating whether the function has been called within
 \code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,

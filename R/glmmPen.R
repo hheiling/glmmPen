@@ -169,7 +169,7 @@ fD_adj = function(out){
 #' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
 #' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 #' Default is 4.0 for SCAD and 3.0 for MCP.
-#' @param optim_options a character string "recommend" or a list of class "optimControl" created 
+#' @param optim_options a structure of class "optimControl" created 
 #' from function \code{\link{optimControl}} that specifies optimization parameters. See the 
 #' documentation for \code{\link{optimControl}} for more details on defaults.
 #' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
@@ -401,30 +401,40 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     
   }else if(inherits(tuning_options, "selectControl")){
     if(is.null(tuning_options$lambda0_seq)){
-      lambda0_range = LambdaRange(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
-                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
-                                  lambda.min = tuning_options$lambda.min)
+      lambda0_seq = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+                                alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
+                                lambda.min = tuning_options$lambda.min)
     }else{
-      lambda0_range = tuning_options$lambda0_seq
-      if(!is.numeric(lambda0_range) | any(lambda0_range < 0)){
-        stop("lambda0_seq must be a positive numeric sequence")
-      }
+      lambda0_seq = tuning_options$lambda0_seq
     }
     if(is.null(tuning_options$lambda1_seq)){
-      lambda1_range = LambdaRange(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
-                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
-                                  lambda.min = tuning_options$lambda.min)
+      lambda1_seq = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+                                alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
+                                lambda.min = tuning_options$lambda.min)
     }else{
-      lambda1_range = tuning_options$lambda1_seq
-      if(!is.numeric(lambda1_range) | any(lambda1_range < 0)){
-        stop("lambda1_seq must be a positive numeric sequence")
+      lambda1_seq = tuning_options$lambda1_seq
+    }
+    
+    lambda.min.presc = tuning_options$lambda.min.presc
+    if(is.null(lambda.min.presc)){
+      if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
+        lambda.min.presc = 0.01
+      }else{
+        lambda.min.presc = 0.05
       }
     }
+    # Minimum lambda values to use for pre-screening and BIC-ICQ full model fit
+    ## minimum penalty for fixed effects, minimum penalty for random effects
+    full_ranef = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+                           alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
+                           lambda.min = lambda.min.presc)
+    lambda.min.full = c(lambda0_seq[1], full_ranef[1])
+    names(lambda.min.full) = c("fixef","ranef")
     
     BIC_option = tuning_options$BIC_option
     pre_screen = tuning_options$pre_screen
     logLik_calc = tuning_options$logLik_calc
-    lambda.min.presc = tuning_options$lambda.min.presc
+    
     
     if(tuning_options$search == "abbrev"){
       
@@ -432,11 +442,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       ## fixed effects penalty: lambda_min
       ## random effects penalty: all lambda1 values
       
-      lam_min = min(lambda0_range)
+      lam_min = min(lambda0_seq)
       
       print("Start of stage 1 of abbreviated grid search")
       fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
-                                lambda0_range = lam_min, lambda1_range = lambda1_range,
+                                lambda0_seq = lam_min, lambda1_seq = lambda1_seq,
                                 penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                                 group_X = group_X, trace = trace,
                                 adapt_RW_options = adapt_RW_options, 
@@ -444,7 +454,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                                 BICq_calc = (BIC_option == "BICq"),
                                 BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
                                 checks_complete = T, pre_screen = pre_screen, 
-                                lambda.min.presc = lambda.min.presc, stage1 = T)
+                                lambda.min.full = lambda.min.full, stage1 = T)
       print("End of stage 1 of abbreviated grid search")
       
       res_pre = fit_fixfull$results
@@ -472,7 +482,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       # Fit second stage of 'abbreviated' model fit
       print("Start of stage 2 of abbreviated grid search")
       fit_select = select_tune(dat = data_input, offset = offset, family = family,
-                               lambda0_range = lambda0_range, lambda1_range = lam_ref,
+                               lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
                                penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                                group_X = group_X, trace = trace,
                                coef_old = coef_old, u_init = u_init,
@@ -481,8 +491,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                                logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
                                BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
                                checks_complete = T, pre_screen = F,
-                               ranef_keep = as.numeric((vars >= 0)), 
-                               lambda.min.presc = lambda.min.presc, stage1 = F)
+                               ranef_keep = as.numeric((vars > 0)), 
+                               lambda.min.full = lambda.min.full, stage1 = F)
       print("End of stage 2 of abbreviated grid search")
       
       resultsA = rbind(fit_fixfull$results, fit_select$results)
@@ -491,7 +501,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     }else if(tuning_options$search == "full_grid"){
       
       fit_select = select_tune(dat = data_input, offset = offset, family = family,
-                               lambda0_range = lambda0_range, lambda1_range = lambda1_range,
+                               lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
                                penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                                group_X = group_X, trace = trace,
                                adapt_RW_options = adapt_RW_options, 
@@ -499,7 +509,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
                                BICq_calc = (tuning_options$BIC_option == "BICq"),
                                BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
                                checks_complete = T, pre_screen = pre_screen, 
-                               lambda.min.presc = lambda.min.presc, stage1 = F)
+                               lambda.min.full = lambda.min.full, stage1 = F)
       
       resultsA = fit_select$results
       coef_results = fit_select$coef
@@ -525,15 +535,16 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     colnames(selection_results) = c(colnames(resultsA), coef_names$fixed, 
                                     str_c("Gamma",0:(ncol(gamma_results)-1)))
     
-    if(BIC_option == "BICh"){
-      optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
-    }else if(BIC_option == "BIC"){
-      optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
-    }else if(BIC_option == "BICq"){
-      optim_results = matrix(selection_results[which.min(selection_results[,"BICq"]),], nrow = 1)
-    }else if(BIC_option == "BICNgrp"){
-      optim_results = matrix(selection_results[which.min(selection_results[,"BICNgrp"]),], nrow = 1)
-    }
+    optim_results = matrix(selection_results[which.min(selection_results[,BIC_option]),], nrow = 1)
+    # if(BIC_option == "BICh"){
+    #   optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
+    # }else if(BIC_option == "BIC"){
+    #   optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
+    # }else if(BIC_option == "BICq"){
+    #   optim_results = matrix(selection_results[which.min(selection_results[,"BICq"]),], nrow = 1)
+    # }else if(BIC_option == "BICNgrp"){
+    #   optim_results = matrix(selection_results[which.min(selection_results[,"BICNgrp"]),], nrow = 1)
+    # }
     colnames(optim_results) = colnames(selection_results)
     
     optim_options = fit_select$optim_options
@@ -670,10 +681,48 @@ XZ_std = function(fD_out, group_num){
 }
 
 
+#' @title Calculation of Penalty Parameter Sequence (Lambda Sequence)
+#' 
+#' @description Calculates the sequence of penalty parameters used in the model selection procedure.
+#' This function calls functions from package \code{ncvreg}. 
+#' 
+#' @inheritParams glmmPen
+#' @inheritParams lambdaControl
+#' @param X matrix of standardized fixed effects (see \code{std} function in \code{ncvreg} 
+#' documenation). X should not include intercept.
+#' @param y numeric vector of response values
+#' @param nlambda positive integer specifying number of penalty parameters (lambda) with 
+#' which to fit a model.
+#' @param penalty.factor an optional numeric vector equal to the \code{fixef_noPen} argument
+#' in \code{\link{glmmPen}}
+#' 
+#' @return numeric sequence of penalty parameters of length \code{nlambda} ranging from the
+#' minimum penalty parameter (first element) equal to fraction \code{lambda.min} multiplied by the 
+#' maximum penalty parameter to the maximum penalty parameter (last element)
+#' 
 #' @importFrom ncvreg setupLambda
 #' @export
-LambdaRange = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
+LambdaSeq = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
                        penalty.factor = NULL){
+  # Checks
+  if(!is.matrix(X)){
+    stop("X must be a matrix")
+  }
+  if(!is.numeric(y)){
+    stop("y must be numeric")
+  }
+  if(nrow(X) != length(y)){
+    stop("The number of rows of X must equal the length of y")
+  }
+  if(!is.null(penalty.factor)){
+    if(ncol(X) != length(penalty.factor)){
+      stop("The number of columns of X must equal the length of penalty.factor")
+    }
+    if(any(!(penalty.factor %in% c(0,1)))){
+      stop("penalty.factor must be vector of 0 and 1 only")
+    }
+  }
+  
   # Borrowed elements from `ncvreg` function
   n = nrow(X)
   p = ncol(X)

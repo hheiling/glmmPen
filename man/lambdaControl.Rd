@@ -29,10 +29,10 @@ covariance parameters}
 and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
 calculated. See 'Details' section for more details on these default calculations.}
 
-\item{nlambda}{positive integer specifying number of lambda with which to fit a model.
+\item{nlambda}{positive integer specifying number of penalty parameters (lambda) with which to fit a model.
 Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
 
-\item{search}{character string of "full_grid" or "abbrev" indicating if the search of models over 
+\item{search}{character string of "abbrev" (default) or "full_grid" indicating if the search of models over 
 the penalty parameter space should be the full grid search (total number of models equals
 `nlambda`^2 or length(`lambda0_seq`)*length(`lambda1_seq`)) or an abbreviated grid search.
 The abbreviated grid search is described in more detail in the Details section.}
@@ -57,9 +57,16 @@ a minimum lambda value, which equals a small fraction of the maximum lambda. The
 \code{lambda.min} specifiex this fraction. Default value is set to \code{NULL}, which
 automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.}
 
-\item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
-during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
-Pre-screening not performed when the number of random effect predictors is 9 or less.}
+\item{pre_screen}{logical value indicating whether pre-screening should be performed before
+model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+no pre-screening will be performed. Pre-screening removes random effects from consideration
+during the model selection process, which can significantly speed up the algorithm.}
+
+\item{lambda.min.presc}{numeric fraction between 0 and 1. During pre-screening and the full
+model fit for the BIC-ICQ calculation, the small penalty used on the random effect is
+the fraction \code{lambda.min.presc} mulitplied by the maximum penalty parameter that penalizes
+all fixed and random effects to 0. If left as \code{NULL}, the default value is 0.01 when the number
+of random effects is 10 or less and 0.05 otherwise.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
@@ -75,7 +82,9 @@ automatically calculated. The sequence will be calculated in the same manner as
 small portion of max (\code{lambda.min}*(lambda max)), sequence is composed of 
 \code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
 values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
-running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}.
+running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
+By default, these sequences are calculated using \code{\link{LambdaSeq}}.
+
 For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
 finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 

@@ -3,7 +3,8 @@
 #' Minimization (MCECM) 
 #' 
 #' \code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-#' Conditional Minimization (MCECM) over multiple tuning parameters
+#' Conditional Minimization (MCECM) over multiple tuning parameters and is called within
+#' \code{glmmPen}
 #' 
 #' @inheritParams glmmPen
 #' @inheritParams fit_dat_B
@@ -11,6 +12,12 @@
 #' @inheritParams optimControl
 #' @param BICq_calc boolean value indicating if the BIC-ICQ criterion should be used to select the
 #' best model.
+#' @param checks_complete boolean value indicating if several data checks have been completed.
+#' @param lambda.min.full a vector of two numeric values that gives the fixed and random effect penalty 
+#' values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
+#' (if applicable)
+#' @param stage1 boolean value indicating if the first stage of the abbreviated two-stage grid
+#' search in the model selection procedure is being performed.
 #' 
 #' @return A list with the following elements:
 #' \item{results}{matrix of summary results for each lambda tuning parameter combination, used
@@ -24,14 +31,14 @@
 #' @importFrom bigmemory attach.big.matrix describe write.big.matrix read.big.matrix
 select_tune = function(dat, offset = NULL, family, covar = c("unstructured","independent"), 
                        group_X = 0:(ncol(dat$X)-1),
-                       penalty, lambda0_range, lambda1_range,
+                       penalty, lambda0_seq, lambda1_seq,
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                        trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
                        BIC_option = c("BICq","BICh","BIC","BICNgrp"), BICq_calc = T, 
                        logLik_calc = switch(BIC_option[1], BICq = F, T),
                        BICq_posterior = NULL, checks_complete = F, pre_screen = T, 
-                       ranef_keep = NULL, lambda.min.presc = NULL, stage1 = F){
+                       ranef_keep = NULL, lambda.min.full, stage1 = F){
   
   # Input modification and restriction for family
   family_info = family_export(family)
@@ -46,27 +53,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   if(!(BIC_option %in% c("BICh","BIC","BICq","BICNgrp"))){
     stop("BIC_option must be 'BICh', 'BIC', 'BICq', or 'BICNgrp'")
   }
-  
-  # # Calculate loglik for saturated model (mu set to y; n parameters, one per observation)
-  # if((family == "binomial") & (link == "logit")){
-  #   sat_ll = 0
-  # }else if((family == "poisson") & (link == "log")){
-  #   sat_ll = 0
-  #   y = dat$y
-  #   for(i in 1:length(y)){
-  #     if(y[i] > 0){
-  #       sat_ll = sat_ll + dpois(x = y[i], lambda = y[i], log = T)
-  #     }
-  #   }
-  # }else if((family == "gaussian") & (link == "identity")){
-  #   # Will not look at model saturation for gaussian family
-  #   sat_ll = 0
-  # }else{
-  #   print(fam_fun)
-  #   stop("specified family and link combination not available \n")
-  # }
-  # # Set null deviance arbitrarily to 1 for the moment
-  # nullDev = 1.0
   
   if(is.null(offset)){
     offset = rep(0, length(dat$y))
@@ -90,32 +76,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   sampler = optim_options$sampler
   
 
-  # 'Full' model: fit model with 'minimum' penalty
-  # 'minimum penalty': lambda.min * (lambda max)
-  # if((ncol(dat$Z)/nlevels(dat$group) <= 11)){ # number random effects (including intercept)
-  #   lambda.min = 0.001
-  # }else{
-  #   lambda.min = 0.01
-  # }
-  if(is.null(lambda.min.presc)){
-    # if((ncol(dat$Z)/nlevels(dat$group) <= 11)){ # number random effects (including intercept)
-    #   lambda.min = 0.001
-    # }else if((ncol(dat$Z)/nlevels(dat$group) <= 26)){
-    #   lambda.min = 0.01
-    # }else if((ncol(dat$Z)/nlevels(dat$group) <= 41)){
-    #   lambda.min = 0.025
-    # }else{
-    #   lambda.min = 0.05
-    # }
-    if((ncol(dat$Z)/nlevels(dat$group) <= 11)){ # number random effects (including intercept)
-      lambda.min = 0.001
-    }else{
-      lambda.min = 0.05
-    }
-  }else{
-    lambda.min = lambda.min.presc
-  }
-  
   # Pre-screening step
   ## If number of random effects in model (including intercept) is 6 or more
   ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
@@ -123,7 +83,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     cat("begin prescreening procedure \n")
     out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 
-                        lambda.min = lambda.min, lambda0_min = min(lambda0_range), 
+                        lambda0_min = lambda.min.full[1], lambda1_min = lambda.min.full[2], 
                         group_X = group_X, sampler = sampler, 
                         adapt_RW_options = adapt_RW_options, covar = covar,
                         var_start = var_start, max_cores = max_cores, 
@@ -191,16 +151,14 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     }
     
     if(fitfull_needed){
-      # For high dimensions (number of fixed or random effects >= 10 not including intercept), 
-      # find a small penalty to use for full model (lambda.min * lambda max)
-      lam_MinMax = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2, lambda.min = lambda.min)
-      lam_min = lam_MinMax[1]
       # fixed effects penalty
-      if(ncol(dat$X) >= 6) lam0 = min(lam_min, min(lambda0_range)) else lam0 = 0
+      if(ncol(dat$X) >= 6) lam0 = lambda.min.full[1] else lam0 = 0
       # random effect penalty - may be larger than fixed effects penalty
       ## There is a general sparsity assumption for random effects, so we may
       ## assume a higher penalty on the random effects for a 'full' model
-      if(ncol(dat$Z)/nlevels(dat$group) >= 6) lam1 = lam_min else lam1 = 0
+      if(ncol(dat$Z)/nlevels(dat$group) >= 6) lam1 = lambda.min.full[2] else lam1 = 0
+      print("Penalty parameters used to calculate full model for BIC-ICQ calculation:")
+      print(sprintf("fixed effects %f, random effects %f", lam0, lam1))
       # Fit 'full' model
       ## Note: M restricted to be >= 10^4 in optimControl(). Will report M posterior draws from full model
       out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
@@ -227,15 +185,14 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         ufull_big = attach.big.matrix(Estep_out$u0)
         write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
         ufull_describe = Estep_out$u0
-        # If pre_screen = T or in first stage of abbreviated grid search, restrict the next
-        # model in the search to only consider random effects that were not penalized out
-        # in this full model
-        if(pre_screen | stage1){
+        # If pre_screen = T, restrict the next model in the search to only consider random 
+        # effects that were not penalized out in this full model
+        if(pre_screen){
           ranef_keep = as.numeric(diag(out$sigma) > 0)
         }
-        # Restrict lambda1_range to not include any points smaller than the minimum lambda used
-        # in the full model fit
-        lambda1_range = lambda1_range[which(lambda1_range >= lam_min)]
+        # Restrict lambda1_seq to not include any points smaller than the minimum lambda used
+        # in the full model fit (restriction also applied if pre-screening performed)
+        lambda1_seq = lambda1_seq[which(lambda1_seq >= lam1)]
       }
       
     }else{ # if fitfull_needed = F
@@ -255,21 +212,20 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     
   } # End if-else BICq_calc = T
   
-  # Restrict lambda1_range to not include any points smaller than the minimum lambda used
-  # in the 'full' model fit used in pre-screening 
+  # Restrict lambda1_seq to not include any points smaller than the minimum lambda used
+  # in the 'full' model fit used in pre-screening or BIC-ICQ calculation
   ## Note: this restriction is also done when the full model is fit for the BIC-ICQ calculation
   ## (see code above)
   if(pre_screen){
-    lam_MinMax = LambdaRange(dat$X[,-1], dat$y, family = family, nlambda = 2, lambda.min = lambda.min)
-    lam_min = lam_MinMax[1]
-    lambda1_range = lambda1_range[which(lambda1_range >= lam_min)]
+    lambda1_seq = lambda1_seq[which(lambda1_seq >= lambda.min.full[2])]
   }
   
-  n1 = length(lambda0_range)
-  n2 = length(lambda1_range)
+  n1 = length(lambda0_seq)
+  n2 = length(lambda1_seq)
   # Keep track of BIC-type selection criteria
   ## BIC_critold: record of largest BIC-type critera so far during selection
-  BIC_crit = BIC_critold = Inf
+  BIC_crit = Inf
+  BIC_critold = Inf
   
   res = matrix(0, nrow = n1*n2, ncol = 11)
   colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef","EM_iter")
@@ -296,7 +252,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   # If stage 1 of abbreviated grid search, will adjust ranef_keep for subsequent models:
   ## if random effect penalized out in model j, that random effect will be assumed 0 in
   ## subseqent model
-  # Therefore, store ranef_keep after pre-screening/full model
+  # Therefore, store ranef_keep after pre-screening/full model (if performed)
   ranef_keep_presc = ranef_keep
   
   for(j in 1:n2){ # random effects
@@ -305,7 +261,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         # start from the initial values input (or NULL values)
         coef_old0 = coef_old
         uold = u_init # Should be null
-      }else if((i == 1) & (j != 1)){ # changed from if(i != 1 & j == 1)
+      }else if((i == 1) & (j != 1)){ 
         # if re-starting fixed effects penalty loop but moving on to next random effects
         # penalty parameter, take the previous j result for i = 1
         coef_old0 = coef_oldj0
@@ -330,10 +286,10 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       
       gc()
       print("------------------------------------------------------------------")
-      print(sprintf("lambda0 %f lambda1 %f", lambda0_range[i], lambda1_range[j]))
+      print(sprintf("lambda0 %f lambda1 %f", lambda0_seq[i], lambda1_seq[j]))
       print(sprintf("lambda0 i %i lambda1 j %i", i, j))
       print("------------------------------------------------------------------")
-      out = try(fit_dat_B(dat, lambda0 = lambda0_range[i], lambda1 = lambda1_range[j], 
+      out = try(fit_dat_B(dat, lambda0 = lambda0_seq[i], lambda1 = lambda1_seq[j], 
                           nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -348,13 +304,14 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
 
       if(is.character(out)) next
       
-      # If in stage 1 of abbreviated grid search, restrict random effects in subsequent model
-      # to only consider random effects not penalized to 0 in this past model
+      # Abbreviated grid search result: in stage 1, will restrict random effects in subsequent
+      ## model to only consider random effects not penalized to 0 in this past model
       if(stage1){
-        ranef_keep = as.numeric(diag(out$sigma) > 0)
+        ranef_keep = as.numeric((diag(out$sigma) > 0))
       }
       
       # for restarting the next j for i = 1
+      ## keep coefficients and posterior draws for initialization of next i = 1, j combination
       if(i == 1){
         coef_oldj0 = out$coef
         uj0 = out$u_init
@@ -386,8 +343,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       names(BIC_report) = c("BICh","BIC","BICq","BICNgrp")
       print(BIC_report)
       
-      res[(j-1)*n1+i,1] = lambda0_range[i]
-      res[(j-1)*n1+i,2] = lambda1_range[j]
+      res[(j-1)*n1+i,1] = lambda0_seq[i]
+      res[(j-1)*n1+i,2] = lambda1_seq[j]
       res[(j-1)*n1+i,3] = BICh
       res[(j-1)*n1+i,4] = BIC
       res[(j-1)*n1+i,5] = BICq
@@ -404,37 +361,10 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       coef = rbind(coef, out$coef)
       print(res[(j-1)*n1+i,])
       
-      # # Check for model saturation in binomial and poisson case
-      # if(family %in% c("binomial","poisson")){
-      #   
-      #   ## set null deviance as deviance for model with fixed and random intercepts only
-      #   ## This assumes lambda.max is the first element of the lambda0 and lambda1 sequences
-      #   ## This assumption not valid if users specify their own lambda0/1 sequences
-      #   ## Idea: fit random intercept model using lme4 and use the given log-lik for the null model
-      #   if((i==1) & (j==1)){
-      #     nullDev = 2*(sat_ll - out$ll)
-      #   }
-      #   
-      #   ## Calculate deviance
-      #   Dev = 2*(sat_ll - out$ll)
-      #   if(is.finite(Dev)){
-      #     if(Dev / nullDev < 0.01){
-      #       print("Reached model saturation")
-      #       saturated = TRUE
-      #       break
-      #     }
-      #   }
-      #   
-      # } End if-else for model saturation check
       
-      
-    } # End i loop for lambda0_range
+    } # End i loop for lambda0_seq
     
-    # if(saturated){
-    #   break
-    # }
-    
-  } # end j loop for lambda1_range
+  } # end j loop for lambda1_seq
   
   colnames(coef) = c("(Intercept)",str_c("B",1:(ncol(dat$X)-1)), str_c("Gamma",1:(ncol(coef)-ncol(dat$X))))
   
