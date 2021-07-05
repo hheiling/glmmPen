@@ -16,7 +16,7 @@ glmmPen(
   penalty = c("MCP", "SCAD", "lasso"),
   alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
-  optim_options = "recommend",
+  optim_options = optimControl(),
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = selectControl(),
@@ -72,7 +72,7 @@ the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regressi
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
 
-\item{optim_options}{a character string "recommend" or a list of class "optimControl" created 
+\item{optim_options}{a structure of class "optimControl" created 
 from function \code{\link{optimControl}} that specifies optimization parameters. See the 
 documentation for \code{\link{optimControl}} for more details on defaults.}
 

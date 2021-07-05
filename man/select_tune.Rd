@@ -12,8 +12,8 @@ select_tune(
   covar = c("unstructured", "independent"),
   group_X = 0:(ncol(dat$X) - 1),
   penalty,
-  lambda0_range,
-  lambda1_range,
+  lambda0_seq,
+  lambda1_seq,
   alpha = 1,
   gamma_penalty = switch(penalty[1], SCAD = 4, 3),
   trace = 0,
@@ -21,12 +21,15 @@ select_tune(
   coef_old = NULL,
   adapt_RW_options = adaptControl(),
   optim_options = optimControl(),
-  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
+  BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
   BICq_calc = T,
+  logLik_calc = switch(BIC_option[1], BICq = F, T),
   BICq_posterior = NULL,
   checks_complete = F,
   pre_screen = T,
-  ranef_keep = NULL
+  ranef_keep = NULL,
+  lambda.min.full,
+  stage1 = F
 )
 }
 \arguments{
@@ -57,6 +60,14 @@ Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the rando
 matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
 random effects coefficients.}
 
+\item{lambda0_seq}{a sequence of non-negative numeric penalty parameters for the fixed 
+and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
+calculated. See 'Details' section for more details on these default calculations.}
+
+\item{lambda1_seq}{a sequence of non-negative numeric penalty parameters for the fixed 
+and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
+calculated. See 'Details' section for more details on these default calculations.}
+
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
@@ -72,19 +83,26 @@ See Details for more information about output provided when trace = 0, 1, or 2.}
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
 Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
 
-\item{optim_options}{a character string "recommend" or a list of class "optimControl" created 
+\item{optim_options}{a structure of class "optimControl" created 
 from function \code{\link{optimControl}} that specifies optimization parameters. See the 
 documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
-Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
+effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-a full model; a small penalty is used for the fixed and/or random effects if the number of 
-effects is 10 or greater.}
+observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
+groups).}
 
 \item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
 best model.}
+
+\item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
+calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
+If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
+\code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
 the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
@@ -94,14 +112,19 @@ specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the p
 will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
 See 'Details' section for additional details.}
 
-\item{checks_complete}{boolean value indicating whether the function has been called within
-\code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
-performs additional checks on the input data. If false, assumes data input checks have 
-already been performed. For package testing purposes only.}
+\item{checks_complete}{boolean value indicating if several data checks have been completed.}
 
-\item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
-during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
-Pre-screening not performed when the number of random effect predictors is 9 or less.}
+\item{pre_screen}{logical value indicating whether pre-screening should be performed before
+model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+no pre-screening will be performed. Pre-screening removes random effects from consideration
+during the model selection process, which can significantly speed up the algorithm.}
+
+\item{lambda.min.full}{a vector of two numeric values that gives the fixed and random effect penalty 
+values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
+(if applicable)}
+
+\item{stage1}{boolean value indicating if the first stage of the abbreviated two-stage grid
+search in the model selection procedure is being performed.}
 }
 \value{
 A list with the following elements:
@@ -114,5 +137,6 @@ Rows correspond with the rows of the results matrix.}
 }
 \description{
 \code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-Conditional Minimization (MCECM) over multiple tuning parameters
+Conditional Minimization (MCECM) over multiple tuning parameters and is called within
+\code{glmmPen}
 }

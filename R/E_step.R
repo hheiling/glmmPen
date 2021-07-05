@@ -4,7 +4,15 @@
 #' @export
 E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, link, phi, sig_g,
                   sampler, d, uold, proposal_SD, batch, batch_length,
-                  offset_increment, trace, num_cores){
+                  offset_increment, trace, max_cores){
+  
+  # Determine number of cores to use - for Stan sampling only
+  if(nMC < 2000){
+    num_cores = 1
+  }else{
+    num_cores = 2 + (nMC - 2000) %/% 1000
+    if(num_cores > max_cores) num_cores = max_cores
+  }
   
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Znew2)/d)
   

@@ -66,7 +66,8 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
     X0 = X[,1:(p1+pnonzerovar+1)]
   }
   if(slopes == T) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
-  z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
+  z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), 
+                          sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
   
   eta = X0 %*% matrix(beta, ncol = 1) + Z0 %*% matrix(z1, ncol = 1)
   mu = invlink(link_int, eta)

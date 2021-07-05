@@ -517,6 +517,54 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4),
 #                  sampler = sampler, d = d)
 # }
 
+#' @importFrom ncvreg std
+#' @export
+pglmmObj_mod = function(object, trace = 0){
+  
+  X = object$data$X
+  X_std = cbind(1, std(X[,-1, drop = F]))
+  
+  y = object$data$y
+  Z = Matrix::as.matrix(object$data$Z_std)
+  group = object$data$group
+  group_num = as.factor(as.numeric(group[[1]]))
+  
+  dat = list(y = y, X = X_std, Z = Z, group = group_num)
+  
+  fam_fun = object$family
+  
+  fit = c(object$Estep_material, list(J = object$J, sigma = object$sigma, 
+             sigma_gaus = ifelse(fam_fun == "gaussian", sqrt(object$scale$Gaus_sig2), 1.0),
+             object$Gibbs_info))
+  
+  Estep_out = E_step_final(dat = dat, fit = fit, optim_options = object$control_info$optim_options, 
+                           fam_fun = fam_fun, extra_calc = T, 
+                           adapt_RW_options = object$control_info$adapt_RW_options, trace = trace)
+  
+  
+  object$posterior_draws = Estep_out$post_out
+  
+  # Random effects coefficients
+  rand = Estep_out$post_modes
+  d = nlevels(group_num)
+  q = ncol(Z) /d
+  
+  ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
+  ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
+  rownames(ref) = rownames(object$ranef[[1]])
+  colnames(ref) = colnames(object$ranef[[1]])
+  ranef = lapply(group, function(j) ref)
+  object$ranef = ranef
+  
+  optim_results = object$results_optim
+  idx = which(colnames(optim_results) %in% c("BICh","BIC","BICNgrp","LogLik"))
+  optim_results[,idx] = c(Estep_out$BICh, Estep_out$BIC, Estep_out$BICNgrp, Estep_out$ll)
+  object$results_optim = optim_results
+  
+  return(object)
+  
+}
+
 #' @export
 logLik.pglmmObj = function(object){ 
   
@@ -525,6 +573,10 @@ logLik.pglmmObj = function(object){
   
   ll = results_optim[ll_elem]
   names(ll) = "logLik"
+  
+  if(is.na(ll)){
+    print("Please perform the modification 'pglmmObj_mod(pglmmObj)' to the pglmmObj output object to calculate the log-likelihood")
+  }
   
   return(ll)
 
@@ -598,6 +650,9 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
   U = object$posterior_draws
   U_cols = colnames(U)
   # colnames organization = var_name:grp_name
+  if(any(is.na(U))){
+    stop("posterior draws in pglmmObj object are NA. Use function pglmmObj_mod() on object")
+  }
   
   if(any(vars == "all")){
     d = nlevels(object$data$group[[1]])

@@ -198,16 +198,12 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     lambda1_seq = tuning_options$lambda1_seq
   }
   
-  ## Specify starting coefficient using opt_res results
-  ## Note: need to make sure fixed effects adjusted for standardized X
-  coef_unstd = opt_res[which(names(opt_res) == "(Intercept)"):length(opt_res)]
-  coef_fix = coef_unstd[1:ncol(X)]
-  coef_rand = coef_unstd[(ncol(X)+1):length(coef_unstd)]
+  BIC_option = tuning_options$BIC_option
+  covar = object$call$covar
+  logLik_calc = tuning_options$logLik_calc
   
-  coef_old = numeric(length(coef_fix))
-  coef_old[1] = coef_fix[1] + sum(coef_fix[-1] * std_info$X_center / std_info$X_scale)
-  coef_old[-1] = coef_fix[-1] * std_info$X_scale
-  coef_old = c(coef_old, coef_rand)
+  ## Specify starting coefficient - unstandardized result from final model in coarse search
+  coef_old = object$Estep_material$coef
   
   fixef_noPen = object$penalty_info$fixef_noPen
   
@@ -231,50 +227,164 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   ranef_keep = object$penalty_info$prescreen_ranef
   names(ranef_keep) = NULL
   
+  # select_tune arguments
   # dat, offset = NULL, family, covar = c("unstructured","independent"), 
   # group_X = 0:(ncol(dat$X)-1),
-  # penalty, lambda0_range, lambda1_range,
+  # penalty, lambda0_seq, lambda1_seq,
   # alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
   # trace = 0, u_init = NULL, coef_old = NULL, 
   # adapt_RW_options = adaptControl(),optim_options = optimControl(), 
   # BIC_option = c("BICh","BIC","BICq","BICNgrp"), BICq_calc = T, 
-  # BICq_posterior = NULL, checks_complete = F, pre_screen = T
+  # BICq_posterior = NULL, checks_complete = F, pre_screen = T,
+  # ranef_keep = NULL, stage1 = F
   
-  fit_select = select_tune(dat = data_input, offset = offset, family = family, 
-                           covar = object$call$covar, group_X = group_X, 
-                           lambda0_range = lambda0_seq, lambda1_range = lambda1_seq,
-                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                           trace = trace, u_init = NULL,
-                           coef_old = coef_old, BICq_calc = (tuning_options$BIC_option == "BICq"),
-                           adapt_RW_options = adapt_RW_options, 
-                           optim_options = optim_options, BICq_posterior = BICq_posterior,
-                           checks_complete = T, pre_screen = F, ranef_keep = ranef_keep)
+  # Note: no pre-screening should be performed in this fine grid search
+  ## pre_screen = F always
+  
+  lambda.min.presc = tuning_options$lambda.min.presc
+  if(is.null(lambda.min.presc)){
+    if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
+      lambda.min.presc = 0.01
+    }else{
+      lambda.min.presc = 0.05
+    }
+  }
+  # Minimum lambda values to use for pre-screening and BIC-ICQ full model fit
+  ## minimum penalty for fixed effects, minimum penalty for random effects
+  full_ranef = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, 
+                         family = object$family$family, 
+                         alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
+                         lambda.min = lambda.min.presc)
+  lambda.min.full = c(min(0.01*full_ranef[2],lambda0_seq[1]), full_ranef[1])
+  names(lambda.min.full) = c("fixef","ranef")
+  
+  if(tuning_options$search == "abbrev"){
+    
+    print("Start of stage 1 of abbreviated grid search")
+    fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
+                              covar = covar, group_X = group_X,
+                              lambda0_seq = min(lambda0_seq), lambda1_seq = lambda1_seq,
+                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                              trace = trace, coef_old = coef_old, 
+                              adapt_RW_options = adapt_RW_options, 
+                              optim_options = optim_options, logLik_calc = logLik_calc,
+                              BICq_calc = (BIC_option == "BICq"),
+                              BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
+                              checks_complete = T, pre_screen = F, ranef_keep = ranef_keep,
+                              lambda.min.full = lambda.min.full, stage1 = T)
+    print("End of stage 1 of abbreviated grid search")
+    
+    res_pre = fit_fixfull$results
+    coef_pre = fit_fixfull$coef
+    
+    # Choose the best model from the above 'fit_fixfull' models
+    opt_pre = matrix(res_pre[which.min(res_pre[,BIC_option]),], nrow = 1)
+    # optimum penalty parameter on random effects from above first step
+    lam_ref = opt_pre[,2]
+    # Extract coefficient and posterior results from 'best' model from first step
+    coef_old = coef_pre[which(res_pre[,2] == lam_ref),]
+    u_init = fit_fixfull$out$u_init
+    
+    # Extract other relevant info
+    ## only consider random effects that are non-zero or above 10^-2 in the optimal random effect model
+    # ranef_keep = fit_fixfull$ranef_keep
+    vars = diag(fit_fixfull$out$sigma)
+    ## BIC-ICQ full model results to avoid repeat calculation of full model
+    if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
+      BICq_post_file = "BICq_Posterior_Draws.txt"
+    }else{
+      BICq_post_file = BICq_posterior
+    }
+    
+    # Fit second stage of 'abbreviated' model fit
+    print("Start of stage 2 of abbreviated grid search")
+    fit_select = select_tune(dat = data_input, offset = offset, family = family,
+                             covar = object$call$covar, group_X = group_X, 
+                             lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
+                             penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                             trace = trace,
+                             coef_old = coef_old, u_init = u_init,
+                             adapt_RW_options = adapt_RW_options, 
+                             optim_options = optim_options,
+                             logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
+                             BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                             checks_complete = T, pre_screen = F,
+                             ranef_keep = as.numeric((vars > 0)), 
+                             lambda.min.full = lambda.min.full, stage1 = F)
+    print("End of stage 2 of abbreviated grid search")
+    
+    resultsA = rbind(fit_fixfull$results, fit_select$results)
+    coef_results = rbind(fit_fixfull$coef, fit_select$coef)
+    
+  }else if(tuning_options$search == "full_grid"){
+    
+    fit_select = select_tune(dat = data_input, offset = offset, family = family, 
+                             covar = object$call$covar, group_X = group_X, 
+                             lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
+                             penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                             trace = trace, 
+                             coef_old = coef_old, u_init = NULL, 
+                             adapt_RW_options = adapt_RW_options, 
+                             optim_options = optim_options, 
+                             logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
+                             BIC_option = BIC_option, BICq_posterior = BICq_posterior,
+                             checks_complete = T, pre_screen = F, ranef_keep = ranef_keep,
+                             lambda.min.full = lambda.min.full, stage1 = F)
+    
+    resultsA = fit_select$results
+    coef_results = fit_select$coef
+    
+  }
   
   fit = fit_select$out
   
-  resultsA = fit_select$results
-  coef_results = fit_select$coef
+  # resultsA = fit_select$results
+  # coef_results = fit_select$coef
   # Unstandardize coefficient results
   beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
-  beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X)], MARGIN = 1, FUN = function(x) sum(x * std_info$X_center / std_info$X_scale))
+  beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=F], MARGIN = 1, FUN = function(x) sum(x * std_info$X_center / std_info$X_scale))
   for(i in 1:nrow(beta_results)){
-    beta_results[,-1] = coef_results[,2:ncol(data_input$X)] / std_info$X_scale
+    beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=F] / std_info$X_scale
   }
-  colnames(beta_results) = names(object$fixef)
+  # colnames(beta_results) = c(coef_names$fixed)
   
-  gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results)]
-  colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
+  gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results), drop=F]
+  # colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
+  
+  opt_names = names(opt_res)
+  coef_names = opt_names[which(names(opt_res) == "(Intercept)"):length(opt_res)]
   
   selection_results = cbind(resultsA,beta_results,gamma_results)
+  colnames(selection_results) = c(colnames(resultsA), coef_names)
   
-  if(tuning_options$BIC_option == "BICh"){
-    optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
-  }else if(tuning_options$BIC_option == "BIC"){
-    optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
-  }else if(tuning_options$BIC_option == "BICq"){
-    optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
-  }
+  optim_results = matrix(selection_results[which.min(selection_results[,BIC_option]),], nrow = 1)
+  # if(BIC_option == "BICh"){
+  #   optim_results = matrix(selection_results[which.min(selection_results[,"BICh"]),], nrow = 1)
+  # }else if(BIC_option == "BIC"){
+  #   optim_results = matrix(selection_results[which.min(selection_results[,"BIC"]),], nrow = 1)
+  # }else if(BIC_option == "BICq"){
+  #   optim_results = matrix(selection_results[which.min(selection_results[,"BICq"]),], nrow = 1)
+  # }else if(BIC_option == "BICNgrp"){
+  #   optim_results = matrix(selection_results[which.min(selection_results[,"BICNgrp"]),], nrow = 1)
+  # }
   colnames(optim_results) = colnames(selection_results)
+  
+  Estep_out = list(u0 = NULL, u_init = fit$u_init, 
+                   post_modes = rep(NA, times = ncol(data_input$Z)),
+                   post_out = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)),
+                   ll = NA, BICh = NA, BIC = NA, BICNgrp = NA)
+  
+  q_final = sum(diag(fit$sigma) > 0)
+  if(q_final <= 51){
+    
+    Estep_out = E_step_final(dat = data_input, fit = fit, optim_options = optim_options, 
+                             fam_fun = object$family, extra_calc = T, 
+                             adapt_RW_options = adapt_RW_options, trace = trace)
+  }
+  
+  # optim_results:
+  optim_results[,c("BICh","BIC","BICNgrp","LogLik")] = c(Estep_out$BICh, Estep_out$BIC, 
+                                                         Estep_out$BICNgrp, Estep_out$ll)
   
   optim_options = fit_select$optim_options
   
@@ -284,7 +394,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   
   call = match.call(expand.dots = F)
   
-  output = c(fit, list(call = call, formula = object$formula, y = y, fixed_vars = object$fixed_vars,
+  output = c(fit, 
+             list(Estep_out = Estep_out, call = call, formula = object$formula, y = y, fixed_vars = object$fixed_vars,
                        X = X, Z_std = Z_std, group = group,
                        coef_names = list(fixed = names(object$fixef), random = colnames(object$sigma)), 
                        family = object$family, offset = offset, frame = object$data$frame, 

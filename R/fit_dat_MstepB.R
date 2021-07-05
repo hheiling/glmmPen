@@ -54,11 +54,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                      alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
                      group_X = 0:(ncol(dat$X)-1),
                      nMC_burnin = 250, nMC = 250, nMC_max = 5000, t = 2, mcc = 2,
-                     nMC_report = 5000, u_init = NULL, coef_old = NULL, 
+                     u_init = NULL, coef_old = NULL, 
                      ufull_describe = NULL, maxitEM = 50, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 1.0, max_cores = 1, checks_complete = F,
+                     var_start = 1.0, logLik_calc = F, max_cores = 1, checks_complete = F,
                      ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group)))){
   
   ############################################################################################
@@ -350,13 +350,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   offset_increment = adapt_RW_options$offset
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Z)/d)
   
-  # Determine initial number of cores to use
-  if(nMC < 2000){
-    num_cores = 1
-  }else{
-    num_cores = 2 + (nMC - 2000) %/% 1000
-    if(num_cores > max_cores) num_cores = max_cores
-  }
+  # Determine number of cores to use
+  # if(nMC < 2000){
+  #   num_cores = 1
+  # }else{
+  #   num_cores = 2 + (nMC - 2000) %/% 1000
+  #   if(num_cores > max_cores) num_cores = max_cores
+  # }
   
   # At start of EM algorithm, acquire posterior draws from all random effect variables
   # Note: restricted to just which variables were not selected out in previous selection models
@@ -375,7 +375,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                        nMC=nMC, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
                        sampler=sampler, d=d, uold=uold, proposal_SD=proposal_SD, 
                        batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
-                       trace=trace, num_cores=num_cores)
+                       trace=trace, max_cores=max_cores)
     
     u0 = attach.big.matrix(Estep_out$u0)
     proposal_SD = Estep_out$proposal_SD
@@ -388,7 +388,7 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
                        nMC=nMC, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
                        sampler=sampler, d=d, uold=rnorm(n = ncol(Z)), proposal_SD=proposal_SD, 
                        batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
-                       trace=trace, num_cores=num_cores)
+                       trace=trace, max_cores=max_cores)
     
     u0 = attach.big.matrix(Estep_out$u0)
     proposal_SD = Estep_out$proposal_SD
@@ -417,6 +417,9 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   # Remove initialized big matrix of posterior draws
   u_big = NULL
   
+  # Alternative maxit_CD for when q is large
+  maxit_CD_alt = 25
+  
   ############################################################################################
   # EM Algorithm
   ############################################################################################
@@ -431,12 +434,31 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     # maxit_CD = 250, conv_CD = 0.0001,
     # init, group_X = 0:(ncol(X)-1), covgroup,
     # penalty, lambda0, lambda1, gamma, alpha = 1.0
+    # if(sum(diag(cov) > 0) > 15){
+    #   maxit_CD = 25
+    # }else if(sum(diag(cov) > 0) > 10){
+    #   maxit_CD = 50
+    # }else{
+    #   maxit_CD = 75
+    # }
+    if(sum(diag(cov) > 0) > 15){
+      maxit_CD_use = maxit_CD_alt
+    }else{
+      maxit_CD_use = maxit_CD
+    }
+    # if(sum(diag(cov) > 0) <= 11){
+    #   maxit_CD_use = maxit_CD
+    # }else{
+    #   maxit_CD_use = maxit_CD_alt
+    # }
+    
+    # print("Start M-step")
     coef = M_step(y=y, X=X, Z=Z, u_address=u0@address, M=nrow(u0), J=J, 
                   group=group, family=family, link_int=link_int, coef=coef, offset=offset_fit,
-                  phi=phi, maxit_CD=maxit_CD, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
+                  phi=phi, maxit_CD=maxit_CD_use, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
                   covgroup=covgroup, penalty=penalty, lambda0=lambda0, lambda1=lambda1, 
                   gamma=gamma_penalty, alpha=alpha, trace=trace)
-    
+    # print("End M-step")
     if(family == "gaussian"){
       # if family = 'gaussian', calculate sigma of error term (standard deviation)
       sig_g = sig_gaus(y, X, Z, u0@address, group, J, coef, offset_fit, c(d, ncol(Z)/d), link_int)
@@ -511,6 +533,20 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     
+    if(trace >= 1){
+      if(nrow(cov) <= 5){
+        print("random effect covariance matrix:")
+        print(cov)
+      }else{
+        print("random effect covariance matrix diagonal:")
+        print(diag(cov))
+      }
+    }
+    
+    if(nrow(cov) == 1){
+      cov_record[i] = cov
+    }
+    
     Znew2 = Z
     finish = 0
     while(finish == 0){
@@ -524,16 +560,16 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     if(i <= t){
       diff[i] = 10^2
     }else{
-      diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / length(coef)
+      # diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / length(coef)
+      diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / sum(coef_record[1,] != 0)
     }
     
     # Update latest record of coef
     coef_record = rbind(coef_record[-1,], t(coef))
     
     # now update EM iteration information  
-    ## Round integers i, nMC, and sum(coef != 0) to avoid printing of unnecessary decimals (x.00000)
-    update_limits = c(i, nMC , round(diff[i],6), (sum(coef!=0)))
-    names(update_limits) = c("Iter","nMC","EM conv","Non0 Coef")
+    update_limits = c(i, nMC , round(diff[i],6), (sum(coef[1:ncol(X)] !=0)), (sum(coef[-c(1:ncol(X))] != 0)))
+    names(update_limits) = c("Iter","nMC","EM conv","Non0 Fixef", "Non0 Ranef")
     print(update_limits)
     
     if(sum(diff[max(i-mcc+1,1):i] < conv_EM) >= mcc){
@@ -557,35 +593,22 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
       if(nMC > nMC_max) nMC = nMC_max
     }
     
-    if(trace >= 1){
-      if(nrow(cov) <= 5){
-        print("random effect covariance matrix:")
-        print(cov)
-      }else{
-        print("random effect covariance matrix diagonal:")
-        print(diag(cov))
-      }
-    }
-    
-    if(nrow(cov) == 1){
-      cov_record[i] = cov
-    }
     
     # E Step 
     
     # Initial points for Metropolis within Gibbs E step algorithms
     uold = as.numeric(u0[nrow(u0),])
     ranef_idx = which(diag(cov) > 0)
-    
+    # print("Start E-step")
     Estep_out = E_step(coef = coef, ranef_idx = ranef_idx, y=y, X=X, Znew2=Znew2, group=group, 
                        nMC=nMC, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
                        sampler=sampler, d=d, uold=uold, proposal_SD=proposal_SD, 
                        batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
-                       trace=trace, num_cores=num_cores)
-    
+                       trace=trace, max_cores=max_cores)
+    # print("End E-step")
     u0 = attach.big.matrix(Estep_out$u0)
     proposal_SD = Estep_out$proposal_SD
-    gibbs_accept_rate = Estep_out$proposal_SD
+    gibbs_accept_rate = Estep_out$gibbs_accept_rate
     batch = Estep_out$updated_batch
     
     nMC2 = nrow(u0)
@@ -597,8 +620,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
             "\n Consider increasing maxitEM iterations or nMC_max in optimControl()", immediate. = T)
   }
   
-  # Another E step for loglik calculation (number draws = M)
-  ## In optimControl() set minimum of M as 10^4
+  
+  
+  # Another E step
+  ## if logLik_calc = T, use M draws to calculate the log-likelihood
+  ## else if logLik_calc = F but family == "gaussian", calculate 10^3 draws if necessary and 
+  ##  use these draws in next round of selection to initialize sig_g value
+  
   
   # Note: Assume that at end of EM algorithm, which(diag(cov) > 0) corresponds with the
   # sampling restrictions specified within EM algorithm:
@@ -607,46 +635,46 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     ## fixed effect for the variable was penalized to zero in a prevoius M step
     ## Make sure to always keep random intercept
   
-  Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
-                     nMC=M, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g = sig_g,
-                     sampler=sampler, d=d, uold=as.numeric(u0[nrow(u0),]), proposal_SD=proposal_SD, 
-                     batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
-                     trace=trace, num_cores=num_cores)
-  
-  u0 = attach.big.matrix(Estep_out$u0)
-  proposal_SD = Estep_out$proposal_SD
-  gibbs_accept_rate = Estep_out$proposal_SD
-  batch = Estep_out$updated_batch
-  
-  if(sampler == "random_walk" & trace >= 2){
-    print("Updated proposal_SD:")
-    print(proposal_SD)
-    print("Updated batch:")
-    print(batch)
+  if(logLik_calc | ((family == "gaussian") & (nrow(u0) < 10^3))){
+    Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
+                       nMC=ifelse(logLik_calc, M, 10^3), 
+                       nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g = sig_g,
+                       sampler=sampler, d=d, uold=as.numeric(u0[nrow(u0),]), proposal_SD=proposal_SD, 
+                       batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
+                       trace=trace, max_cores=max_cores)
+    
+    u0 = attach.big.matrix(Estep_out$u0)
+    proposal_SD = Estep_out$proposal_SD
+    gibbs_accept_rate = Estep_out$gibbs_accept_rate
+    batch = Estep_out$updated_batch
+    
+    if(sampler == "random_walk" & trace >= 2){
+      print("Updated proposal_SD:")
+      print(proposal_SD)
+      print("Updated batch:")
+      print(batch)
+    }
   }
   
-  # Calculate posterior modes
-  post_U = big.matrix(nrow = nrow(u0), ncol = ncol(u0))
-  for(k in 1:d){
-    idx = seq(from = k, to = ncol(Z), by = d)
-    post_U[,idx] = u0[,idx] %*% t(gamma)
-  }
-  post_modes = numeric(ncol(u0))
-  for(j in 1:ncol(u0)){
-    post_modes[j] = mean(post_U[,j])
-  }
   
   # Calculate loglik using Pajor method (see "logLik_Pajor.R")
-  ll = CAME_IS(posterior = u0, y = y, X = X, Z = Z, group = group,
-               coef = coef, sigma = cov, family = fam_fun, M = M, gaus_sig = sig_g)
-  
-  # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
-  # d = nlevels(group) = number independent subjects/groups
-  BICh = -2*ll + sum(coef[-c(1:ncol(X))] != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
-  # Usual BIC
-  BIC = -2*ll + sum(coef != 0)*log(nrow(X))
-  # BIC using N = nlevels(group)
-  BICNgrp = -2*ll + sum(coef != 0)*log(d)
+  if(logLik_calc){
+    ll = CAME_IS(posterior = u0, y = y, X = X, Z = Z, group = group,
+                 coef = coef, sigma = cov, family = fam_fun, M = M, gaus_sig = sig_g, trace = trace)
+    
+    # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
+    # d = nlevels(group) = number independent subjects/groups
+    BICh = -2*ll + sum(coef[-c(1:ncol(X))] != 0)*log(d) + sum(coef[1:ncol(X)] != 0)*log(nrow(X))
+    # Usual BIC
+    BIC = -2*ll + sum(coef != 0)*log(nrow(X))
+    # BIC using N = nlevels(group)
+    BICNgrp = -2*ll + sum(coef != 0)*log(d)
+  }else{
+    ll = NA
+    BICh = NA
+    BIC = NA
+    BICNgrp = NA
+  }
   
   # Calculated BICq
   ## Using posterior draws from the full model (ufull) and the coefficients from the
@@ -666,13 +694,13 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
     BICq = NA
   }
   
-  out = list(coef = coef, sigma = cov,  
+  out = list(coef = coef, sigma = cov, Gamma_mat = gamma,
              lambda0 = lambda0, lambda1 = lambda1, 
              covgroup = covgroup, J = J, ll = ll, BICh = BICh, BIC = BIC, BICq = BICq, 
-             BICNgrp = BICNgrp, extra = list(Znew2 = Znew2), EM_iter = i, EM_conv = diff[i],
-             u_big = Estep_out$u0, post_modes = post_modes)
+             BICNgrp = BICNgrp, EM_iter = i, EM_conv = diff[i]) 
+             # u_big = Estep_out$u0, post_modes = post_modes
   
-  # If gaussian family, take last 1000 rows of u0 for u_init in next round of selection 
+  # If gaussian family, take 1000 draws of last u0 for u_init in next round of selection 
   #  (to use for sig_g calculation)
   # Else, take last row for initializing E step in next round of selection
   if(family == "gaussian"){
@@ -684,9 +712,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   if(sampler %in% c("random_walk","independence")){
     out$gibbs_accept_rate = gibbs_accept_rate
     out$proposal_SD = proposal_SD
+    out$updated_batch = batch
   }else if(sampler == "stan"){
     out$gibbs_accept_rate = NULL
     out$proposal_SD = NULL
+    out$updated_batch = NULL
   }
   
   if((is.null(coef_old)) & (trace >= 1)){
@@ -697,36 +727,36 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   }
   
   
-  if(nrow(post_U) >= nMC_report){
-    # Take last nMC_report rows
-    r_start = nrow(post_U) - nMC_report + 1
-    r_end = nrow(post_U)
-    u_out = bigmemory::as.matrix(post_U[c(r_start:r_end),])
-  }else{
-    # Run E step for another nMC_report draws
-    Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
-                       nMC=nMC_report, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
-                       sampler=sampler, d=d, uold=as.numeric(u0[nrow(u0),]), proposal_SD=proposal_SD, 
-                       batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
-                       trace=trace, num_cores=num_cores)
-    
-    u0 = attach.big.matrix(Estep_out$u0)
-    proposal_SD = Estep_out$proposal_SD
-    gibbs_accept_rate = Estep_out$proposal_SD
-    batch = Estep_out$updated_batch
-    
-    post_U = big.matrix(nrow = nrow(u0), ncol = ncol(u0))
-    for(k in 1:d){
-      idx = seq(from = k, to = ncol(Z), by = d)
-      post_U[,idx] = u0[,idx] %*% t(gamma)
-    }
-    
-    u_out = bigmemory::as.matrix(post_U)
-    
-  }
-  
-  # Change to saving of big.matrix instead of regular matrix?
-  out$u = u_out
+  # if(nrow(post_U) >= nMC_report){
+  #   # Take last nMC_report rows
+  #   r_start = nrow(post_U) - nMC_report + 1
+  #   r_end = nrow(post_U)
+  #   u_out = bigmemory::as.matrix(post_U[c(r_start:r_end),])
+  # }else{
+  #   # Run E step for another nMC_report draws
+  #   Estep_out = E_step(coef=coef, ranef_idx=which(diag(cov) > 0), y=y, X=X, Znew2=Znew2, group=group, 
+  #                      nMC=nMC_report, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
+  #                      sampler=sampler, d=d, uold=as.numeric(u0[nrow(u0),]), proposal_SD=proposal_SD, 
+  #                      batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
+  #                      trace=trace, num_cores=num_cores)
+  #   
+  #   u0 = attach.big.matrix(Estep_out$u0)
+  #   proposal_SD = Estep_out$proposal_SD
+  #   gibbs_accept_rate = Estep_out$gibbs_accept_rate
+  #   batch = Estep_out$updated_batch
+  #   
+  #   post_U = big.matrix(nrow = nrow(u0), ncol = ncol(u0))
+  #   for(k in 1:d){
+  #     idx = seq(from = k, to = ncol(Z), by = d)
+  #     post_U[,idx] = u0[,idx] %*% t(gamma)
+  #   }
+  #   
+  #   u_out = bigmemory::as.matrix(post_U)
+  #   
+  # }
+  # 
+  # # Change to saving of big.matrix instead of regular matrix?
+  # out$u = u_out
   
   # if(family == "negbin"){
   #   out$phi = phi

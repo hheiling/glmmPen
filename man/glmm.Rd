@@ -11,7 +11,7 @@ glmm(
   covar = c("unstructured", "independent"),
   offset = NULL,
   na.action = na.omit,
-  optim_options = "recommend",
+  optim_options = optimControl(),
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = lambdaControl(),
@@ -49,7 +49,7 @@ argument should specify the name of a column in the data.frame.}
 \item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
 option \code{na.omit} are recognized by this function.}
 
-\item{optim_options}{a character string "recommend" or a list of class "optimControl" created 
+\item{optim_options}{a structure of class "optimControl" created 
 from function \code{\link{optimControl}} that specifies optimization parameters. See the 
 documentation for \code{\link{optimControl}} for more details on defaults.}
 

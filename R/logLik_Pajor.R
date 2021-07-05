@@ -29,7 +29,7 @@ indicator_2 = function(bounds, samples){
 # }
 #' @importFrom mvtnorm rmvnorm dmvnorm
 #' @export
-CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL){
+CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL, trace){
   
   cat("Pajor Log-Likelihood Calculation \n")
   
@@ -127,7 +127,9 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
     }else{
       indic = indicator_2(bounds[,cols], imp_samp)
     }
-    cat("proportion of importance samples inside bounds:", mean(indic), "\n")
+    if(trace >= 1){
+      cat("proportion of importance samples inside bounds:", mean(indic), "\n")
+    }
     
     dens_k = rep(1, times = M)
     

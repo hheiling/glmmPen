@@ -11,8 +11,12 @@ selectControl(
   lambda0_seq = NULL,
   lambda1_seq = NULL,
   nlambda = 10,
-  BIC_option = c("BICh", "BIC", "BICq", "BICNgrp"),
-  pre_screen = T
+  search = c("abbrev", "full_grid"),
+  BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
+  logLik_calc = switch(BIC_option[1], BICq = F, T),
+  lambda.min = NULL,
+  pre_screen = T,
+  lambda.min.presc = NULL
 )
 }
 \arguments{
@@ -21,38 +25,66 @@ selectControl(
 \item{lambda1}{a non-negative numeric penalty parameter for the (grouped) random effects
 covariance parameters}
 
-\item{lambda0_seq, lambda1_seq}{a range of non-negative numeric penalty parameters for the fixed 
-and random effect parameters, respectively. If \code{NULL}, then a range will be automatically 
+\item{lambda0_seq, lambda1_seq}{a sequence of non-negative numeric penalty parameters for the fixed 
+and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
 calculated. See 'Details' section for more details on these default calculations.}
 
-\item{nlambda}{positive integer specifying number of lambda with which to fit a model.
+\item{nlambda}{positive integer specifying number of penalty parameters (lambda) with which to fit a model.
 Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
 
-\item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
-Default "BICh" utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
-The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
-observations). The "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-a full model; a small penalty is used for the fixed and/or random effects if the number of 
-effects is 10 or greater.}
+\item{search}{character string of "abbrev" (default) or "full_grid" indicating if the search of models over 
+the penalty parameter space should be the full grid search (total number of models equals
+`nlambda`^2 or length(`lambda0_seq`)*length(`lambda1_seq`)) or an abbreviated grid search.
+The abbreviated grid search is described in more detail in the Details section.}
 
-\item{pre_screen}{logical value indicating if pre-screening of random effects should be performed
-during selection when the number random effect predictors is 10 or more. Default \code{TRUE}. 
-Pre-screening not performed when the number of random effect predictors is 9 or less.}
+\item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
+Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
+effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
+observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
+groups).}
+
+\item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
+calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
+If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
+\code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
+
+\item{lambda.min}{numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
+ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
+a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
+\code{lambda.min} specifiex this fraction. Default value is set to \code{NULL}, which
+automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.}
+
+\item{pre_screen}{logical value indicating whether pre-screening should be performed before
+model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+no pre-screening will be performed. Pre-screening removes random effects from consideration
+during the model selection process, which can significantly speed up the algorithm.}
+
+\item{lambda.min.presc}{numeric fraction between 0 and 1. During pre-screening and the full
+model fit for the BIC-ICQ calculation, the small penalty used on the random effect is
+the fraction \code{lambda.min.presc} mulitplied by the maximum penalty parameter that penalizes
+all fixed and random effects to 0. If left as \code{NULL}, the default value is 0.01 when the number
+of random effects is 10 or less and 0.05 otherwise.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
-containing penalization parameter values, presented either as an individual set or as a range of
-possible values.
+containing parameter values that determine settings for variable selection.
 }
 \description{
 Constructs control structures for penalized mixed model fitting.
 }
 \details{
 If unspecified, the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
-automatically calculated. For an initial
-grid search using \code{\link{glmmPen}}, the range will be calculated in the same manner as 
+automatically calculated. The sequence will be calculated in the same manner as 
 \code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
-small portion of max, range is composed of \code{nlambda} values spread evenly on the log scale.
+small portion of max (\code{lambda.min}*(lambda max)), sequence is composed of 
+\code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
+values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
+running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
+By default, these sequences are calculated using \code{\link{LambdaSeq}}.
+
 For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
 from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
 finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
@@ -60,5 +92,17 @@ positions away from the best lambda in the original lambda sequences for the fix
 effects.
 
 The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
-non-zero penalty parameter combination. However, this is generally not recommended.
+non-zero penalty parameter combination. However, this is generally not recommended. 
+
+Abbreviated grid search: The abbreviated grid search proceeds in two stages. In stage 1, the
+algorithm fits the following series of models: the fixed effects penalty parameter remains a
+fixed value evaluated at the minimum of the fixed effects penalty parameters, and a all
+random effects penalty parameters are examined. The 'best' model from this first stage of models
+determines the optimum random effect penalty parameter. In stage 2, the algorithm fits the 
+following series of models: the random effects penalty parameter remains fixed at the value of
+the optimum random effect penalty parameter (from stage 1) and all fixed effects penalty
+parameters are considered. The best overall model is the best model from stage 2. This reduces the 
+number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). Although this
+can drastically increase the time of the algorithm to proceed, the authors found in simulations
+that this generally increases the false positive rate by a factor of between 1.5 and 2.
 }

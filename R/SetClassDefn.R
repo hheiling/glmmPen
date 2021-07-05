@@ -22,6 +22,7 @@
 #' showClass("pglmmObj")
 #' methods(class = "pglmmObj")
 #' 
+#' @importFrom stringr str_c
 #' @export
 pglmmObj = setRefClass("pglmmObj",
             fields = list(
@@ -45,6 +46,7 @@ pglmmObj = setRefClass("pglmmObj",
               data = "list",
               optinfo = "list",
               control_info = "list",
+              Estep_material = "list",
               Gibbs_info = "list"
             ),
             methods = list(
@@ -93,12 +95,15 @@ pglmmObj = setRefClass("pglmmObj",
                 colnames(sigma) <<- x$coef_names$random
                 rownames(sigma) <<- x$coef_names$random
                 
+                # coef <<- x$coef
+                # names(coef) = c(x$coef_names$fixed, str_c("Gamma",0:length(coef[-c(1:p)])))
+                
                 # Return MCMC results - potentially for MCMC diagnostics if desired
-                posterior_draws <<- x$u
+                posterior_draws <<- x$Estep_out$post_out
                 colnames(posterior_draws) <<- colnames(Z_std)
                 
                 # Random effects coefficients
-                rand = x$post_modes
+                rand = x$Estep_out$post_modes
                 q = ncol(Z_std) / d
                 
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
@@ -138,6 +143,8 @@ pglmmObj = setRefClass("pglmmObj",
                 optinfo <<- list(iter = x$EM_iter, conv = x$EM_conv, warnings = x$warnings,
                                  control_options = x$control_options$optim_options)
                 control_info <<- x$control_options
+                Estep_material <<- list(u_init = x$Estep_out$u_init, coef = x$coef,
+                                        updated_batch = x$updated_batch)
                 Gibbs_info <<- list(gibbs_accept_rate = x$gibbs_accept_rate, proposal_SD = x$proposal_SD)
                 
               },
