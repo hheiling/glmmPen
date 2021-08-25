@@ -145,9 +145,12 @@ fD_adj = function(out){
 #' with canonical links only.
 #' @param covar character string specifying whether the covariance matrix should be unstructured
 #' ("unstructured") or diagonal with no covariances between variables ("independent").
-#' Default is "unstructured", but if the number of random effects (not including the intercept) is 
+#' Default is set to \code{NULL}. If \code{covar} is set to \code{NULL} and the number of random effects
+#' predictors (not including the intercept) is 
 #' greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-#' independent covariance structure and \code{covar} is switched to "independent".
+#' independent covariance structure and \code{covar} is set to "independent". Otherwise if \code{covar}
+#' is set to \code{NULL} and the number of random effects predictors is less than 10, then the
+#' algorithm automatically assumes an unstructured covariance structure and \code{covar} is set to "unstructured".
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
 #' linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
 #' argument is \code{NULL}, this should be a numeric vector of length equal to the 
@@ -182,13 +185,15 @@ fD_adj = function(out){
 #' The default for \code{glmm} is to run the model fit with no penalization (\code{lambda0} = \code{lambda1} = 0).
 #' When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
 #' See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.
-#' @param BICq_posterior an optional character string expressing the path and file name of a text file that 
-#' the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+#' @param BICq_posterior an optional character string expressing the path and file basename of a file combination that 
+#' the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 #' These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-#' are requested. The name of the file should include a .txt extension. If this argument is
+#' are requested. If this argument is
 #' specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
-#' will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
-#' See 'Details' section for additional details. 
+#' will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
+#' in the working directory.
+#' See 'Details' section for additional details about the required format of \code{BICq_posterior}
+#' and the file-backed big matrix. 
 #' @param trace an integer specifying print output to include as function runs. Default value is 0. 
 #' See Details for more information about output provided when trace = 0, 1, or 2.
 #' 
@@ -199,15 +204,21 @@ fD_adj = function(out){
 #' lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
 #' In order to avoid repetitive calculations of
 #' this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
-#' posterior draws will be saved in a .txt file. If the file already exits, the full model 
+#' posterior draws will be file-backed as two files: a backing file with extention '.bin' and a 
+#' descriptor file with extension '.desc'. The \code{BICq_posterior} argument should contain a 
+#' path and a filename with no extension of the form "./path/filename" such that the backingfile and
+#' the descriptor file would then be saved as "./path/filename.bin" and "./path/filename.desc", respectively.
+#' If \code{BICq_posterior} is set to \code{NULL}, then by default, the backingfile and descriptor
+#' file are saved in the working directory as "BICq_Posterior_Draws.bin" and "BICq_Posterior_Draws.desc".
+#' If the big matrix of posterior draws is already file-backed, \code{BICq_posterior} should
+#' specify the path and basename of the appropriate files (again of form "./path/filename"); 
+#' the full model 
 #' will not be fit again and the big.matrix of 
-#' posterior draws will be read using \code{bigmemory::read.big.matrix}
-#' (\code{bigmemory::read.big.matrix(filename, sep = ' ', type = 'double')}) and used in the BIC-ICQ 
-#' calcuations. If the file does not exist or \code{BICq_posterior} 
+#' posterior draws will be read using \code{bigmemory::attach.big.matrix}
+#' (\code{bigmemory::attach.big.matrix(sprintf("%s.desc",BICq_posterior))}) and used in the BIC-ICQ 
+#' calcuations. If the appropriate files do not exist or \code{BICq_posterior} 
 #' is specified as \code{NULL}, the full model will be fit and the full model posterior
-#' draws will be saved at the specified file location (using \code{bigmemory::write.big.matrix})
-#' or in the working directory with generic filename "BICq_Posterior_Draws.txt" (if \code{NULL} 
-#' is specified). The algorithm will save 10^4 posterior draws automatically.
+#' draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
 #' 
 #' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 #' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
@@ -226,7 +237,7 @@ fD_adj = function(out){
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @export
-glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstructured","independent"),
+glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL, na.action = na.omit, 
                    fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
@@ -341,6 +352,21 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
   ## formula, data, any other items included in glmmPen function call
   call = match.call(expand.dots = F)
   
+  # If covar specified as NULL, recommend a covariance structure based on the size of the 
+  # random effects.
+  if(is.null(covar) & (ncol(data_input$Z)/nlevels(data_input$group) >= 11)){
+    print("Setting random effect covariance structure to 'independent'")
+    covar = "independent"
+  }else if(is.null(covar) & (ncol(data_input$Z)/nlevels(data_input$group) < 11)){
+    print("Setting random effect covariance structure to 'unstructured'")
+    covar = "unstructured"
+  }
+  
+  if((covar == "unstructured") & (ncol(data_input$Z)/nlevels(data_input$group) >= 11)){
+    warning("The random effect covariance matrix is currently specified as 'unstructured'. 
+            Due to dimension of sigma covariance matrix, we suggest using covar = 'independent' to simplify computation",
+            immediate. = T)
+  }
   
   if(inherits(tuning_options, "lambdaControl")){
     lambda0 = tuning_options$lambda0
@@ -350,7 +376,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     }
     
     # If nMC arguments or maxitEM left as NULL, fill in defaults
-    optim_options = optim_recommend(optim_options = optim_options, family = family, 
+    optim_options = optim_recommend(optim_options = optim_options, family = family,
                                     q = ncol(fD_out$Z)/nlevels(data_input$group), select = F)
     
     if(optim_options$var_start == "recommend"){
@@ -375,7 +401,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     var_start = optim_options$var_start
     max_cores = optim_options$max_cores
     
-    
     # Call fit_dat function
     # fit_dat_B function found in "/R/fit_dat_MstepB.R" file
     
@@ -394,7 +419,13 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
     # If relevant, save posterior draws for later BIC-ICQ calculations
     if(!is.null(BICq_posterior)){
       ufull_big = attach.big.matrix(fit$u_big)
-      write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
+      ufull_big_tmp = as.big.matrix(ufull_big[,],
+                                    backingpath = dirname(BICq_posterior),
+                                    backingfile = sprintf("%s.bin",basename(BICq_posterior)),
+                                    descriptorfile = sprintf("%s.desc",basename(BICq_posterior)))
+      rm(ufull_big_tmp)
+      # From when we saved the posterior draws as a .txt file:
+      # write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
     }
     
     ranef_keep = NULL
@@ -474,7 +505,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = c("unstruc
       vars = diag(fit_fixfull$out$sigma)
       ## BIC-ICQ full model results to avoid repeat calculation of full model
       if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
-        BICq_post_file = "BICq_Posterior_Draws.txt"
+        BICq_post_file = "BICq_Posterior_Draws"
       }else{
         BICq_post_file = BICq_posterior
       }

@@ -49,9 +49,12 @@ with canonical links only.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
-Default is "unstructured", but if the number of random effects (not including the intercept) is 
+Default is set to \code{NULL}. If \code{covar} is set to \code{NULL} and the number of random effects
+predictors (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure and \code{covar} is switched to "independent".}
+independent covariance structure and \code{covar} is set to "independent". Otherwise if \code{covar}
+is set to \code{NULL} and the number of random effects predictors is less than 10, then the
+algorithm automatically assumes an unstructured covariance structure and \code{covar} is set to "unstructured".}
 
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
@@ -104,13 +107,15 @@ If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if 
 in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
 \code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
 
-\item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
-the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+\item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
+the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-are requested. The name of the file should include a .txt extension. If this argument is
+are requested. If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
-will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
-See 'Details' section for additional details.}
+will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
+in the working directory.
+See 'Details' section for additional details about the required format of \code{BICq_posterior}
+and the file-backed big matrix.}
 
 \item{checks_complete}{boolean value indicating if several data checks have been completed.}
 

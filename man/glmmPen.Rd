@@ -9,7 +9,7 @@ glmmPen(
   formula,
   data = NULL,
   family = "binomial",
-  covar = c("unstructured", "independent"),
+  covar = NULL,
   offset = NULL,
   na.action = na.omit,
   fixef_noPen = NULL,
@@ -41,9 +41,12 @@ with canonical links only.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
-Default is "unstructured", but if the number of random effects (not including the intercept) is 
+Default is set to \code{NULL}. If \code{covar} is set to \code{NULL} and the number of random effects
+predictors (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure and \code{covar} is switched to "independent".}
+independent covariance structure and \code{covar} is set to "independent". Otherwise if \code{covar}
+is set to \code{NULL} and the number of random effects predictors is less than 10, then the
+algorithm automatically assumes an unstructured covariance structure and \code{covar} is set to "unstructured".}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
@@ -91,13 +94,15 @@ The default for \code{glmm} is to run the model fit with no penalization (\code{
 When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
-\item{BICq_posterior}{an optional character string expressing the path and file name of a text file that 
-the will store or currently stores a \code{big.matrix} of the posterior draws from the full model.
+\item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
+the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-are requested. The name of the file should include a .txt extension. If this argument is
+are requested. If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
-will be saved in the file 'BICq_Posterior_Draws.txt' in the working directory.
-See 'Details' section for additional details.}
+will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
+in the working directory.
+See 'Details' section for additional details about the required format of \code{BICq_posterior}
+and the file-backed big matrix.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 
@@ -108,29 +113,5 @@ available (e.g. \code{methods(class = "pglmmObj")})
 Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 }
 \details{
-\code{BICq_posterior}: If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 
-to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
-process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
-lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
-In order to avoid repetitive calculations of
-this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
-posterior draws will be saved in a .txt file. If the file already exits, the full model 
-will not be fit again and the big.matrix of 
-posterior draws will be read using \code{bigmemory::read.big.matrix}
-(\code{bigmemory::read.big.matrix(filename, sep = ' ', type = 'double')}) and used in the BIC-ICQ 
-calcuations. If the file does not exist or \code{BICq_posterior} 
-is specified as \code{NULL}, the full model will be fit and the full model posterior
-draws will be saved at the specified file location (using \code{bigmemory::write.big.matrix})
-or in the working directory with generic filename "BICq_Posterior_Draws.txt" (if \code{NULL} 
-is specified). The algorithm will save 10^4 posterior draws automatically.
 
-Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
-number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-from t iterations back EM_conv, and number of non-zero coefficients Non0 Coef). The value of 1
-additionally outputs the updated coefficients, updated covariance matrix values, and the
-number of coordinate descent iterations used for the M step for each
-EM iteration. If Stan is not used as the E-step sampling mechanism, 
-the value of 2 outputs all of the above plus gibbs acceptance rate information
-for the adaptive random walk and independence samplers and the updated proposal standard deviation
-for the adaptive random walk.
 }

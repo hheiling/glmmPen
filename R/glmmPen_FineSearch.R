@@ -30,9 +30,10 @@
 #' previous round of selection stored within the \code{pglmmObj} object.
 #' @param trace an integer specifying print output to include as function runs. Default value is 0. 
 #' See Details for more information about output provided when trace = 0, 1, or 2.
-#' @param BICq_posterior an optional character string specifying the file containing the posterior
-#' draws used to calculate the BIC-ICQ selection criterion if such a file was created in the
-#' previous round of selection.
+#' @param BICq_posterior an optional character string specifying the file-backed \code{big.matrix} 
+#' containing the posterior draws used to calculate the BIC-ICQ selection criterion if such a 
+#' \code{big.matrix} was created in the previous round of selection. See \code{\link{glmmPen}} 
+#' documentation for further details.
 #'   
 #' @details 
 #' The \code{glmmPen_FineSearch} function extracts the data, the penalty information (penalty type,
@@ -291,7 +292,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     vars = diag(fit_fixfull$out$sigma)
     ## BIC-ICQ full model results to avoid repeat calculation of full model
     if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
-      BICq_post_file = "BICq_Posterior_Draws.txt"
+      BICq_post_file = "BICq_Posterior_Draws"
     }else{
       BICq_post_file = BICq_posterior
     }

@@ -58,12 +58,17 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     offset = rep(0, length(dat$y))
   }
   
-  if((covar == "unstructured") & (ncol(dat$Z)/nlevels(dat$group) >= 11)){
-    warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation",
-            immediate. = T)
-    covar = "independent"
-  }
-
+  # if((covar == "unstructured") & (ncol(dat$Z)/nlevels(dat$group) >= 11)){
+  #   warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation",
+  #           immediate. = T)
+  #   covar = "independent"
+  # }
+  # if((covar == "unstructured") & (ncol(dat$Z)/nlevels(dat$group) >= 11)){
+  #   warning("The random effect covariance matrix is currently specified as 'unstructured'. 
+  #           Due to dimension of sigma covariance matrix, we suggest using covar = 'independent' to simplify computation",
+  #           immediate. = T)
+  # }
+  
   if(optim_options$var_start == "recommend"){
     var_start = var_init(dat, fam_fun)
     cat("recommended starting variance: ", var_start, "\n")
@@ -75,7 +80,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   sampler = optim_options$sampler
   
-
   # Pre-screening step
   ## If number of random effects in model (including intercept) is 6 or more
   ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
@@ -133,20 +137,25 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     # If posterior draws from full model not yet created, fit full model and save posterior draws
     # Otherwise, read in the prevoiusly fit full model posterior draw results
     if(!is.null(BICq_posterior)){
-      if(file.exists(BICq_posterior)){
-        cat("Using saved posterior draws from full model for BIC-ICQ calculation: ",
-            BICq_posterior,"\n")
+      if(file.exists(sprintf("%s.desc",BICq_posterior)) & file.exists(sprintf("%s.bin",BICq_posterior))){
+        print("Using saved posterior draws from full model for BIC-ICQ calculation:")
+        print(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior))
         fitfull_needed = F
       }else{
-        cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n")
+        print(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior))
+        print(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc",
+                      BICq_posterior, BICq_posterior))
+        # cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n")
         # warning("BICq_posterior file ",BICq_posterior," not found", 
         #         "  Creating new full model posterior draws", immediate. = T)
         fitfull_needed = T
       }
     }else{ # if is.null(BICq_posterior)
-      BICq_posterior = "BICq_Posterior_Draws.txt"
-      cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n",
-          "  within working directory \n")
+      BICq_posterior = "BICq_Posterior_Draws"
+      print(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc within working directory",
+                    BICq_posterior, BICq_posterior))
+      # cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n",
+      #     "  within working directory \n")
       fitfull_needed = T
     }
     
@@ -183,7 +192,12 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                                  adapt_RW_options = adapt_RW_options, trace = trace)
         
         ufull_big = attach.big.matrix(Estep_out$u0)
-        write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
+        ufull_big_tmp = as.big.matrix(ufull_big[,],
+                                      backingpath = dirname(BICq_posterior),
+                                      backingfile = sprintf("%s.bin",basename(BICq_posterior)),
+                                      descriptorfile = sprintf("%s.desc",basename(BICq_posterior)))
+        rm(ufull_big_tmp)
+        # write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
         ufull_describe = Estep_out$u0
         # If pre_screen = T, restrict the next model in the search to only consider random 
         # effects that were not penalized out in this full model
@@ -197,7 +211,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       
     }else{ # if fitfull_needed = F
       cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
-      ufull_big = read.big.matrix(filename = BICq_posterior, sep = " ", type = 'double')
+      ufull_big = attach.big.matrix(sprintf("%s.desc",BICq_posterior))
+      # ufull_big = read.big.matrix(filename = BICq_posterior, sep = " ", type = 'double')
       ufull_describe = describe(ufull_big)
       # Checks
       if(ncol(ufull_big) != ncol(dat$Z)){

@@ -127,11 +127,11 @@ fit_dat_B = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0
   if(lambda0 <=10^-6) lambda0 = 0
   if(lambda1 <=10^-6) lambda1 = 0
   
-  if((covar == "unstructured") & (ncol(Z)/d >= 11)){
-    warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation",
-            immediate. = T)
-    covar = "independent"
-  }
+  # if((covar == "unstructured") & (ncol(Z)/d >= 11)){
+  #   warning("The random effect covariance matrix is currently specified as 'unstructured'. 
+  #           Due to dimension of sigma covariance matrix, we suggest using covar = 'independent' to simplify computation",
+  #           immediate. = T)
+  # }
   
   # Create J matrix (from t(alpha_k kronecker z_ki) * J from paper) and 
   # covgroup = indexing of random effect covariate group

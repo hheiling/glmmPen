@@ -1,26 +1,38 @@
 # glmmPen
 glmmPen package
 
-This package fits a penalized generalized mixed model via Monte Carlo Expectation Conditional 
-Minimization (MCECM). It can be downloaded using the following lines of code:
+Generalized linear mixed models (GLMMs) are popular for their flexibility and their ability to estimate population-level effects while accounting for between-group heterogeneity. While GLMMs are very
+versatile, the specification of fixed and random effects is a critical part of the modeling process. The package glmmPen simultaneously selects fixed and random effects from high dimensional penalized generalized linear mixed models (pGLMMs) using the funcion `glmmPen`. This function `glmmPen` fits a sequence of pGLMMs and chooses the best model using one of several Bayesian Information Criterion (BIC)-derived selection criteria. The package can also fit single GLMM models (with or without penalization) using the function `glmm`. Model parameters are estimated using a Monte Carlo Expectation Conditional Maximization (MCECM) algorithm, which leverages Stan and RcppArmadillo
+to increase computational efficiency.
 
-library(devtools)
-library(remotes)
-install_github("hheiling/glmmPen")
+Our package supports the penalty functions MCP, SCAD, and LASSO, and the distributional families Binomial, Gaussian, and Poisson (with canonical links). The available BIC-derived selection criteria include the BIC-ICQ, the regular BIC, and the hybrid BICh (see documentation for further details). The user interface of the package was designed to be similar to the popular lme4 R package, including the specification of the model equation with fixed and random effects.Tools available in the package include
+automated tuning parameter selection and automated initialization of the random effect variance. 
 
-Family options: Currently, only the 'binomial' family option is available, and currently only the logit link for this family is fully functional.
+Windows users must first run the following lines of code in order to properly install the package:
 
-The function 'glmmPen' is the user-friendly function in the package. While the documentation is not fully complete in the package, the available documentation should be sufficient for most user's purposes for the time being. 
+```
+dotR <- file.path(Sys.getenv("HOME"), ".R")
+if (!file.exists(dotR)) dir.create(dotR)
+M <- file.path(dotR, "Makevars.win")
+if (!file.exists(M)) file.create(M)
+cat("\nCXX14FLAGS=-O3 -march=corei7 -mtune=corei7",
+    "CXX14 = $(BINPREF)g++ -m$(WIN) -std=c++1y",
+    "CXX11FLAGS=-O3 -march=corei7 -mtune=corei7",
+    file = M, sep = "\n", append = TRUE)
+```
 
-The formula should be specified like glmer specifies their formulas. For instance, suppose we have a vector of response variables y, a matrix of covariates (not including an intercept) X, and a vector grp that specifies which group an observation belongs to (of same length as y). The formula would be specified as y ~ X + (X | grp). If the user has ideas about restricting the number of random effects, the X within the parentheses can be restricted.
+The package can then be installed using the following lines of code:
 
-If there are any covariates that the user thinks should always remain in the model (i.e. should not be penalized out of the fixed effects part of the model), then the argument fixef_noPen can be specified in the function (vector of same length as the number of columns of X, 0 if the variable should never be penalized, 1 otherwise).
+```
+#install.packages("devtools")
+devtools::install_github("hheiling/glmmPen")
+```
 
-The output object, of class pglmmObj, will have the following S3 methods of interest:
-fixef.pglmmObj, ranef.glmmObj, fitted, predict, print, and summary, which act similar to the same S3 methods for the glmer output object. (There are a few others, but these are likely the most relevant for the time being).
+The manual is available in the 'inst/' folder of the package and gives more specifics about the required and optional arguments for the main functions `glmmPen` and `glmm`.
 
-There is also a plot_mcmc function that can perform some diagnostic plots on the posterior draw outputs if that is of interest. The documentation is not yet finished for this function, but hopefully the argument names make enough sensefor it to be usable
+The output object, of class pglmmObj, includes the following S3 methods of interest:
+fixef, ranef, sigma, fitted, predict, print, and summary, which act similar to the same S3 methods for the output object of lme4 functions. 
 
-As this package is still in development, there are likely still some bugs to work out. 
+There is also a plot_mcmc function that can perform some diagnostic plots on the posterior draw outputs.
 
 Contact information: email hheiling@live.unc.edu
