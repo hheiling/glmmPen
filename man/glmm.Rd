@@ -36,9 +36,12 @@ with canonical links only.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
-Default is "unstructured", but if the number of random effects (not including the intercept) is 
+Default is set to \code{NULL}. If \code{covar} is set to \code{NULL} and the number of random effects
+predictors (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure and \code{covar} is switched to "independent".}
+independent covariance structure and \code{covar} is set to "independent". Otherwise if \code{covar}
+is set to \code{NULL} and the number of random effects predictors is less than 10, then the
+algorithm automatically assumes an unstructured covariance structure and \code{covar} is set to "unstructured".}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 

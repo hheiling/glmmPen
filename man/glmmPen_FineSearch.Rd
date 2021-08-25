@@ -49,9 +49,10 @@ previous round of selection stored within the \code{pglmmObj} object.}
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
 
-\item{BICq_posterior}{an optional character string specifying the file containing the posterior
-draws used to calculate the BIC-ICQ selection criterion if such a file was created in the
-previous round of selection.}
+\item{BICq_posterior}{an optional character string specifying the file-backed \code{big.matrix} 
+containing the posterior draws used to calculate the BIC-ICQ selection criterion if such a 
+\code{big.matrix} was created in the previous round of selection. See \code{\link{glmmPen}} 
+documentation for further details.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 

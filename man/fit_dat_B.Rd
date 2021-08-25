@@ -129,9 +129,12 @@ Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" 
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").
-Default is "unstructured", but if the number of random effects (not including the intercept) is 
+Default is set to \code{NULL}. If \code{covar} is set to \code{NULL} and the number of random effects
+predictors (not including the intercept) is 
 greater than or equal to 10 (i.e. high dimensional), then the algorithm automatically assumes an 
-independent covariance structure and \code{covar} is switched to "independent".}
+independent covariance structure and \code{covar} is set to "independent". Otherwise if \code{covar}
+is set to \code{NULL} and the number of random effects predictors is less than 10, then the
+algorithm automatically assumes an unstructured covariance structure and \code{covar} is set to "unstructured".}
 
 \item{var_start}{either the character string "recommend" or a positive number specifying the 
 starting values to initialize the variance of the covariance matrix. Default "recommend" first

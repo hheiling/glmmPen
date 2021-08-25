@@ -39,12 +39,15 @@ checkPenalty = function(penalty, gamma_penalty, alpha){
 #' @importFrom stringr str_c
 checkCovar = function(covar, acceptable = c("unstructured","independent")){
   
-  if(length(covar) > 1){
-    covar = covar[1]
+  if(!is.null(covar)){
+    if(length(covar) > 1){
+      covar = covar[1]
+    }
+    if(!(covar %in% acceptable)){
+      stop("covariance structure 'covar' must be ", str_c(acceptable, collapse = " or "))
+    }
   }
-  if(!(covar %in% acceptable)){
-    stop("covariance structure 'covar' must be ", str_c(acceptable, collapse = " or "))
-  }
+  
   return(covar)
 }
 
@@ -63,14 +66,16 @@ checkSampler = function(sampler, acceptable = c("stan","random_walk","independen
 # check that BICq_posterior can be saved appropriately
 #' @importFrom stringr str_detect
 checkBICqPost = function(BICq_posterior){
+  
   if(!is.null(BICq_posterior)){
     
     file_name = basename(BICq_posterior)
     path_name = dirname(BICq_posterior)
-    # Check file is specified as a .txt file
-    if(!str_detect(file_name,".txt$")){
-      stop("BICq_posterior file name must end in a .txt extension")
-    }
+  
+    # Check file is specified as a .desc file
+    # if(!str_detect(file_name,".desc$")){
+    #   stop("BICq_posterior file name must end in a .desc extension")
+    # }
     # Check that path to file exists
     if(!dir.exists(path_name)){
       stop("The path ", path_name, " specified for the 'BICq_posterior' does not exist")
@@ -79,3 +84,22 @@ checkBICqPost = function(BICq_posterior){
   }
   
 }
+
+# Old version:
+# checkBICqPost = function(BICq_posterior){
+#   if(!is.null(BICq_posterior)){
+#     
+#     file_name = basename(BICq_posterior)
+#     path_name = dirname(BICq_posterior)
+#     # Check file is specified as a .txt file
+#     if(!str_detect(file_name,".txt$")){
+#       stop("BICq_posterior file name must end in a .txt extension")
+#     }
+#     # Check that path to file exists
+#     if(!dir.exists(path_name)){
+#       stop("The path ", path_name, " specified for the 'BICq_posterior' does not exist")
+#     }
+#     
+#   }
+#   
+# }
