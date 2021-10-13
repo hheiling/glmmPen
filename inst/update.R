@@ -10,6 +10,8 @@ devtools::load_all(path = "C:/Users/hheiling/Documents/GitHub/glmmPen")
 
 devtools::install(pkg = "C:/Users/hheiling/Documents/GitHub/glmmPen")
 
+devtools::check(pkg = "C:/Users/hheiling/Documents/GitHub/glmmPen")
+
 # other branch
 # install_github("hheiling/glmmPen", ref = "alt_branch", force = TRUE)
 # master branch
@@ -35,7 +37,8 @@ library(rstantools)
 rstan_config(pkgdir = "C:/Users/hheiling/Documents/GitHub/glmmPen")
 
 # Build manual
-devtools::build_manual()
+devtools::build_manual(pkg = "C:/Users/hheiling/Documents/GitHub/glmmPen", 
+                       path = "C:/Users/hheiling/Documents/GitHub/glmmPen/inst")
 
 # Tips for building vignette:
 # https://r-pkgs.org/vignettes.html
