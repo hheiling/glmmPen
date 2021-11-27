@@ -290,7 +290,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
   
   // Provide access to the big.matrix of posterior draws
   XPtr<BigMatrix> pMat(pBigMat);
-  arma::Mat<double> u((double*) pMat->matrix(), pMat->nrow(), pMat->ncol(),false);
+  arma::Mat<double> post((double*) pMat->matrix(), pMat->nrow(), pMat->ncol(),false);
   
   int M = pMat->nrow();
   int N = y.n_elem;
@@ -302,6 +302,7 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
   int i=0;
   int k=0;
   int f=0;
+  int n_k=0;
   
   int d = dims(0); // Number groups
   int q = dims(1); // Number random effect variables
@@ -311,6 +312,10 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
   
   arma::mat eta(M,N);
   arma::vec mu(M);
+  
+  arma::mat u(M,q);
+  arma::rowvec Zki(q);
+  arma::mat A(M,J_q.n_cols);
   
   // parameters needed for gaussian distribution
   // double s2 = sig_g * sig_g; // estimate of sigma^2 
@@ -329,12 +334,14 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
     }
     
     arma::mat Zk = Z.submat(ids, col_idx);
+    n_k = ids.n_elem;
     
-    for(m=0;m<M;m++){
-      m0 = m;
-      arma::mat A = kron(u.submat(m0,col_idx), Zk) * J_q;
-      eta.submat(m0,ids) = trans(Xk * beta.subvec(0,p-1) + A * beta.subvec(p,p2-1) + offset(ids));
-      
+    u = post.cols(col_idx);
+    
+    for(i=0;i<n_k;i++){
+      Zki = Zk.row(i);
+      A = kron(u, Zki) * J_q;
+      eta.col(ids(i)) = as_scalar(Xk.row(i) * beta.subvec(0,p-1)) + A * beta.subvec(p,p2-1) + offset(ids(i));
     }
     
   } // End k for loop

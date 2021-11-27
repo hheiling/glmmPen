@@ -8,9 +8,8 @@ glmm(
   formula,
   data = NULL,
   family = "binomial",
-  covar = c("unstructured", "independent"),
+  covar = NULL,
   offset = NULL,
-  na.action = na.omit,
   optim_options = optimControl(),
   adapt_RW_options = adaptControl(),
   trace = 0,
@@ -48,9 +47,6 @@ linear predictor during fitting. Default set to \code{NULL} (no offset). If the 
 argument is \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the response). If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame.}
-
-\item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
-option \code{na.omit} are recognized by this function.}
 
 \item{optim_options}{a structure of class "optimControl" created 
 from function \code{\link{optimControl}} that specifies optimization parameters. See the 

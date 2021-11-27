@@ -7,7 +7,7 @@
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
+arma::vec pglm_fit(arma::vec y, arma::mat X, arma::vec dims,
                   arma::vec beta, arma::vec offset,
                   const char* family, int link,
                   const char* penalty, arma::vec params,

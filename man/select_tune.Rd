@@ -135,7 +135,7 @@ search in the model selection procedure is being performed.}
 A list with the following elements:
 \item{results}{matrix of summary results for each lambda tuning parameter combination, used
 to select the 'best' model}
-\item{out}{list of \code{\link{fit_dat_B}} results for the models with the minimum BICh and 
+\item{out}{list of \code{\link{fit_dat}} results for the models with the minimum BICh and 
 minimum BIC values}
 \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
 Rows correspond with the rows of the results matrix.}

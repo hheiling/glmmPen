@@ -34,15 +34,14 @@ option \code{na.omit} removes observations with any missing values in any of the
 }
 \value{
 a list with the following elements:
-\item{y}{a numeric vector of the response variable}
-\item{X}{a model matrix with the fixed covariates}
-\item{Z}{a sparse model matrix for the random effects}
-\item{group}{a factor vector of the grouping variable}
-\item{cnms}{a vector of column names of the random effects}
-\item{group_name}{character name of the group variable}
-\item{flist}{a list of grouping factors using inf the random-effects terms}
-\item{frame}{a model frame including all fixed and random covariates, the response, and the 
+\item{fr}{a model frame including all fixed and random covariates, the response, and the 
 grouping variable}
+\item{X}{fixed effects covariates model matrix}
+\item{reTrms}{list containing several items relating to the random effects} 
+\item{family}{family specified for data modeling}
+\item{formula}{formula}
+\item{fixed_vars}{vector of variable names used for fixed effects}
+\item{fwmsgs}{indicator for a check of the group levels}
 }
 \description{
 Takes the model \code{formula} and an optional data frame and converts them into y, X, Z, and group output.

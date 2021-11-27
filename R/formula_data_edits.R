@@ -129,23 +129,23 @@ checkXmatrix = function(X){
 #' option \code{na.omit} removes observations with any missing values in any of the variables
 #' 
 #' @return a list with the following elements:
-#' \item{y}{a numeric vector of the response variable}
-#' \item{X}{a model matrix with the fixed covariates}
-#' \item{Z}{a sparse model matrix for the random effects}
-#' \item{group}{a factor vector of the grouping variable}
-#' \item{cnms}{a vector of column names of the random effects}
-#' \item{group_name}{character name of the group variable}
-#' \item{flist}{a list of grouping factors using inf the random-effects terms}
-#' \item{frame}{a model frame including all fixed and random covariates, the response, and the 
+#' \item{fr}{a model frame including all fixed and random covariates, the response, and the 
 #' grouping variable}
+#' \item{X}{fixed effects covariates model matrix}
+#' \item{reTrms}{list containing several items relating to the random effects} 
+#' \item{family}{family specified for data modeling}
+#' \item{formula}{formula}
+#' \item{fixed_vars}{vector of variable names used for fixed effects}
+#' \item{fwmsgs}{indicator for a check of the group levels}
 #' 
 #' @importFrom lme4 factorize mkReTrms nobars subbars findbars
 glFormula_edit <- function(formula, data=NULL, family,
                            subset, weights, na.action, offset,
                            contrasts = NULL, ...) {
   
-  # Edits by Hillary:
-  # Remove/change some checks
+  # glFormula_edit is an edited version of glFormula from the lme4 package. 
+  # Edit summary:
+  # Remove/change some checks used by lme4 package
   ## Allow p > n for the random effects
   ## Don't check scale of X (will perform scaling of X later in glmmPen function)
   # Removed predvars.fixed and predvars.random attributes to model frame
@@ -175,7 +175,7 @@ glFormula_edit <- function(formula, data=NULL, family,
   }
   mf$formula <- fr.form
   fr <- eval(mf, parent.frame())
-  ## convert character vectors to factor (defensive)
+  ## convert group character vectors to factor (defensive)
   fr <- factorize(fr.form, fr, char.only = TRUE)
   ## store full, original formula & offset
   attr(fr,"formula") <- formula

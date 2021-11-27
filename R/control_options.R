@@ -160,7 +160,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
   
   if(!is.null(lambda.min)){
     if(!is.numeric(lambda.min)){
-      stop("lambda.min.seq must be numeric")
+      stop("lambda.min must be numeric")
     }
     if((lambda.min >= 1) | (lambda.min <=0 )){
       stop("lambda.min must be a fraction between 0 and 1")
@@ -174,10 +174,10 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
   
   if(!is.null(lambda.min.presc)){
     if(!is.numeric(lambda.min.presc)){
-      stop("lambda.min.seq must be numeric")
+      stop("lambda.min.presc must be numeric")
     }
     if((lambda.min.presc >= 1) | (lambda.min.presc <=0 )){
-      stop("lambda.min must be a fraction between 0 and 1")
+      stop("lambda.min.presc must be a fraction between 0 and 1")
     }
   }
   
@@ -270,11 +270,6 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
 #' random intercept variance estimate from this model is then multiplied by 2 and used as the 
 #' starting variance. 
-#' @param max_cores integer describing the number of cores available for computation. If 
-#' \code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
-#' parallel computation using multiple cores is used to calculate the Stan MCMC samples within
-#' each E step. The package authors do not advise using parallelization in the E step
-#' unless \code{nMC_max} is set to a large number, such as 10^4 or more.
 #' 
 #' @details When the \code{optim_options} arugment in \code{\link{glmm}} and \code{\link{glmmPen}}
 #' is set to "recommend", the default settings discussed in the given \code{optimControl} arguments are
@@ -292,34 +287,28 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
                         maxitEM = NULL, maxit_CD = 50, 
                         M = 10000, t = 2, mcc = 2,
                         sampler = c("stan","random_walk","independence"), 
-                        var_start = "recommend", max_cores = 1){
+                        var_start = "recommend"){
   
-  # conv_EM = 0.0015, conv_CD = 0.0005, 
-  # nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
-  # maxitEM = 50, maxit_CD = 50, 
-  # M = 10000, t = 2, mcc = 2,
-  # sampler = c("stan","random_walk","independence"), 
-  # var_start = "recommend", max_cores = 1
-  
-  call = match.call(expand.dots = F)
-  
-  # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
+  # Acceptable input types and input restrictions
+  ## Arguments with default as NULL
   args_null = list(nMC_burnin = nMC_burnin, nMC_start = nMC_start, 
                    nMC_max = nMC_max, maxitEM = maxitEM)
+  ## x = vector of several arguments restricted to be positive integers, will check inputs
+  ##    in next steps.
   x = c(nMC_report, maxitEM, maxit_CD, M, t, mcc)
+  ## If user set some of the 'args_null' arguments to non-NULL values, check these input values
+  ##    as well (should be positive integers).
   for(a in 1:length(args_null)){
     if(!is.null(args_null[[a]])){
       x = c(x, args_null[[a]])
     }
   }
-  if((!all(floor(x)==x)) | (sum(x <= 0) > 0)){ # if any of the above values not positive integers
+  ## Check arguments that should be positive integers
+  if((!all(floor(x)==x)) | (sum(x <= 1) > 0)){ # if any of the above values not positive integers
     stop("M, t, mcc, and all entered nMC and maxit arguments must be positive integers")
   }
   
   # More restrictive checks
-  # if(M < 10^4){
-  #   stop("M must be greater than or equal to 10^4")
-  # }
   if(M < 5000){
     stop("M must be greater than or equal to 5000")
   }
@@ -345,10 +334,6 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
     }
   }
   
-  if((max_cores < 1) | (max_cores) %% 1 != 0){
-    stop("max_cores must be a positive integer")
-  }
-  
   sampler = checkSampler(sampler)
   
   if(mcc < 2){
@@ -358,26 +343,19 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report,
                  maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, mcc = mcc,
-                 sampler = sampler, var_start = var_start,
-                 max_cores = max_cores),
+                 sampler = sampler, var_start = var_start),
             class = "optimControl")
 }
 
-
+# optim_recommend: For input arguments of optimControl() that are set to NULL by default,
+#   recommend appropriate inputs that depend on the family, number of random effects,
+#   and whether or not variable selection is being performed.
 # q = number of random effects (including random intercept)
 # select: TRUE if running the selection algorithm
 optim_recommend = function(optim_options, family, q, select){
   
-  # Default values to use for 'binomial' and 'poisson' families when fitting single model 
-  #   (i.e. not using model selection):
-  # conv_EM = 0.0015, conv_CD = 0.0005, 
-  # nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
-  # maxitEM = 50, maxit_CD = 50, 
-  # M = 10000, t = 2, mcc = 2,
-  # sampler = c("stan","random_walk","independence"), 
-  # var_start = "recommend", max_cores = 1
+  # If selection and moderate/small q, or if large q (with or without selection):
   
-  # Depending on value of q and whether selection is being performed, adjusted default values
   if (q <= 11) { # q includes random intercept
     # For selection, decrease nMC_max to improve time
     ## Note: During selection, will initialize with good starting points, so
@@ -430,40 +408,3 @@ optim_recommend = function(optim_options, family, q, select){
   
 }
 
-# optim_recommend = function(family, q, select){
-#   
-#   optim_options = optimControl()
-#   # Default options for family = 'binomial' or 'poisson'
-#   if (family == "gaussian") {
-#     # increase maxitEM
-#     optim_options = optimControl()
-#     optim_options$maxitEM = 100
-#   }
-#   
-#   if (q <= 11) {
-#     # For selection, decrease nMC_max to improve time
-#     ## Note: During selection, will initialize with good starting points, so
-#     ## larger nMC_max not needed for convergence
-#     ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
-#     # Otherwise, keep everything else the same
-#     if (select == T) {
-#       optim_options$nMC_max = 2500
-#       # optim_options$maxitEM = optim_options$maxitEM + 15
-#     }
-#   }else{
-#     # Decrease nMC
-#     optim_options$nMC_burnin = 100
-#     optim_options$nMC = 100
-#     optim_options$nMC_max = 1000
-#     # optim_options$nMC_max = 1500
-#     # optim_options$maxitEM = optim_options$maxitEM + 15
-#     
-#   }
-#   
-#   # if(select == T){
-#   #   optim_options$conv_EM = 0.0015
-#   # }
-#   
-#   return(optim_options)
-#   
-# }

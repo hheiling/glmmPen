@@ -19,8 +19,7 @@ optimControl(
   t = 2,
   mcc = 2,
   sampler = c("stan", "random_walk", "independence"),
-  var_start = "recommend",
-  max_cores = 1
+  var_start = "recommend"
 )
 }
 \arguments{
@@ -81,12 +80,6 @@ starting values to initialize the variance of the covariance matrix. Default "re
 fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
 random intercept variance estimate from this model is then multiplied by 2 and used as the 
 starting variance.}
-
-\item{max_cores}{integer describing the number of cores available for computation. If 
-\code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
-parallel computation using multiple cores is used to calculate the Stan MCMC samples within
-each E step. The package authors do not advise using parallelization in the E step
-unless \code{nMC_max} is set to a large number, such as 10^4 or more.}
 }
 \value{
 Function returns a list (inheriting from class "\code{optimControl}") 

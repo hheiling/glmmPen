@@ -11,7 +11,6 @@ glmmPen(
   family = "binomial",
   covar = NULL,
   offset = NULL,
-  na.action = na.omit,
   fixef_noPen = NULL,
   penalty = c("MCP", "SCAD", "lasso"),
   alpha = 1,
@@ -53,9 +52,6 @@ linear predictor during fitting. Default set to \code{NULL} (no offset). If the 
 argument is \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the response). If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame.}
-
-\item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
-option \code{na.omit} are recognized by this function.}
 
 \item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 used in the model. Value 0 indicates the variable should not have its fixed effect coefficient

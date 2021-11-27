@@ -7,7 +7,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
                      penalty, alpha, gamma_penalty, 
                      lambda0_min, lambda1_min, group_X,
                      sampler, adapt_RW_options, covar,
-                     var_start, max_cores, checks_complete){
+                     var_start, checks_complete){
   
   
   # fixed effects penalty
@@ -15,7 +15,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   # random effect penalty 
   lam1 = lambda1_min
   
-  print(sprintf("Pre-screening penalty parameters: fixed effects %f, random effects %f", lam0, lam1))
+  cat(sprintf("Pre-screening penalty parameters: fixed effects %f, random effects %f", lam0, lam1), "\n")
   
   # Determine nMC ranges
   q = ncol(dat$Z) / nlevels(dat$group)
@@ -32,7 +32,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   mcc = 2
   
   # Fit 'full' model (small penalty for fixed and random effects)
-  out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
+  out = try(fit_dat(dat, lambda0 = lam0, lambda1 = lam1, 
                       nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                       family = family, offset_fit = offset_fit, group_X = group_X,
                       penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -41,7 +41,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
                       maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                       sampler = sampler, adapt_RW_options = adapt_RW_options,
                       covar = covar, var_start = var_start, logLik_calc = F,
-                      max_cores = max_cores, checks_complete = checks_complete))
+                      checks_complete = checks_complete))
   
   if(is.character(out)){
     stop("Issue with pre-screening step in model selection procedure")
@@ -64,8 +64,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
     }
   }
   
-  max_var = max(vars)
   
-  return(list(ranef_keep = ranef_keep, coef_pre = out$coef, u_pre = out$u_init, max_var = max_var))
+  return(list(ranef_keep = ranef_keep, coef_pre = out$coef, u_pre = out$u_init))
   
 }

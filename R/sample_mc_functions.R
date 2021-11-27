@@ -10,39 +10,46 @@
 
 
 #' @importFrom bigmemory big.matrix describe
-sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, group, d,
+sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, offset_fit, nMC, family, link, group, d,
                                   uold, proposal_SD, batch, batch_length = 100, 
                                   offset = 0, nMC_burnin = 500, phi = 0.0, sig_g = 1.0){
   
   # Re-code link as integer
   ## All link_int will have two digits
-  ## First digit corresponds to family that link is canonical for
+  ## First digit corresponds to family that link is generally associated with
   ## 1 = binomial, 2 = poisson or negative binomial, 3 = gaussian
   ## Second digit: 0 = canonical link, other = arbitrary enumeration of common non-canonical links
   if(link == "logit"){
     link_int = 10
-  }else if(link == "probit"){
-    link_int = 11
-  }else if(link == "cloglog"){
-    link_int = 12
   }else if(link == "log"){
     link_int = 20
-  }else if(link == "sqrt"){
-    link_int = 21
   }else if(link == "identity"){
     link_int = 30
-  }else if(link == "inverse"){
-    link_int = 31
   }
+  # For potential expansion of available links:
+  # if(link == "logit"){
+  #   link_int = 10
+  # }else if(link == "probit"){
+  #   link_int = 11
+  # }else if(link == "cloglog"){
+  #   link_int = 12
+  # }else if(link == "log"){
+  #   link_int = 20
+  # }else if(link == "sqrt"){
+  #   link_int = 21
+  # }else if(link == "identity"){
+  #   link_int = 30
+  # }else if(link == "inverse"){
+  #   link_int = 31
+  # }
   
-  eta = X %*% matrix(coef, ncol=1) 
   
   # matrix to hold accepted samples
   u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init = 0)
   # u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
   
   # fitted
-  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1))
+  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1) + matrix(offset_fit, ncol=1))
   #generate samples for each i
   
   q = ncol(Z) / d
@@ -78,39 +85,46 @@ sample_mc_adapt_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, g
 } # End sample_mc_adapt_BigMat()
 
 #' @importFrom bigmemory big.matrix describe
-sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, nMC, family, link, group, d, 
+sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, offset_fit, nMC, family, link, group, d, 
                              uold, phi = 0.0, sig_g = 1.0){
   
   # Re-code link as integer
   ## All link_int will have two digits
-  ## First digit corresponds to family that link is canonical for
+  ## First digit corresponds to family that link is generally associated with
   ## 1 = binomial, 2 = poisson or negative binomial, 3 = gaussian
   ## Second digit: 0 = canonical link, other = arbitrary enumeration of common non-canonical links
   if(link == "logit"){
     link_int = 10
-  }else if(link == "probit"){
-    link_int = 11
-  }else if(link == "cloglog"){
-    link_int = 12
   }else if(link == "log"){
     link_int = 20
-  }else if(link == "sqrt"){
-    link_int = 21
   }else if(link == "identity"){
     link_int = 30
-  }else if(link == "inverse"){
-    link_int = 31
   }
+  # For potential expansion of available links:
+  # if(link == "logit"){
+  #   link_int = 10
+  # }else if(link == "probit"){
+  #   link_int = 11
+  # }else if(link == "cloglog"){
+  #   link_int = 12
+  # }else if(link == "log"){
+  #   link_int = 20
+  # }else if(link == "sqrt"){
+  #   link_int = 21
+  # }else if(link == "identity"){
+  #   link_int = 30
+  # }else if(link == "inverse"){
+  #   link_int = 31
+  # }
   
   uhat  = rep(0, ncol(Z))
-  eta = X %*% matrix(coef, ncol=1) 
   
   # matrix to hold accepted samples
   u0 = big.matrix(nrow = nMC, ncol = ncol(Z), init = 0)
   # u0 = matrix(rnorm(nMC*ncol(Z)) , nMC, ncol(Z))
   
   # fitted
-  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1))
+  fitted_mat = as.matrix(X %*% matrix(coef, ncol=1) + matrix(offset_fit, ncol=1))
   #generate samples for each i
   
   error_out = F

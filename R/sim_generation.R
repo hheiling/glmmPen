@@ -1,11 +1,12 @@
 #' @importFrom stringr str_c str_detect
 #' @importFrom ncvreg std
+#' @importFrom mvtnorm rmvnorm
 #' @export
 sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, 
                      slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
   
   set.seed(seed = seed)
-  library(mvtnorm)
+  
   # set variables
   p = ptot
   p1 = pnonzero
@@ -24,7 +25,6 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
     mat = matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) # 11/15 switching to var = 1, then scaling below
     #mat = matrix(rbinom(n*p, p = 0.5, size = 1), nrow = n) # now switching back to normal to have more resolution to show prediction performance
   }else{
-    library(mvtnorm)
     cor = matrix(corr, p, p)
     diag(cor) = 1
     sigma = 0.5*cor
