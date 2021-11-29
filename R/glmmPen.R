@@ -10,15 +10,16 @@
 #' for further details.
 #' 
 #' @details The \code{glmm} function can be used to fit a single generalized mixed model.
-#' While this approach is meant to be used in the 'oracle' case where the user knows which
+#' While this approach is meant to be used in the case where the user knows which
 #' covariates belong in the fixed and random effects and no penalization is required, one is
 #' allowed to specify non-zero fixed and random effects penalites using \code{\link{lambdaControl}}
 #' and the (...) arguments. The (...) allow for specification of penalty-related arguments; see
 #' \code{\link{glmmPen}} for details. For a high dimensional situation, the user may want to fit a 
 #' full model using a small penalty for the fixed and random effects and save the posterior
 #' draws from this full model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
-#' Specifying a .txt file in the 'BICq_posterior' argument will save the posterior draws from the 
-#' \code{glmm} model into a big.matrix within the .txt file specified (\code{bigmemory::write.big.matrix}).
+#' Specifying a file name in the 'BICq_posterior' argument will save the posterior draws from the 
+#' \code{glmm} model into a big.matrix with this file name, see the Details section of 
+#' \code{\link{glmmPen}} for additional details.
 #' 
 #' 
 #' @return A reference class object of class \code{\link{pglmmObj}} for which many methods are 
@@ -184,7 +185,7 @@ fD_adj = function(out){
   
 } # End fD_adj() function
 
-#' Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
+#' @title Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
 #' Minimization (MCECM)
 #' 
 #' \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
@@ -198,7 +199,7 @@ fD_adj = function(out){
 #' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
 #' The offset must be specified outside of the formula in the 'offset' argument.
 #' @param data an optional data frame containing the variables named in \code{formula}. If \code{data} is 
-#' omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).
+#' omitted, variables will be taken from the environment of \code{formula}.
 #' @param family a description of the error distribution and link function to be used in the model. 
 #' Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
 #' with canonical links only.
@@ -226,7 +227,7 @@ fD_adj = function(out){
 #' @param alpha Tuning parameter for the Mnet estimator which controls the relative contributions 
 #' from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 #' the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-#' \code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero
+#' \code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero
 #' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 #' Default is 4.0 for SCAD and 3.0 for MCP.
 #' @param optim_options a structure of class "optimControl" created 
@@ -243,7 +244,7 @@ fD_adj = function(out){
 #' When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
 #' See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.
 #' @param BICq_posterior an optional character string expressing the path and file basename of a file combination that 
-#' the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
+#' will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 #' These full model posterior draws will be used in BIC-ICQ calculations if these calculations
 #' are requested. If this argument is
 #' specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
@@ -254,13 +255,15 @@ fD_adj = function(out){
 #' @param trace an integer specifying print output to include as function runs. Default value is 0. 
 #' See Details for more information about output provided when trace = 0, 1, or 2.
 #' 
-#' @details 
-#' \code{BICq_posterior}: If the \code{BIC_option} in \code{\link{selectControl}} (\code{tuning_options}) is specified 
+#' @details Argument \code{BICq_posterior}: If the \code{BIC_option} in \code{\link{selectControl}} 
+#' (\code{tuning_options}) is specified 
 #' to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
 #' process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
 #' lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
 #' In order to avoid repetitive calculations of
-#' this full model if secondary rounds of selection are desired, a \code{big.matrix} of these 
+#' this full model (i.e. if secondary rounds of selection are desired in 
+#' \code{\link{glmmPen_FineSearch}} or if the user wants to re-run \code{glmmPen} with a different
+#' set of penalty parameters), a \code{big.matrix} of these 
 #' posterior draws will be file-backed as two files: a backing file with extention '.bin' and a 
 #' descriptor file with extension '.desc'. The \code{BICq_posterior} argument should contain a 
 #' path and a filename with no extension of the form "./path/filename" such that the backingfile and
@@ -279,7 +282,7 @@ fD_adj = function(out){
 #' 
 #' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 #' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-#' from t iterations back EM_conv, and number of non-zero coefficients Non0 Coef). The value of 1
+#' from t iterations back EM_conv, and number of non-zero fixed and random effects). The value of 1
 #' additionally outputs the updated coefficients, updated covariance matrix values, and the
 #' number of coordinate descent iterations used for the M step for each
 #' EM iteration. If Stan is not used as the E-step sampling mechanism, 
@@ -288,7 +291,7 @@ fD_adj = function(out){
 #' for the adaptive random walk. 
 #' 
 #' @return A reference class object of class \code{\link{pglmmObj}} for which many methods are 
-#' available (e.g. \code{methods(class = "pglmmObj")})
+#' available (e.g. \code{methods(class = "pglmmObj")}, see ?pglmmObj for additional documentation)
 #'  
 #' @importFrom stringr str_to_lower str_c str_detect
 #' @importFrom Matrix Matrix
@@ -300,9 +303,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
                    trace = 0, tuning_options = selectControl(), BICq_posterior = NULL){
-  # Things to address / Questions to answer:
-  ## Specify what fit_dat output will be
-  ## Provide option for offset, weights
   
   ###########################################################################################
   # Input argument checks and modifications
@@ -350,7 +350,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                            contrasts = NULL)
   
   # Perform additional checks/restrictions/modifications of data input
-  # See function earlier in this document
+  # See fD_adj() function earlier in this document
   fD_out = fD_adj(out = fD_out0)
   
   # If offset = NULL, then set offset as arbitrary vector of 0s
@@ -473,17 +473,43 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     
+    ranef_keep = NULL
+    
     # If relevant, save posterior draws for later BIC-ICQ calculations
     if(!is.null(BICq_posterior)){
-      ufull_big = attach.big.matrix(fit$u_big)
-      ufull_big_tmp = as.big.matrix(ufull_big[,],
+      
+      y = data_input$y
+      X = data_input$X
+      Z = data_input$Z
+      group = data_input$group
+      d = nlevels(data_input$group)
+      
+      coef = fit$coef
+      J = fit$J
+      gamma = fit$Gamma_mat
+      # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% gamma (calculate for each group individually)
+      # Used within E-step
+      Znew2 = Z
+      for(j in 1:d){
+        Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
+      }
+      Estep_out = E_step(coef = coef, ranef_idx = sum(diag(fit$sigma) > 0), 
+                         y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
+                         nMC=nMC, nMC_burnin=nMC_burnin, family=fam_fun$family, link=fam_fun$link, 
+                         phi=1.0, sig_g=out$sigma_gaus,
+                         sampler=sampler, d=d, uold=fit$u_init, proposal_SD=fit$proposal_SD, 
+                         batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
+                         offset_increment=adapt_RW_options$offset_increment, 
+                         trace=trace)
+      # cat("End E-step \n")
+      u0 = attach.big.matrix(Estep_out$u0)
+      # File-back the posterior samples of the full model
+      ufull_big_tmp = as.big.matrix(u0[,],
                                     backingpath = dirname(BICq_posterior),
                                     backingfile = sprintf("%s.bin",basename(BICq_posterior)),
                                     descriptorfile = sprintf("%s.desc",basename(BICq_posterior)))
       rm(ufull_big_tmp)
     }
-    
-    ranef_keep = NULL
     
   }else if(inherits(tuning_options, "selectControl")){
     
@@ -640,10 +666,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     for(i in 1:nrow(beta_results)){
       beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=F] / std_out$X_scale
     }
-    # colnames(beta_results) = c(coef_names$fixed)
     
     gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results),drop=F]
-    # colnames(gamma_results) = str_c("Gamma",0:(ncol(gamma_results)-1))
     
     # Combine all relevant selection results
     selection_results = cbind(resultsA,beta_results,gamma_results)
@@ -742,6 +766,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
 ###########################################################################################
 # Standardization of covariates
 ###########################################################################################
+# Standardize fixed effects covariates, use these standardized values in the 
+# Z random effects covariates model matrix, and save standarization information
 
 #' @importFrom ncvreg std
 XZ_std = function(fD_out){

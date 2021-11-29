@@ -27,13 +27,13 @@ with canonical links only.}
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
+\code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
 \item{lambda.min}{numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
 ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
 a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
-\code{lambda.min} specifiex this fraction. Default value is set to \code{NULL}, which
-automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.}
+\code{lambda.min} specifies this fraction. Default value is set to \code{NULL}, which
+automatically selects \code{lambda.min} to equal 0.01 when p <= 10 and 0.05 when p > 10.}
 
 \item{nlambda}{positive integer specifying number of penalty parameters (lambda) with 
 which to fit a model.}

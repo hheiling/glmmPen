@@ -1,10 +1,11 @@
 
-#' Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+#' @title Fit a Sequence of Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 #' Minimization (MCECM) 
 #' 
-#' \code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-#' Conditional Minimization (MCECM) over multiple tuning parameters and is called within
-#' \code{glmmPen}
+#' \code{select_tune} is used to fit a sequence of penalized generalized mixed models 
+#' via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+#' multiple tuning parameter combinations and is called within
+#' \code{glmmPen} (cannot be called directly by user)
 #' 
 #' @inheritParams glmmPen
 #' @inheritParams fit_dat
@@ -17,13 +18,14 @@
 #' values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
 #' (if applicable)
 #' @param stage1 boolean value indicating if the first stage of the abbreviated two-stage grid
-#' search in the model selection procedure is being performed.
+#' search in the model selection procedure is being performed. \code{FALSE} if either 
+#' performing the second stage of the abbreviated two-stage grid search or if performing the
+#' full grid search over all possible penalty parameter combinations.
 #' 
 #' @return A list with the following elements:
 #' \item{results}{matrix of summary results for each lambda tuning parameter combination, used
 #' to select the 'best' model}
-#' \item{out}{list of \code{\link{fit_dat}} results for the models with the minimum BICh and 
-#' minimum BIC values}
+#' \item{out}{list of \code{\link{fit_dat}} results for the best model}
 #' \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
 #' Rows correspond with the rows of the results matrix.}
 #'  
@@ -194,6 +196,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                                  adapt_RW_options = adapt_RW_options, trace = trace)
         # ufull_big: big.matrix of posterior samples from full model
         ufull_big = attach.big.matrix(Estep_out$u0)
+        # File-back the posterior samples of the full model
         ufull_big_tmp = as.big.matrix(ufull_big[,],
                                       backingpath = dirname(BICq_posterior),
                                       backingfile = sprintf("%s.bin",basename(BICq_posterior)),
@@ -270,9 +273,9 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   }
   
   # results matrix to store some 'summary' results for each model fit
-  res = matrix(0, nrow = n1*n2, ncol = 11)
+  res = matrix(0, nrow = n1*n2, ncol = 12)
   colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik",
-                    "Non_0_fef","Non_0_ref","Non_0_coef","EM_iter")
+                    "Non_0_fef","Non_0_ref","Non_0_coef","EM_iter","Converged")
   # During selection, will store coefficients from each model in a matrix. Initialize as NULL.
   coef = NULL
   
@@ -391,6 +394,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       }
       res[(j-1)*n1+i,10] = sum(out$coef != 0)
       res[(j-1)*n1+i,11] = out$EM_iter
+      res[(j-1)*n1+i,12] = out$converged
       print(res[(j-1)*n1+i,])
       # Store coefficients
       coef = rbind(coef, out$coef)

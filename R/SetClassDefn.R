@@ -1,12 +1,14 @@
 # Setting class definitions
 # Example from merMod in lme4: https://github.com/lme4/lme4/blob/master/R/AllClass.R
 
-#' @title Class "pglmmObj" of Fitted Penalized Generalized Mixed-Effects Models
+#' @title Class \code{pglmmObj} of Fitted Penalized Generalized Mixed-Effects Models for 
+#' package \code{glmmPen}
 #' 
 #' @description The functions \code{\link{glmm}}, \code{\link{glmmPen}}, and 
-#' \code{\link{glmmPen_FineSearch}} output the reference class object of type \code{pglmmObj}.
+#' \code{\link{glmmPen_FineSearch}} from the package \code{glmmPen} 
+#' output the reference class object of type \code{pglmmObj}.
 #' 
-#' @name pglmmObj-class
+#' @name pglmmObj-class 
 #' @aliases pglmmObj-class pglmmObj
 #' show, pglmmObj-method, coef.pglmmObj, fitted.pglmmObj, fixef.pglmmObj, formula.pglmmObj,
 #' logLik.pglmmObj, model.frame.pglmmObj, model.matrix.pglmmObj, plot.pglmmObj, 
@@ -17,7 +19,45 @@
 #' 
 #' @keywords classes
 #' 
-#' @examples
+#' @return The pglmmObj object returns the following items:
+#' \item{fixef}{vector of fixed effects coefficients}
+#' \item{ranef}{matrix of random effects coefficients for each 
+#' explanatory variable for each level of the grouping factor}
+#' \item{sigma}{random effects covariance matrix}
+#' \item{scale}{if family is Gaussian, returns the residual error variance}
+#' \item{posterior_samples}{Samples from the posterior distribution of the random effects,
+#' taken at the end of the model fit (after convergence or after maximum iterations allowed).
+#' Can be used for diagnositics purposes. Note: These posterior samples are from a single chain.}
+#' \item{sampling}{character string for type of sampling used to calculate the posterior samples
+#' in the E-step of the algorithm}
+#' \item{results_all}{matrix of results from all model fits during variable selection (if selection
+#' performed). Output for each model includes: penalty parameters for fixed (lambda0) and random 
+#' (lambda1) effects, BIC-derived quantities and the log-likelihood 
+#' (note: the arguments \code{BIC_option} and \code{logLik_calc} in \code{\link{selectControl}}
+#' determine which of these quantities are calculated for each model), 
+#' the number of non-zero fixed and random effects (includes intercept),
+#' number of EM iterations used for model fit, whether or not the 
+#' model converged (0 for no vs 1 for yes), and the fixed and random effects coefficients}
+#' \item{results_optim}{results from the 'best' model fit; see results_all for details. 
+#' BICh, BIC, BICNgrp, and LogLik computed for this best model if not previously calculated.}
+#' \item{family}{Family}
+#' \item{penalty_info}{list of penalty information}
+#' \item{call}{arguments plugged into \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}}
+#' \item{formula}{formula}
+#' \item{fixed_vars}{names of fixed effects variables}
+#' \item{data}{list of data used in model fit, including the response y, the fixed effects 
+#' covariates matrix X, the random effects model matrix Z (which is composed of values from the 
+#' standardized fixed effects model matrix), 
+#' the grouping factor, offset, model frame,
+#' and standarization information used to standardize the fixed effects covariates}
+#' \item{optinfo}{Information about the optimization of the 'best' model}
+#' \item{control_info}{optimization parameters used for the model fit}
+#' \item{Estep_init}{materials that can be used to initialize another E-step (for 
+#' use in \code{glmmPen_FineSearch})}
+#' \item{Gibbs_info}{list of materials to perform diagnositics on the Metropolis-within-Gibbs
+#' sample chains, including the Gibbs acceptance rates (included for both the independence
+#' and adaptive random walk samplers) and the final proposal standard deviations 
+#' (included for the adaptive random walk sampler only))}
 #' 
 #' showClass("pglmmObj")
 #' methods(class = "pglmmObj")
@@ -29,24 +69,20 @@ pglmmObj = setRefClass("pglmmObj",
               fixef = "numeric", # fixed effects coefficients
               ranef = "list", # random effects coefficients
               sigma = "matrix", 
-                # sigma: Turn in to "dgCMatrix"? - sparse for large dimensions matrix
-                # alternatively, if large dims, assume diagonal, could report matrix with ncol = 1
               scale = "list",
-              posterior_draws = "matrix",
+              posterior_samples = "matrix",
               sampling = "character",
               results_all = "matrix",
               results_optim = "matrix",
               family = "family",
-              J = "Matrix", # sparse matrix
               penalty_info = "list",
-              nonzeroFE = "numeric", # non-zero fixed effects coefficients (colnames)
               call = "call",
               formula = "formula",
               fixed_vars = "character",
               data = "list",
               optinfo = "list",
               control_info = "list",
-              Estep_material = "list",
+              Estep_init = "list",
               Gibbs_info = "list"
             ),
             methods = list(
@@ -88,7 +124,6 @@ pglmmObj = setRefClass("pglmmObj",
                   beta[-1] = beta[-1] / scale_std
                 names(beta) = x$coef_names$fixed
                 fixef <<- beta
-                nonzeroFE <<- fixef[which(fixef != 0)]
                 
                 # Covariance matrix of random effects
                 sigma <<- x$sigma
@@ -99,8 +134,8 @@ pglmmObj = setRefClass("pglmmObj",
                 # names(coef) = c(x$coef_names$fixed, str_c("Gamma",0:length(coef[-c(1:p)])))
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
-                posterior_draws <<- x$Estep_out$post_out
-                colnames(posterior_draws) <<- colnames(Z_std)
+                posterior_samples <<- x$Estep_out$post_out
+                colnames(posterior_samples) <<- colnames(Z_std)
                 
                 # Random effects coefficients
                 rand = x$Estep_out$post_modes
@@ -122,7 +157,6 @@ pglmmObj = setRefClass("pglmmObj",
                   scale <<- list(scale = NULL)
                 }
                 
-                J <<- x$J
                 formula <<- x$formula
                 fixed_vars <<- x$fixed_vars
                 call <<- x$call
@@ -143,7 +177,7 @@ pglmmObj = setRefClass("pglmmObj",
                 optinfo <<- list(iter = x$EM_iter, conv = x$EM_conv, warnings = x$warnings,
                                  control_options = x$control_options$optim_options)
                 control_info <<- x$control_options
-                Estep_material <<- list(u_init = x$Estep_out$u_init, coef = x$coef,
+                Estep_init <<- list(u_init = x$Estep_out$u_init, coef = x$coef,
                                         updated_batch = x$updated_batch)
                 Gibbs_info <<- list(gibbs_accept_rate = x$gibbs_accept_rate, proposal_SD = x$proposal_SD)
                 

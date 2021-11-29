@@ -3,7 +3,12 @@
 \name{fit_dat}
 \alias{fit_dat}
 \title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
-Minimization (MCECM)}
+Minimization (MCECM)
+
+\code{fit_dat} is used to fit a penalized generalized mixed model
+via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+a single tuning parameter combinations and is called within
+\code{glmmPen} or \code{glmm} (cannot be called directly by user)}
 \usage{
 fit_dat(
   dat,
@@ -50,13 +55,14 @@ the study, batch, or other group identity to which on observation belongs)}
 covariance parameters}
 
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
-EM algorithm. Default is 0.001. EM algorithm is considered to have converge if the average Euclidean 
+EM algorithm. Default is 0.0015. 
+EM algorithm is considered to have converge if the average Euclidean 
 distance between the current coefficient estimates and the coefficient estimates from 
 \code{t} EM iterations back is less than \code{conv_EM} \code{mcc} times in a row.
 See \code{t} and \code{mcc} for more details.}
 
 \item{conv_CD}{a non-negative numeric convergence criteria for the convergence of the 
-grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.}
+grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0005.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
@@ -77,14 +83,14 @@ random effects coefficients.}
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
+\code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
 
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
-\item{nMC_burnin}{positive integer specifying the number of posterior draws to use as
+\item{nMC_burnin}{positive integer specifying the number of posterior samples to use as
 burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
 the following defaults: Default 250 when the number of random effects 
 predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
@@ -114,10 +120,10 @@ Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian fa
 \item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
 coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.}
 
-\item{M}{positive integer specifying the number of posterior draws to use within the 
+\item{M}{positive integer specifying the number of posterior samples to use within the 
 Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.}
 
-\item{sampler}{character string specifying whether the posterior draws of the random effects
+\item{sampler}{character string specifying whether the posterior samples of the random effects
 should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 incorporating an adaptive random walk sampler ("random_walk") or an
 independence sampler ("independence"). If using the random walk sampler, see \code{\link{adaptControl}}
@@ -138,20 +144,22 @@ algorithm automatically assumes an unstructured covariance structure and \code{c
 
 \item{var_start}{either the character string "recommend" or a positive number specifying the 
 starting values to initialize the variance of the covariance matrix. Default "recommend" first
-fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
+fits a simple model with a fixed and random intercept only using a Laplace approximation. The 
 random intercept variance estimate from this model is then multiplied by 2 and used as the 
 starting variance.}
 
 \item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
 calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
-If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+If BIC-ICQ is used for selection, the log-likelihood is not needed for each model. 
+However, if users are interested
 in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
-\code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
+\code{logLik_calc} to \code{TRUE} will calculate these other quantities for all of the models.}
 
 \item{checks_complete}{boolean value indicating whether the function has been called within
-\code{glmm} or \code{glmmPen} or whether the function has been called by itself. If true,
+\code{glmm} or \code{glmmPen} or whether the function has been called by itself. 
+Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,
 performs additional checks on the input data. If false, assumes data input checks have 
-already been performed. For package testing purposes only.}
+already been performed.}
 
 \item{conv_type}{integer specifying which type of convergence criteria to use. Default 1 specifies
 using the average Eucledian distance, and 2 specifies using relative change in the Q-function
@@ -175,6 +183,8 @@ For independent covariance matrices, q^2 x q.}
 \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
 \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
 \item{BIC}{Regular BIC estimate}
+\item{BICNgrps}{BIC estimate with N = number of groups in penalty term instead of N = number
+of total observations.}
 \item{BICq}{BIC-ICQ estimate}
 \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
 then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
@@ -185,5 +195,11 @@ random walk version of the Metropolis-within-Gibbs sampling) for each variable (
 each group (rows)}
 }
 \description{
-Description
+Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+Minimization (MCECM)
+
+\code{fit_dat} is used to fit a penalized generalized mixed model
+via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+a single tuning parameter combinations and is called within
+\code{glmmPen} or \code{glmm} (cannot be called directly by user)
 }

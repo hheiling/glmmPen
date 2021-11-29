@@ -2,8 +2,13 @@
 % Please edit documentation in R/select_tune.R
 \name{select_tune}
 \alias{select_tune}
-\title{Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
-Minimization (MCECM)}
+\title{Fit a Sequence of Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+Minimization (MCECM) 
+
+\code{select_tune} is used to fit a sequence of penalized generalized mixed models 
+via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+multiple tuning parameter combinations and is called within
+\code{glmmPen} (cannot be called directly by user)}
 \usage{
 select_tune(
   dat,
@@ -74,7 +79,7 @@ calculated. See 'Details' section for more details on these default calculations
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
+\code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
@@ -92,8 +97,9 @@ documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
 Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
-effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+a full model; a small penalty (the minimum of the penalty sequence) 
+is used for the fixed and random effects. 
+The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 groups).}
@@ -103,12 +109,13 @@ best model.}
 
 \item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
 calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
-If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+If BIC-ICQ is used for selection, the log-likelihood is not needed for each model. 
+However, if users are interested
 in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
-\code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.}
+\code{logLik_calc} to \code{TRUE} will calculate these other quantities for all of the models.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
-the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
+will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
 are requested. If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
@@ -129,19 +136,24 @@ values to use in pre-screening and/or the full model fit for the BIC-ICQ calcula
 (if applicable)}
 
 \item{stage1}{boolean value indicating if the first stage of the abbreviated two-stage grid
-search in the model selection procedure is being performed.}
+search in the model selection procedure is being performed. \code{FALSE} if either 
+performing the second stage of the abbreviated two-stage grid search or if performing the
+full grid search over all possible penalty parameter combinations.}
 }
 \value{
 A list with the following elements:
 \item{results}{matrix of summary results for each lambda tuning parameter combination, used
 to select the 'best' model}
-\item{out}{list of \code{\link{fit_dat}} results for the models with the minimum BICh and 
-minimum BIC values}
+\item{out}{list of \code{\link{fit_dat}} results for the best model}
 \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
 Rows correspond with the rows of the results matrix.}
 }
 \description{
-\code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-Conditional Minimization (MCECM) over multiple tuning parameters and is called within
-\code{glmmPen}
+Fit a Sequence of Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+Minimization (MCECM) 
+
+\code{select_tune} is used to fit a sequence of penalized generalized mixed models 
+via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+multiple tuning parameter combinations and is called within
+\code{glmmPen} (cannot be called directly by user)
 }

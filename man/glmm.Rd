@@ -27,7 +27,7 @@ will be recognized. The random effects covariates need to be a subset of the fix
 The offset must be specified outside of the formula in the 'offset' argument.}
 
 \item{data}{an optional data frame containing the variables named in \code{formula}. If \code{data} is 
-omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
+omitted, variables will be taken from the environment of \code{formula}.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
@@ -81,13 +81,14 @@ is performed.
 }
 \details{
 The \code{glmm} function can be used to fit a single generalized mixed model.
-While this approach is meant to be used in the 'oracle' case where the user knows which
+While this approach is meant to be used in the case where the user knows which
 covariates belong in the fixed and random effects and no penalization is required, one is
 allowed to specify non-zero fixed and random effects penalites using \code{\link{lambdaControl}}
 and the (...) arguments. The (...) allow for specification of penalty-related arguments; see
 \code{\link{glmmPen}} for details. For a high dimensional situation, the user may want to fit a 
 full model using a small penalty for the fixed and random effects and save the posterior
 draws from this full model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
-Specifying a .txt file in the 'BICq_posterior' argument will save the posterior draws from the 
-\code{glmm} model into a big.matrix within the .txt file specified (\code{bigmemory::write.big.matrix}).
+Specifying a file name in the 'BICq_posterior' argument will save the posterior draws from the 
+\code{glmm} model into a big.matrix with this file name, see the Details section of 
+\code{\link{glmmPen}} for additional details.
 }

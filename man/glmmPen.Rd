@@ -3,7 +3,10 @@
 \name{glmmPen}
 \alias{glmmPen}
 \title{Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
-Minimization (MCECM)}
+Minimization (MCECM)
+
+\code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
+Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria}
 \usage{
 glmmPen(
   formula,
@@ -32,7 +35,7 @@ will be recognized. The random effects covariates need to be a subset of the fix
 The offset must be specified outside of the formula in the 'offset' argument.}
 
 \item{data}{an optional data frame containing the variables named in \code{formula}. If \code{data} is 
-omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
+omitted, variables will be taken from the environment of \code{formula}.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
@@ -66,7 +69,7 @@ random effects coefficients.}
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
+\code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
@@ -91,7 +94,7 @@ When function \code{glmmPen} is run, \code{tuning_options} is specified usig \co
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
-the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
+will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
 are requested. If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
@@ -102,9 +105,12 @@ and the file-backed big matrix.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 
-available (e.g. \code{methods(class = "pglmmObj")})
+available (e.g. \code{methods(class = "pglmmObj")}, see ?pglmmObj for additional documentation)
 }
 \description{
+Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
+Minimization (MCECM)
+
 \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
 Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 }

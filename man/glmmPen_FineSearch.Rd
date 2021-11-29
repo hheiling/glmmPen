@@ -83,7 +83,11 @@ the finer lambda grid search: (i) The lambda combination from the best model is 
 from the earlier selection results saved in the \code{pglmmObj} object. (ii) For the fixed and
 random effects separately, the new max and min lambda values are the lambda values \code{idx_range} 
 positions away from the best lambda in the original lambda sequences for the fixed and random
-effects. 
+effects. For instance, suppose we consider a hypothetical lambda sequence of 
+\{0.1,0.2,0.3,0.4,0.5,0.6,0.7\} for both fixed and random effects, 
+and the best model was given by the (0.4,0.5) combination. If the \code{idx_lambda} = 2, then
+the fine search would use the fixed effects sequence would have (min,max) = (0.2,0.6) and
+the fixed effects sequence would have (min,max) = (0.3,0.7).
 
 Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
