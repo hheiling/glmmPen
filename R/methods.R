@@ -573,6 +573,28 @@ BIC.pglmmObj = function(object){ # extractBIC.pglmmObj
   
 }
 
+# @export
+# extractBICq = function(object, BICq_posterior = NULL,
+#                        tuning_options = NULL){
+#   
+#   ###################################################################################
+#   # Extraction of data/arguments from pglmmObj
+#   # Input argument checks
+#   ###################################################################################
+#   
+#   
+#   ###################################################################################
+#   # Fit 'full' model, save posterior samples for BIC-ICQ calculation
+#   ###################################################################################
+#   
+#   
+#   ###################################################################################
+#   # BIC-ICQ calculation
+#   ###################################################################################
+#   
+# }
+
+
 #' @title Plot Diagnostics for MCMC Posterior Draws of the Random Effects
 #' 
 #' @description Provides graphical diagnostics of the random effect posterior draws from the (best) model.
@@ -595,11 +617,12 @@ BIC.pglmmObj = function(object){ # extractBIC.pglmmObj
 #' 'all', which picks all variables with non-zero random effects.
 #' Tip: can find the names of the random effect variables in
 #' the output sigma matrix found in the \code{pglmmObj} object, run \code{sigma(object)}. 
-#' @param numeric.grps if TRUE, specifies that the groups factor should be converted to numeric 
+#' @param numeric_grp_order if TRUE, specifies that the groups factor should be converted to numeric 
 #' values. This option could be used to ensure that the organization of the groups is in the 
 #' proper numeric order (e.g. groups with levels 1-10 are ordered 1-10, not 1, 10, 2-9).
 #' @param bin_width optional binwidth argument for \code{geom_histogram} from the \code{ggplot2} 
-#' package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth.
+#' package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth. 
+#' This argument only applies if the "histogram" plot type is selected.
 #' 
 #' @return a list of ggplot graphics, each faceted by group and random effect variable. 
 #' Type of plots specified in the \code{plots} argument.
@@ -608,8 +631,9 @@ BIC.pglmmObj = function(object){ # extractBIC.pglmmObj
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
 #' @import ggplot2 
 #' @export 
-plot_mcmc = function(object, plots = "sample.path", # ,"autocorr","histogram","cumsum","all"
-                     grps = "all", vars = "all", numeric.grps = F, bin_width = NULL){ 
+plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocorr","histogram","cumsum","all")
+                     grps = "all", vars = "all", 
+                     numeric_grp_order = F, bin_width = NULL){ 
   
   ##############################################################################################
   # Checks

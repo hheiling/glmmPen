@@ -9,7 +9,7 @@ plot_mcmc(
   plots = "sample.path",
   grps = "all",
   vars = "all",
-  numeric.grps = F,
+  numeric_grp_order = F,
   bin_width = NULL
 )
 }
@@ -35,12 +35,13 @@ should have diagnostics provided. Default is set to
 Tip: can find the names of the random effect variables in
 the output sigma matrix found in the \code{pglmmObj} object, run \code{sigma(object)}.}
 
-\item{numeric.grps}{if TRUE, specifies that the groups factor should be converted to numeric 
+\item{numeric_grp_order}{if TRUE, specifies that the groups factor should be converted to numeric 
 values. This option could be used to ensure that the organization of the groups is in the 
 proper numeric order (e.g. groups with levels 1-10 are ordered 1-10, not 1, 10, 2-9).}
 
 \item{bin_width}{optional binwidth argument for \code{geom_histogram} from the \code{ggplot2} 
-package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth.}
+package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth. 
+This argument only applies if the "histogram" plot type is selected.}
 }
 \value{
 a list of ggplot graphics, each faceted by group and random effect variable. 

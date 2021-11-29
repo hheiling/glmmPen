@@ -37,8 +37,9 @@
 #'   
 #' @details 
 #' The \code{glmmPen_FineSearch} function extracts the data, the penalty information (penalty type,
-#' gamma_penalty, and alpha), and some other argument specifications from the \code{pglmmObj} object
-#' created during a previous round of model selection. In this finer grid search, the user has
+#' gamma_penalty, and alpha), the pre-screening results from the initial variable selection
+#' procedure, and some other argument specifications from the \code{pglmmObj} object
+#' created during a previous round of variable/model selection. In this finer grid search, the user has
 #' the ability to make the following adjustments: the user can change the BIC option used for selection,
 #' any optimization control parameters, or any adaptive random walk parameters (if the sampler
 #' specified in the optimization parameters is "random_walk"). The user could manually specify the 
