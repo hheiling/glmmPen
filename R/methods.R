@@ -573,27 +573,6 @@ BIC.pglmmObj = function(object){ # extractBIC.pglmmObj
   
 }
 
-# @export
-# extractBICq = function(object, BICq_posterior = NULL,
-#                        tuning_options = NULL){
-#   
-#   ###################################################################################
-#   # Extraction of data/arguments from pglmmObj
-#   # Input argument checks
-#   ###################################################################################
-#   
-#   
-#   ###################################################################################
-#   # Fit 'full' model, save posterior samples for BIC-ICQ calculation
-#   ###################################################################################
-#   
-#   
-#   ###################################################################################
-#   # BIC-ICQ calculation
-#   ###################################################################################
-#   
-# }
-
 
 #' @title Plot Diagnostics for MCMC Posterior Draws of the Random Effects
 #' 
