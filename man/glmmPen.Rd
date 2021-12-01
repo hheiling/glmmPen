@@ -115,5 +115,38 @@ Minimization (MCECM)
 Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 }
 \details{
-
+Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
+(\code{tuning_options}) is specified 
+to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
+process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
+lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
+In order to avoid repetitive calculations of
+this full model (i.e. if secondary rounds of selection are desired in 
+\code{\link{glmmPen_FineSearch}} or if the user wants to re-run \code{glmmPen} with a different
+set of penalty parameters), a \code{big.matrix} of these 
+posterior draws will be file-backed as two files: a backing file with extention '.bin' and a 
+descriptor file with extension '.desc'. The \code{BICq_posterior} argument should contain a 
+path and a filename with no extension of the form "./path/filename" such that the backingfile and
+the descriptor file would then be saved as "./path/filename.bin" and "./path/filename.desc", respectively.
+If \code{BICq_posterior} is set to \code{NULL}, then by default, the backingfile and descriptor
+file are saved in the working directory as "BICq_Posterior_Draws.bin" and "BICq_Posterior_Draws.desc".
+If the big matrix of posterior draws is already file-backed, \code{BICq_posterior} should
+specify the path and basename of the appropriate files (again of form "./path/filename"); 
+the full model 
+will not be fit again and the big.matrix of 
+posterior draws will be read using the \code{attach.big.matrix} function of the
+ \code{bigmemory} package and used in the BIC-ICQ 
+calcuations. If the appropriate files do not exist or \code{BICq_posterior} 
+is specified as \code{NULL}, the full model will be fit and the full model posterior
+draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
+ 
+Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t iterations back EM_conv, and number of non-zero fixed and random effects). The value of 1
+additionally outputs the updated coefficients, updated covariance matrix values, and the
+number of coordinate descent iterations used for the M step for each
+EM iteration. If Stan is not used as the E-step sampling mechanism, 
+the value of 2 outputs all of the above plus gibbs acceptance rate information
+for the adaptive random walk and independence samplers and the updated proposal standard deviation
+for the adaptive random walk.
 }

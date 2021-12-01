@@ -255,7 +255,7 @@ fD_adj = function(out){
 #' @param trace an integer specifying print output to include as function runs. Default value is 0. 
 #' See Details for more information about output provided when trace = 0, 1, or 2.
 #' 
-#' @details Argument \code{BICq_posterior}: If the \code{BIC_option} in \code{\link{selectControl}} 
+#' @details Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
 #' (\code{tuning_options}) is specified 
 #' to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
 #' process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
@@ -274,12 +274,12 @@ fD_adj = function(out){
 #' specify the path and basename of the appropriate files (again of form "./path/filename"); 
 #' the full model 
 #' will not be fit again and the big.matrix of 
-#' posterior draws will be read using \code{bigmemory::attach.big.matrix}
-#' (\code{bigmemory::attach.big.matrix(sprintf("%s.desc",BICq_posterior))}) and used in the BIC-ICQ 
+#' posterior draws will be read using the \code{attach.big.matrix} function of the
+#'  \code{bigmemory} package and used in the BIC-ICQ 
 #' calcuations. If the appropriate files do not exist or \code{BICq_posterior} 
 #' is specified as \code{NULL}, the full model will be fit and the full model posterior
 #' draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
-#' 
+#'  
 #' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 #' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
 #' from t iterations back EM_conv, and number of non-zero fixed and random effects). The value of 1
