@@ -1,13 +1,14 @@
 
-#' Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+#' @title Fit a Sequence of Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
 #' Minimization (MCECM) 
 #' 
-#' \code{select_tune} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-#' Conditional Minimization (MCECM) over multiple tuning parameters and is called within
-#' \code{glmmPen}
+#' \code{select_tune} is used to fit a sequence of penalized generalized mixed models 
+#' via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+#' multiple tuning parameter combinations and is called within
+#' \code{glmmPen} (cannot be called directly by user)
 #' 
 #' @inheritParams glmmPen
-#' @inheritParams fit_dat_B
+#' @inheritParams fit_dat
 #' @inheritParams selectControl
 #' @inheritParams optimControl
 #' @param BICq_calc boolean value indicating if the BIC-ICQ criterion should be used to select the
@@ -17,13 +18,14 @@
 #' values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
 #' (if applicable)
 #' @param stage1 boolean value indicating if the first stage of the abbreviated two-stage grid
-#' search in the model selection procedure is being performed.
+#' search in the model selection procedure is being performed. \code{FALSE} if either 
+#' performing the second stage of the abbreviated two-stage grid search or if performing the
+#' full grid search over all possible penalty parameter combinations.
 #' 
 #' @return A list with the following elements:
 #' \item{results}{matrix of summary results for each lambda tuning parameter combination, used
 #' to select the 'best' model}
-#' \item{out}{list of \code{\link{fit_dat_B}} results for the models with the minimum BICh and 
-#' minimum BIC values}
+#' \item{out}{list of \code{\link{fit_dat}} results for the best model}
 #' \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
 #' Rows correspond with the rows of the results matrix.}
 #'  
@@ -40,13 +42,18 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                        BICq_posterior = NULL, checks_complete = F, pre_screen = T, 
                        ranef_keep = NULL, lambda.min.full, stage1 = F){
   
+  ###########################################################################################
+  # Input checks and modifications
+  ###########################################################################################
+  
   # Input modification and restriction for family
   family_info = family_export(family)
   fam_fun = family_info$family_fun
   link = family_info$link
-  link_int = family_info$link_int # Recoded link as integer
+  link_int = family_info$link_int # Recoded link as integer, see "family_export.R" for details
   family = family_info$family
   
+  # Check of BIC-derived quantity to use for selection
   if(length(BIC_option) > 1){
     BIC_option = BIC_option[1]
   }
@@ -58,17 +65,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     offset = rep(0, length(dat$y))
   }
   
-  # if((covar == "unstructured") & (ncol(dat$Z)/nlevels(dat$group) >= 11)){
-  #   warning("Due to dimension of sigma covariance matrix, will use covar = 'independent' to simplify computation",
-  #           immediate. = T)
-  #   covar = "independent"
-  # }
-  # if((covar == "unstructured") & (ncol(dat$Z)/nlevels(dat$group) >= 11)){
-  #   warning("The random effect covariance matrix is currently specified as 'unstructured'. 
-  #           Due to dimension of sigma covariance matrix, we suggest using covar = 'independent' to simplify computation",
-  #           immediate. = T)
-  # }
-  
+  # Initialize starting variance for random effect covariance matrix
   if(optim_options$var_start == "recommend"){
     var_start = var_init(dat, fam_fun)
     cat("recommended starting variance: ", var_start, "\n")
@@ -80,6 +77,10 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   sampler = optim_options$sampler
   
+  ###########################################################################################
+  # Pre-screening of random effects (optional)
+  ###########################################################################################
+  
   # Pre-screening step
   ## If number of random effects in model (including intercept) is 6 or more
   ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
@@ -90,7 +91,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                         lambda0_min = lambda.min.full[1], lambda1_min = lambda.min.full[2], 
                         group_X = group_X, sampler = sampler, 
                         adapt_RW_options = adapt_RW_options, covar = covar,
-                        var_start = var_start, max_cores = max_cores, 
+                        var_start = var_start, 
                         checks_complete = checks_complete)
     cat("end prescreening procedure \n")
     ranef_keep = out_pre$ranef_keep
@@ -104,13 +105,11 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     u_pre = NULL
   }
   
-  if(is.character(optim_options)){
-    if(optim_options == "recommend"){
-      optim_options = optim_recommend(family, sum(ranef_keep), select = T)
-    }
-  }
+  ###########################################################################################
+  # Optimization arguments
+  ###########################################################################################
   
-  # If nMC arguments or maxitEM left as NULL, fill in defaults
+  # If any optimization arguments set to NULL, fill in defaults
   optim_options = optim_recommend(optim_options = optim_options, family = family, 
                                   q = sum(ranef_keep), select = T)
   
@@ -127,38 +126,39 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   t = optim_options$t
   mcc = optim_options$mcc
   sampler = optim_options$sampler
-  max_cores = optim_options$max_cores
   
-  # If need to calculate full model for BICq calculation
-  ## Use minimum lambda in range of lambda
+  ###########################################################################################
+  # BIC-ICQ calculation (optional)
+  ###########################################################################################
+  
+  # ufull_describe: the output from describe(big_matrix)
   ufull_describe = NULL
   
+  # Either read in already saved posterior samples for BIC-ICQ calculation, or
+  # specify that the full model needs to be fit in order to calculate these posterior samples
   if(BICq_calc == T){
     # If posterior draws from full model not yet created, fit full model and save posterior draws
     # Otherwise, read in the prevoiusly fit full model posterior draw results
     if(!is.null(BICq_posterior)){
       if(file.exists(sprintf("%s.desc",BICq_posterior)) & file.exists(sprintf("%s.bin",BICq_posterior))){
-        print("Using saved posterior draws from full model for BIC-ICQ calculation:")
-        print(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior))
+        cat("Using saved posterior draws from full model for BIC-ICQ calculation: \n")
+        cat(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior), "\n")
         fitfull_needed = F
       }else{
-        print(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior))
-        print(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc",
-                      BICq_posterior, BICq_posterior))
-        # cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n")
-        # warning("BICq_posterior file ",BICq_posterior," not found", 
-        #         "  Creating new full model posterior draws", immediate. = T)
+        cat(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior), "\n")
+        cat(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc",
+                      BICq_posterior, BICq_posterior), "\n")
         fitfull_needed = T
       }
     }else{ # if is.null(BICq_posterior)
       BICq_posterior = "BICq_Posterior_Draws"
-      print(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc within working directory",
-                    BICq_posterior, BICq_posterior))
-      # cat("Fitting full model and saving posterior draws to ",BICq_posterior, "\n",
-      #     "  within working directory \n")
+      cat(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc within working directory",
+                    BICq_posterior, BICq_posterior), "\n")
       fitfull_needed = T
-    }
+    } # End if-else !is.null(BICq_posterior)
     
+    # If in previous code chunk specified that full model needed to be fit, run full model
+    # and save posterior samples for BIC-ICQ calculation
     if(fitfull_needed){
       # fixed effects penalty
       if(ncol(dat$X) >= 6) lam0 = lambda.min.full[1] else lam0 = 0
@@ -166,11 +166,11 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       ## There is a general sparsity assumption for random effects, so we may
       ## assume a higher penalty on the random effects for a 'full' model
       if(ncol(dat$Z)/nlevels(dat$group) >= 6) lam1 = lambda.min.full[2] else lam1 = 0
-      print("Penalty parameters used to calculate full model for BIC-ICQ calculation:")
-      print(sprintf("fixed effects %f, random effects %f", lam0, lam1))
+      cat("Penalty parameters used to calculate full model for BIC-ICQ calculation: \n")
+      cat(sprintf("fixed effects %f, random effects %f", lam0, lam1), "\n")
       # Fit 'full' model
-      ## Note: M restricted to be >= 10^4 in optimControl(). Will report M posterior draws from full model
-      out = try(fit_dat_B(dat, lambda0 = lam0, lambda1 = lam1, 
+      ## Note: M default set to 10^4 in optimControl(). Will report M posterior draws from full model
+      out = try(fit_dat(dat, lambda0 = lam0, lambda1 = lam1, 
                           nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -179,25 +179,30 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           maxitEM = maxitEM + 15, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start, logLik_calc = F,
-                          max_cores = max_cores, checks_complete = checks_complete,
+                          checks_complete = checks_complete,
                           ranef_keep = ranef_keep))
       
       if(is.character(out)){
-        print("Issue with full model fit, no BICq calculation will be completed")
+        cat("Issue with full model fit, no BICq calculation will be completed \n")
+        cat("Setting model selection criteria to BICh")
+        BIC_option = "BICh"
         ufull_describe = NULL
       }else{
         
-        Estep_out = E_step_final(dat = dat, fit = out, optim_options = optim_options, 
+        # Using full model fit parameters, sample from the posterior (posterior samples used for
+        # BIC-ICQ calculation)
+        Estep_out = E_step_final(dat = dat, offset_fit = offset, fit = out, optim_options = optim_options, 
                                  fam_fun = fam_fun, extra_calc = F, 
                                  adapt_RW_options = adapt_RW_options, trace = trace)
-        
+        # ufull_big: big.matrix of posterior samples from full model
         ufull_big = attach.big.matrix(Estep_out$u0)
+        # File-back the posterior samples of the full model
         ufull_big_tmp = as.big.matrix(ufull_big[,],
                                       backingpath = dirname(BICq_posterior),
                                       backingfile = sprintf("%s.bin",basename(BICq_posterior)),
                                       descriptorfile = sprintf("%s.desc",basename(BICq_posterior)))
         rm(ufull_big_tmp)
-        # write.big.matrix(ufull_big, filename = BICq_posterior, sep = " ")
+        # ufull_describe: describe() output for the big.matrix of posterior samples
         ufull_describe = Estep_out$u0
         # If pre_screen = T, restrict the next model in the search to only consider random 
         # effects that were not penalized out in this full model
@@ -211,8 +216,9 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       
     }else{ # if fitfull_needed = F
       cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
+      # ufull_big: big.matrix of posterior samples from full model
       ufull_big = attach.big.matrix(sprintf("%s.desc",BICq_posterior))
-      # ufull_big = read.big.matrix(filename = BICq_posterior, sep = " ", type = 'double')
+      # ufull_describe: describe() output for the big.matrix of posterior samples
       ufull_describe = describe(ufull_big)
       # Checks
       if(ncol(ufull_big) != ncol(dat$Z)){
@@ -235,33 +241,44 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     lambda1_seq = lambda1_seq[which(lambda1_seq >= lambda.min.full[2])]
   }
   
-  n1 = length(lambda0_seq)
-  n2 = length(lambda1_seq)
+  # Length of sequences for penalty parameters
+  n1 = length(lambda0_seq) # fixed effects
+  n2 = length(lambda1_seq) # random effects
+  
   # Keep track of BIC-type selection criteria
   ## BIC_critold: record of largest BIC-type critera so far during selection
   BIC_crit = Inf
   BIC_critold = Inf
   
-  res = matrix(0, nrow = n1*n2, ncol = 11)
-  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik","Non_0_fef","Non_0_ref","Non_0_coef","EM_iter")
-  
-  # If available, initialize first model with 'full' model from BIC-ICQ calculation
+  # If available, initialize first model with 'full' model from BIC-ICQ calculation or
+  # results from pre-screening
   if(BICq_calc){
     if(fitfull_needed){
       if(!is.character(out)){
         coef_old = out$coef
+        u_init = out$u_init
         coef_oldj0 = coef_old
         uj0 = out$u_init
       }
     }
+  }else if(!is.null(coef_pre)){
+    coef_old = coef_pre
+    u_init = u_pre
+    coef_oldj0 = coef_pre
+    uj0 = u_pre
   }else{
+    coef_old = NULL
     coef_oldj0 = NULL
     uj0 = NULL
   }
   
+  # results matrix to store some 'summary' results for each model fit
+  res = matrix(0, nrow = n1*n2, ncol = 12)
+  colnames(res) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp","LogLik",
+                    "Non_0_fef","Non_0_ref","Non_0_coef","EM_iter","Converged")
+  # During selection, will store coefficients from each model in a matrix. Initialize as NULL.
   coef = NULL
   
-  # saturated = FALSE
   fout = list()
   
   # If stage 1 of abbreviated grid search, will adjust ranef_keep for subsequent models:
@@ -272,6 +289,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   for(j in 1:n2){ # random effects
     for(i in 1:n1){ # fixed effects
+      
+      # Initialize coefficients (often from a past model) 
       if((i == 1) & (j == 1)){
         # start from the initial values input (or NULL values)
         coef_old0 = coef_old
@@ -299,12 +318,13 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         }
       }
       
+      # Model fit
       gc()
-      print("------------------------------------------------------------------")
-      print(sprintf("lambda0 %f lambda1 %f", lambda0_seq[i], lambda1_seq[j]))
-      print(sprintf("lambda0 i %i lambda1 j %i", i, j))
-      print("------------------------------------------------------------------")
-      out = try(fit_dat_B(dat, lambda0 = lambda0_seq[i], lambda1 = lambda1_seq[j], 
+      cat("------------------------------------------------------------------ \n")
+      cat(sprintf("lambda0 %f lambda1 %f", lambda0_seq[i], lambda1_seq[j]), "\n")
+      cat(sprintf("lambda0 i %i lambda1 j %i", i, j), "\n")
+      cat("------------------------------------------------------------------ \n")
+      out = try(fit_dat(dat, lambda0 = lambda0_seq[i], lambda1 = lambda1_seq[j], 
                           nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -313,7 +333,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start, logLik_calc = logLik_calc,
-                          max_cores = max_cores, checks_complete = checks_complete,
+                          checks_complete = checks_complete,
                           ranef_keep = ranef_keep))
       
 
@@ -358,6 +378,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       names(BIC_report) = c("BICh","BIC","BICq","BICNgrp")
       print(BIC_report)
       
+      # Store some 'summary' results
       res[(j-1)*n1+i,1] = lambda0_seq[i]
       res[(j-1)*n1+i,2] = lambda1_seq[j]
       res[(j-1)*n1+i,3] = BICh
@@ -373,9 +394,10 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       }
       res[(j-1)*n1+i,10] = sum(out$coef != 0)
       res[(j-1)*n1+i,11] = out$EM_iter
-      coef = rbind(coef, out$coef)
+      res[(j-1)*n1+i,12] = out$converged
       print(res[(j-1)*n1+i,])
-      
+      # Store coefficients
+      coef = rbind(coef, out$coef)
       
     } # End i loop for lambda0_seq
     

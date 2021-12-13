@@ -7,7 +7,7 @@
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
+arma::vec pglm_fit(arma::vec y, arma::mat X, arma::vec dims,
                   arma::vec beta, arma::vec offset,
                   const char* family, int link,
                   const char* penalty, arma::vec params,
@@ -50,7 +50,7 @@ arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims,
   resid = deriv % (y - mu);
   weights = constant.ones() / (deriv % deriv % Vmu);
   for(i=0; i<N; i++){
-    if(weights(i) <= 1e-8 | mu_check(i) == 0){
+    if((weights(i) <= 1e-8) | (mu_check(i) == 0)){
       resid(i) = 0.0;
       weights(i) = 0.0;
     }

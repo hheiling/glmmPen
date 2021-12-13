@@ -7,27 +7,11 @@
 
 using namespace Rcpp;
 
-// glm_fit
-arma::vec glm_fit(arma::vec y, arma::mat X, arma::vec dims, arma::vec beta, arma::vec offset, const char* family, int link, const char* penalty, arma::vec params, arma::vec penalty_factor, int trace);
-RcppExport SEXP _glmmPen_glm_fit(SEXP ySEXP, SEXP XSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP penaltySEXP, SEXP paramsSEXP, SEXP penalty_factorSEXP, SEXP traceSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type offset(offsetSEXP);
-    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
-    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
-    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type penalty_factor(penalty_factorSEXP);
-    Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
-    rcpp_result_gen = Rcpp::wrap(glm_fit(y, X, dims, beta, offset, family, link, penalty, params, penalty_factor, trace));
-    return rcpp_result_gen;
-END_RCPP
-}
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // grp_CD_XZ
 arma::vec grp_CD_XZ(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const arma::vec& group, SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims, arma::vec beta, const arma::vec& offset, const char* family, int link, int init, double phi, const arma::uvec& XZ_group, arma::uvec K, const char* penalty, arma::vec params, int trace);
 RcppExport SEXP _glmmPen_grp_CD_XZ(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP groupSEXP, SEXP pBigMatSEXP, SEXP J_qSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP initSEXP, SEXP phiSEXP, SEXP XZ_groupSEXP, SEXP KSEXP, SEXP penaltySEXP, SEXP paramsSEXP, SEXP traceSEXP) {
@@ -53,6 +37,34 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
     Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
     rcpp_result_gen = Rcpp::wrap(grp_CD_XZ(y, X, Z, group, pBigMat, J_q, dims, beta, offset, family, link, init, phi, XZ_group, K, penalty, params, trace));
+    return rcpp_result_gen;
+END_RCPP
+}
+// grp_CD_XZ_FA
+arma::vec grp_CD_XZ_FA(const arma::vec& y, const arma::mat& X, const arma::mat& Z, const arma::vec& group, SEXP pBigMat, const arma::sp_mat& J_f, arma::vec dims, arma::vec beta, const arma::vec& offset, const char* family, int link, int init, double phi, const arma::uvec& X_group, arma::uvec K, const char* penalty, arma::vec params, int trace);
+RcppExport SEXP _glmmPen_grp_CD_XZ_FA(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP groupSEXP, SEXP pBigMatSEXP, SEXP J_fSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP initSEXP, SEXP phiSEXP, SEXP X_groupSEXP, SEXP KSEXP, SEXP penaltySEXP, SEXP paramsSEXP, SEXP traceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type pBigMat(pBigMatSEXP);
+    Rcpp::traits::input_parameter< const arma::sp_mat& >::type J_f(J_fSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< int >::type init(initSEXP);
+    Rcpp::traits::input_parameter< double >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type X_group(X_groupSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type K(KSEXP);
+    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
+    Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
+    rcpp_result_gen = Rcpp::wrap(grp_CD_XZ_FA(y, X, Z, group, pBigMat, J_f, dims, beta, offset, family, link, init, phi, X_group, K, penalty, params, trace));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -126,6 +138,27 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// pglm_fit
+arma::vec pglm_fit(arma::vec y, arma::mat X, arma::vec dims, arma::vec beta, arma::vec offset, const char* family, int link, const char* penalty, arma::vec params, arma::vec penalty_factor, int trace);
+RcppExport SEXP _glmmPen_pglm_fit(SEXP ySEXP, SEXP XSEXP, SEXP dimsSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP penaltySEXP, SEXP paramsSEXP, SEXP penalty_factorSEXP, SEXP traceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type y(ySEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< const char* >::type penalty(penaltySEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type params(paramsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type penalty_factor(penalty_factorSEXP);
+    Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
+    rcpp_result_gen = Rcpp::wrap(pglm_fit(y, X, dims, beta, offset, family, link, penalty, params, penalty_factor, trace));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_mc_inner_gibbs
 List sample_mc_inner_gibbs(arma::mat f, arma::mat z, arma::vec y, arma::vec t, int NMC, arma::vec u0, const char* family, int link, double phi, double sig_g);
 RcppExport SEXP _glmmPen_sample_mc_inner_gibbs(SEXP fSEXP, SEXP zSEXP, SEXP ySEXP, SEXP tSEXP, SEXP NMCSEXP, SEXP u0SEXP, SEXP familySEXP, SEXP linkSEXP, SEXP phiSEXP, SEXP sig_gSEXP) {
@@ -167,6 +200,29 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type phi(phiSEXP);
     Rcpp::traits::input_parameter< double >::type sig_g(sig_gSEXP);
     rcpp_result_gen = Rcpp::wrap(sample_mc_gibbs_adapt_rw(f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, nMC_burnin, family, link, phi, sig_g));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Qfun_FA_B
+double Qfun_FA_B(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, const arma::vec& group, const arma::sp_mat& J_f, const arma::vec& beta, const arma::vec offset, arma::vec dims, const char* family, int link, double sig_g, double phi);
+RcppExport SEXP _glmmPen_Qfun_FA_B(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP pBigMatSEXP, SEXP groupSEXP, SEXP J_fSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP dimsSEXP, SEXP familySEXP, SEXP linkSEXP, SEXP sig_gSEXP, SEXP phiSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type pBigMat(pBigMatSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type group(groupSEXP);
+    Rcpp::traits::input_parameter< const arma::sp_mat& >::type J_f(J_fSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type dims(dimsSEXP);
+    Rcpp::traits::input_parameter< const char* >::type family(familySEXP);
+    Rcpp::traits::input_parameter< int >::type link(linkSEXP);
+    Rcpp::traits::input_parameter< double >::type sig_g(sig_gSEXP);
+    Rcpp::traits::input_parameter< double >::type phi(phiSEXP);
+    rcpp_result_gen = Rcpp::wrap(Qfun_FA_B(y, X, Z, pBigMat, group, J_f, beta, offset, dims, family, link, sig_g, phi));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -262,14 +318,16 @@ RcppExport SEXP _rcpp_module_boot_stan_fit4gaussian_identity_model_mod();
 RcppExport SEXP _rcpp_module_boot_stan_fit4poisson_log_model_mod();
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_glmmPen_glm_fit", (DL_FUNC) &_glmmPen_glm_fit, 11},
     {"_glmmPen_grp_CD_XZ", (DL_FUNC) &_glmmPen_grp_CD_XZ, 18},
+    {"_glmmPen_grp_CD_XZ_FA", (DL_FUNC) &_glmmPen_grp_CD_XZ_FA, 18},
     {"_glmmPen_grp_CD_XZ_fast", (DL_FUNC) &_glmmPen_grp_CD_XZ_fast, 18},
     {"_glmmPen_soft_thresh", (DL_FUNC) &_glmmPen_soft_thresh, 2},
     {"_glmmPen_MCP_soln", (DL_FUNC) &_glmmPen_MCP_soln, 5},
     {"_glmmPen_SCAD_soln", (DL_FUNC) &_glmmPen_SCAD_soln, 5},
+    {"_glmmPen_pglm_fit", (DL_FUNC) &_glmmPen_pglm_fit, 11},
     {"_glmmPen_sample_mc_inner_gibbs", (DL_FUNC) &_glmmPen_sample_mc_inner_gibbs, 10},
     {"_glmmPen_sample_mc_gibbs_adapt_rw", (DL_FUNC) &_glmmPen_sample_mc_gibbs_adapt_rw, 14},
+    {"_glmmPen_Qfun_FA_B", (DL_FUNC) &_glmmPen_Qfun_FA_B, 13},
     {"_glmmPen_invlink", (DL_FUNC) &_glmmPen_invlink, 2},
     {"_glmmPen_Qfun", (DL_FUNC) &_glmmPen_Qfun, 13},
     {"_glmmPen_sig_gaus", (DL_FUNC) &_glmmPen_sig_gaus, 10},

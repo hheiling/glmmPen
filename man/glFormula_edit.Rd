@@ -12,7 +12,6 @@ glFormula_edit(
   weights,
   na.action,
   offset,
-  contrasts = NULL,
   ...
 )
 }
@@ -29,20 +28,32 @@ The offset must be specified outside of the formula in the 'offset' argument.}
 \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
 omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
 
+\item{family}{a description of the error distribution and link function to be used in the model 
+(a family function or the result of a call to a family function).
+(See \link{family} for details of family functions.)}
+
+\item{subset}{an optional vector specifying a subset of observations to be used in the fitting process.}
+
+\item{weights}{an optional vector of ‘prior weights’ to be used in the fitting process. Should be NULL or a numeric vector.}
+
 \item{na.action}{a function that indicates what should happen when the data contain NAs. The default
 option \code{na.omit} removes observations with any missing values in any of the variables}
+
+\item{offset}{this can be used to specify an a priori known component to be included in the linear predictor during fitting. 
+This should be NULL or a numeric vector of length equal to the number of cases.}
+
+\item{...}{potential further arguments}
 }
 \value{
 a list with the following elements:
-\item{y}{a numeric vector of the response variable}
-\item{X}{a model matrix with the fixed covariates}
-\item{Z}{a sparse model matrix for the random effects}
-\item{group}{a factor vector of the grouping variable}
-\item{cnms}{a vector of column names of the random effects}
-\item{group_name}{character name of the group variable}
-\item{flist}{a list of grouping factors using inf the random-effects terms}
-\item{frame}{a model frame including all fixed and random covariates, the response, and the 
+\item{fr}{a model frame including all fixed and random covariates, the response, and the 
 grouping variable}
+\item{X}{fixed effects covariates model matrix}
+\item{reTrms}{list containing several items relating to the random effects} 
+\item{family}{family specified for data modeling}
+\item{formula}{formula}
+\item{fixed_vars}{vector of variable names used for fixed effects}
+\item{fwmsgs}{indicator for a check of the group levels}
 }
 \description{
 Takes the model \code{formula} and an optional data frame and converts them into y, X, Z, and group output.

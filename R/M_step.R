@@ -1,6 +1,9 @@
 
 #################################################################################################
-# Coordinate Descent (ungrouped) for fixed effects only
+# Coordinate Descent (ungrouped) for 'naive' model fit
+#   Estimates fixed effects at start of EM algorithm in "fit_dat.R" assuming no random effects
+#   Naive model fit used when not using a previous model to initialize coefficients (such as
+#   in model selection procedure)
 #################################################################################################
 
 CD = function(y, X, family, link_int, offset,
@@ -10,31 +13,27 @@ CD = function(y, X, family, link_int, offset,
   p = ncol(X)
   N = length(y)
   
-  # Coding of link_ink:
-  # logit = 10, probit = 11, cloglog = 12
-  # log = 20, sqrt = 21 identity = 30, inverse = 31
+  # Coding of link_int: see "family_export.R" for reasoning
+  # logit = 10, log = 20, identity = 30
   
   penalty_params = c(lambda, gamma, alpha)
   
   dims = c(p, N, conv, maxit_CD)
   
-  coef_new = glm_fit(y, X, dims, coef_init, offset, family, link_int, penalty, penalty_params, penalty_factor, trace)
+  coef_new = pglm_fit(y, X, dims, coef_init, offset, family, link_int, penalty, penalty_params, penalty_factor, trace)
   
   return(as.numeric(coef_new))
 }
 
 
 #################################################################################################
-# Grouped Coordinate Descent for fixed and random effects
+# Grouped Coordinate Descent for M-step of fit_dat() function in "fit_dat.R"
+#   Estimates both fixed and random effects
 #################################################################################################
 
-# Eventually implement the following:
-## In fit_dat or glmmPen, check that group_X made of subsequent integers
-## Change Z to be sparse (fit_dat and glmmPen)
-
-# init: if this is the first attempt at a fit (using initial coef)
+# init: indicator if this is the first M-step of the EM algorithm
 # family: character describing which family
-# link_int: integer summarizing with link to use (see coding in fit_dat_B())
+# link_int: integer summarizing with link to use (see coding in "family_export.R")
 M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offset, phi,
                   maxit_CD = 250, conv_CD = 0.0001,
                   init, group_X = 0:(ncol(X)-1), covgroup,
@@ -72,15 +71,7 @@ M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offse
   
   dims = c(p, N, d, q, M, J_XZ, conv_CD, maxit_CD)
   
-  # const arma::vec& y, const arma::mat& X, const arma::mat& Z,
-  # const arma::vec& group, 
-  # SEXP pBigMat, const arma::sp_mat& J_q, arma::vec dims,
-  # arma::vec beta, const arma::vec& offset,
-  # const char* family, int link, int init, double phi,
-  # const arma::uvec& XZ_group, arma::uvec K, // covariate group index and size of covariate groups
-  # const char* penalty, arma::vec params
   coef_new = grp_CD_XZ_fast(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
-  # coef_new = grp_CD_XZ(y, X, Z, group, u_address, J, dims, coef, offset, family, link_int, init, phi, XZ_group, K, penalty, penalty_params, trace)
   
   return(as.numeric(coef_new))
 }

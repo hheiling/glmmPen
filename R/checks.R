@@ -72,10 +72,6 @@ checkBICqPost = function(BICq_posterior){
     file_name = basename(BICq_posterior)
     path_name = dirname(BICq_posterior)
   
-    # Check file is specified as a .desc file
-    # if(!str_detect(file_name,".desc$")){
-    #   stop("BICq_posterior file name must end in a .desc extension")
-    # }
     # Check that path to file exists
     if(!dir.exists(path_name)){
       stop("The path ", path_name, " specified for the 'BICq_posterior' does not exist")
@@ -85,21 +81,3 @@ checkBICqPost = function(BICq_posterior){
   
 }
 
-# Old version:
-# checkBICqPost = function(BICq_posterior){
-#   if(!is.null(BICq_posterior)){
-#     
-#     file_name = basename(BICq_posterior)
-#     path_name = dirname(BICq_posterior)
-#     # Check file is specified as a .txt file
-#     if(!str_detect(file_name,".txt$")){
-#       stop("BICq_posterior file name must end in a .txt extension")
-#     }
-#     # Check that path to file exists
-#     if(!dir.exists(path_name)){
-#       stop("The path ", path_name, " specified for the 'BICq_posterior' does not exist")
-#     }
-#     
-#   }
-#   
-# }

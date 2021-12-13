@@ -1,24 +1,38 @@
 
+# E_step(): Function to perform E-step within the EM algorithm for a single model fit
+# coef: coefficients from the M-step. Input all fixed and random effect coefficients,
+#   only use fixed effects
+# ranef_idx: index of which random effects are non-zero as of latest M-step (will not
+#   sample from random effects that have been penalized out)
+# y: response
+# X: fixed effects covariates
+# Znew2: For each group k (k = 1,...,d), Znew2 = Z * Gamma (Gamma = t(chol(sigma)))
+# group: group index
+# offset_fit: offset for the linear predictor
+# nMC: how many posterior samples to acquire
+# nMC_burnin: how many posterior samples to discard as burn-in
+# family, link: family and link for model
+# phi, sig_g: additional parameters needed for negative binomial and gaussian families
+#   Note: negative binomial family not available in current version of package
+# sampler: type of sampler to use (Stan, adaptive random walk ...)
+# d: total number groups
+# uold: posterior sample to use for initialization of E-step
+# proposal_SD, batch, batch_length, offset_increment: arguments for adaptive random walk
+
+
 #' @importFrom bigmemory attach.big.matrix describe big.matrix
 #' @importFrom rstan sampling extract
-#' @export
-E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, link, phi, sig_g,
+E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit, 
+                  nMC, nMC_burnin, family, link, phi, sig_g,
                   sampler, d, uold, proposal_SD, batch, batch_length,
-                  offset_increment, trace, max_cores){
-  
-  # Determine number of cores to use - for Stan sampling only
-  if(nMC < 2000){
-    num_cores = 1
-  }else{
-    num_cores = 2 + (nMC - 2000) %/% 1000
-    if(num_cores > max_cores) num_cores = max_cores
-  }
+                  offset_increment, trace){
   
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Znew2)/d)
   
   if(sampler == "independence"){
     # No burnin adjustments used
-    samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, Z=Znew2, 
+    samplemc_out = sample_mc2_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, 
+                                     Z=Znew2, offset_fit=offset_fit,
                                      nMC=nMC, family = family, link = link, group = group, 
                                      d = d, uold = uold, phi = phi, sig_g = sig_g)
     u0 = attach.big.matrix(samplemc_out$u0)
@@ -32,7 +46,8 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
   }else if(sampler == "random_walk"){ 
     # First adapt the proposal variance during an initial burnin period
     samplemc_burnin = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, 
-                                             Z=Znew2, nMC=nMC_burnin, family = family, link = link,
+                                             Z=Znew2, offset_fit=offset_fit,
+                                             nMC=nMC_burnin, family = family, link = link,
                                              group = group, d = d, uold = uold,
                                              proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
                                              offset = offset_increment, nMC_burnin = nMC_burnin,
@@ -49,10 +64,11 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       print(proposal_SD)
     }
     
-    # Run the official first E step with no adaptation
+    # Run the official E step with no adaptation
     uold = as.numeric(u0[nrow(u0),])
     samplemc_out = sample_mc_adapt_BigMat(coef=coef[1:ncol(X)], ranef_idx=ranef_idx, y=y, X=X, 
-                                          Z=Znew2, nMC=nMC, family = family, link = link, 
+                                          Z=Znew2, offset_fit=offset_fit,
+                                          nMC=nMC, family = family, link = link, 
                                           group = group, d = d, uold = uold,
                                           proposal_SD = proposal_SD, batch = batch, batch_length = batch_length,
                                           offset = offset_increment, nMC_burnin = 0,
@@ -81,10 +97,11 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
     }
     
     # Number draws to extract in each chain (after burn-in)
-    nMC_chain = ceiling(nMC/num_cores)
+    nMC_chain = nMC 
     
     # Record last elements of each chain for initialization of next E step
-    last_draws = matrix(0, nrow = num_cores, ncol = ncol(Znew2)) 
+    ## Restriction: single chain for each E-step
+    last_draws = matrix(0, nrow = 1, ncol = ncol(Znew2)) 
     
     # For each group, sample from posterior distribution (sample the alpha values)
     for(k in 1:d){
@@ -101,14 +118,14 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       
       if(length(idx_k) == 1){
         dat_list = list(N = length(idx_k), # Number individuals in group k
-                        q = length(ranef_idx), # number random effects
-                        eta_fef = as.array(as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1))), # fixed effects componenet of linear predictor
+                        q = length(ranef_idx), # number random effects (or common factors)
+                        eta_fef = as.array(as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)) + offset_fit[idx_k]), # fixed effects componenet of linear predictor
                         y = as.array(y_k), # outcomes for group k
                         Z = Z_k) # portion of Z matrix corresonding to group k
       }else{ # length(idx_k) > 1
         dat_list = list(N = length(idx_k), # Number individuals in group k
                         q = length(ranef_idx), # number random effects
-                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)), # fixed effects componenet of linear predictor
+                        eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1) + offset_fit[idx_k]), # fixed effects componenet of linear predictor
                         y = y_k, # outcomes for group k
                         Z = Z_k) # portion of Z matrix corresonding to group k
       }
@@ -118,27 +135,26 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
         
         dat_list$sigma = sig_g # standard deviation of normal dist of y
         
-      }else if(family == "negbin"){
-        
-        dat_list$theta = 1.0/phi # dispersion parameter, negbin var = (mu + mu^2 / theta) = (mu + mu^2 * phi)
-        
       }
+      # else if(family == "negbin"){
+      #   
+      #   dat_list$theta = 1.0/phi # dispersion parameter, negbin var = (mu + mu^2 / theta) = (mu + mu^2 * phi)
+      #   
+      # }
       
       # initialize posterior random draws
       init_lst = list()
-      for(cr in 1:num_cores){
-        if(length(cols_use) == 1){
-          init_lst[[cr]] = list(alpha = as.array(uold[cols_use]))
-        }else{ # length(cols_use) > 1
-          init_lst[[cr]] = list(alpha = uold[cols_use])
-        }
+      if(length(cols_use) == 1){
+        init_lst[[1]] = list(alpha = as.array(uold[cols_use]))
+      }else{ # length(cols_use) > 1
+        init_lst[[1]] = list(alpha = uold[cols_use])
       }
       
       # Avoid excessive warnings when nMC_chain is low in early EM iterations
       stan_fit = suppressWarnings(rstan::sampling(stan_file, data = dat_list, init = init_lst, 
                                          iter = nMC_chain + nMC_burnin,
                                          warmup = nMC_burnin, show_messages = F, refresh = 0,
-                                         chains = num_cores, cores = num_cores))
+                                         chains = 1, cores = 1))
       
       stan_out = as.matrix(stan_fit)
       
@@ -151,9 +167,7 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, 
       
       
       # Find last elements for each chain for initialization of next E step
-      for(m in 1:num_cores){
-        last_draws[m,cols_use] = draws_mat[nMC_chain*m,]
-      }
+      last_draws[1,cols_use] = draws_mat[nMC_chain,]
       
       if(nrow(draws_mat) == nMC){
         u0[,cols_use] = draws_mat

@@ -3,7 +3,10 @@
 \name{glmmPen}
 \alias{glmmPen}
 \title{Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
-Minimization (MCECM)}
+Minimization (MCECM)
+
+\code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
+Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria}
 \usage{
 glmmPen(
   formula,
@@ -11,7 +14,6 @@ glmmPen(
   family = "binomial",
   covar = NULL,
   offset = NULL,
-  na.action = na.omit,
   fixef_noPen = NULL,
   penalty = c("MCP", "SCAD", "lasso"),
   alpha = 1,
@@ -33,7 +35,7 @@ will be recognized. The random effects covariates need to be a subset of the fix
 The offset must be specified outside of the formula in the 'offset' argument.}
 
 \item{data}{an optional data frame containing the variables named in \code{formula}. If \code{data} is 
-omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
+omitted, variables will be taken from the environment of \code{formula}.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
@@ -54,9 +56,6 @@ argument is \code{NULL}, this should be a numeric vector of length equal to the
 number of cases (the response). If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame.}
 
-\item{na.action}{a function that indicates what should happen when the data contain NAs. Only the 
-option \code{na.omit} are recognized by this function.}
-
 \item{fixef_noPen}{Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
 penalized, 1 indicates that it can be penalized. Order should correspond to the same order of the 
@@ -70,7 +69,7 @@ random effects coefficients.}
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
 the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
-\code{alpha=0} is not supported; \code{alpha} may be arbibrarily small, but not exactly zero}
+\code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
 \item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
 Default is 4.0 for SCAD and 3.0 for MCP.}
@@ -95,7 +94,7 @@ When function \code{glmmPen} is run, \code{tuning_options} is specified usig \co
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
-the will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
+will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
 are requested. If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
@@ -106,12 +105,48 @@ and the file-backed big matrix.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 
-available (e.g. \code{methods(class = "pglmmObj")})
+available (e.g. \code{methods(class = "pglmmObj")}, see ?pglmmObj for additional documentation)
 }
 \description{
+Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
+Minimization (MCECM)
+
 \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
 Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
 }
 \details{
-
+Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
+(\code{tuning_options}) is specified 
+to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
+process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
+lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
+In order to avoid repetitive calculations of
+this full model (i.e. if secondary rounds of selection are desired in 
+\code{\link{glmmPen_FineSearch}} or if the user wants to re-run \code{glmmPen} with a different
+set of penalty parameters), a \code{big.matrix} of these 
+posterior draws will be file-backed as two files: a backing file with extention '.bin' and a 
+descriptor file with extension '.desc'. The \code{BICq_posterior} argument should contain a 
+path and a filename with no extension of the form "./path/filename" such that the backingfile and
+the descriptor file would then be saved as "./path/filename.bin" and "./path/filename.desc", respectively.
+If \code{BICq_posterior} is set to \code{NULL}, then by default, the backingfile and descriptor
+file are saved in the working directory as "BICq_Posterior_Draws.bin" and "BICq_Posterior_Draws.desc".
+If the big matrix of posterior draws is already file-backed, \code{BICq_posterior} should
+specify the path and basename of the appropriate files (again of form "./path/filename"); 
+the full model 
+will not be fit again and the big.matrix of 
+posterior draws will be read using the \code{attach.big.matrix} function of the
+ \code{bigmemory} package and used in the BIC-ICQ 
+calcuations. If the appropriate files do not exist or \code{BICq_posterior} 
+is specified as \code{NULL}, the full model will be fit and the full model posterior
+draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
+ 
+Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t iterations back EM_conv, and number of non-zero fixed and random effects). The value of 1
+additionally outputs the updated coefficients, updated covariance matrix values, and the
+number of coordinate descent iterations used for the M step for each
+EM iteration. If Stan is not used as the E-step sampling mechanism, 
+the value of 2 outputs all of the above plus gibbs acceptance rate information
+for the adaptive random walk and independence samplers and the updated proposal standard deviation
+for the adaptive random walk.
 }

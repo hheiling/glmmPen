@@ -8,7 +8,9 @@ to increase computational efficiency.
 Our package supports the penalty functions MCP, SCAD, and LASSO, and the distributional families Binomial, Gaussian, and Poisson (with canonical links). The available BIC-derived selection criteria include the BIC-ICQ, the regular BIC, and the hybrid BICh (see documentation for further details). The user interface of the package was designed to be similar to the popular lme4 R package, including the specification of the model equation with fixed and random effects.Tools available in the package include
 automated tuning parameter selection and automated initialization of the random effect variance. 
 
-Windows users must first run the following lines of code in order to properly install the package:
+Windows users must perform an additional step to create/edit a "~/.R/Makevars.win" document, which is required due to the dependence on the `rstan` package. These adjustments are required for the package to properly install. The appropriate adjustment depends on what version of R is being used (a version earlier than 4.0 or the version 4.0 or later).
+
+For Windows users using a version of R earlier than 4.0, first run the following lines of code:
 
 ```
 dotR <- file.path(Sys.getenv("HOME"), ".R")
@@ -19,6 +21,14 @@ cat("\nCXX14FLAGS=-O3 -march=corei7 -mtune=corei7",
     "CXX14 = $(BINPREF)g++ -m$(WIN) -std=c++1y",
     "CXX11FLAGS=-O3 -march=corei7 -mtune=corei7",
     file = M, sep = "\n", append = TRUE)
+```
+
+For Windows users using a version of R 4.0 or later, first run the following lines of code: (instructions and further comments also given by the Stan team here: <<https://discourse.mc-stan.org/t/dealing-with-r-4-0/14586>>)
+
+```
+file.rename(from = "~/.R/Makevars.win", to = "~/.R/Makevars_old")
+cat("CXX14FLAGS += -mtune=native -march=native -Wno-ignored-attributes -Wno-deprecated-declarations \n", file = "~/.R/Makevars.win")
+pkgbuild::has_build_tools(debug = TRUE)
 ```
 
 The package can then be installed using the following lines of code:

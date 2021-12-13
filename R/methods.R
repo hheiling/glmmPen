@@ -5,21 +5,29 @@
 ## Reference Class object
 
 
+#' @describeIn pglmmObj Provides the fixed effects coefficients
+#' 
 #' @importFrom lme4 fixef
 #' @export
 fixef.pglmmObj = function(object){
   object$fixef
 }
 
+#' @describeIn pglmmObj Provides the random effects coefficients for each explanatory variable
+#' for each level of the grouping factor
+#'
 #' @importFrom lme4 ranef
 #' @export
 ranef.pglmmObj = function(object){
   object$ranef
 }
 
+#' @describeIn pglmmObj Provides the random effect covariance matrix. If family is Gaussian,
+#' also returns the standard deviation of the residual error.
+#'
 #' @importFrom stats sigma
 #' @export
-sigma.pglmmObj = function(object){
+sigma.pglmmObj = function(object, ...){
   
   fam_fun = object$family
   family = fam_fun$family
@@ -31,16 +39,20 @@ sigma.pglmmObj = function(object){
   out[[grp]] = object$sigma
   if(family == "gaussian"){
     out[["Residual StdDev"]] = sqrt(scale)
-  }else if(family == "negbin"){
-    out[["phi"]] = scale
   }
+  # else if(family == "negbin"){
+  #   out[["phi"]] = scale
+  # }
   
   return(out)
 }
 
+#' @describeIn pglmmObj Computes the sum of the random and fixed effects 
+#' coefficients for each explanatory variable for each level of each grouping factor.
+#' 
 #' @importFrom stats coef
 #' @export
-coef.pglmmObj = function(object){
+coef.pglmmObj = function(object, ...){
   # Find combined coefficients
   ## Borrowed code elements from coef.merMod in lme4
   
@@ -74,32 +86,52 @@ coef.pglmmObj = function(object){
   
 }
 
+#' @describeIn pglmmObj Family of the fitted GLMM
+#'
 #' @importFrom stats family
 #' @export
-family.pglmmObj = function(object){
+family.pglmmObj = function(object, ...){
   object$family
 }
 
+#' @describeIn pglmmObj Number of observations used in the model fit
+#'
 #' @export
-nobs.pglmmObj = function(object){
+nobs.pglmmObj = function(object, ...){
   nrow(object$data$X)
 }
 
-# @export
-# ngrps.pglmmObj = function(object){
-#   nlevels(object$data$group[[1]])
-# }
+#' @describeIn pglmmObj Number of levels in the grouping factor
+#' 
+#' @importFrom lme4 ngrps
+#' @export
+ngrps.pglmmObj = function(object, ...){
+  nlevels(object$data$group[[1]])
+}
 
+# Copied from lme4 source code (utilities.R)
+deparse1 <- function (expr, collapse = " ", width.cutoff = 500L, ...)
+  paste(deparse(expr, width.cutoff, ...), collapse = collapse)
 
 reOnly <- function(f, response=FALSE) {
   # Copied from lme4 source code (predict.R)
-  reformulate(paste0("(", vapply(findbars(f), safeDeparse, ""), ")"),
+  reformulate(paste0("(", vapply(findbars(f), deparse1, ""), ")"),
               response = if(response && length(f)==3L) f[[2]])
 }
 
+#' @describeIn pglmmObj Formula used for the model fit. Can return the full
+#' formula, or just the formula elements relating to the fixed effects
+#' (fixed.only = T) or random effects (random.only = T)
+#'
+#' @param random.only logical value used in \code{formula}; \code{TRUE} indicates that 
+#' only the formula elements relating to the random effects should be returned
+#' 
 #' @importFrom stats formula
 #' @export
-formula.pglmmObj = function(object, fixed.only = F, random.only = F){
+formula.pglmmObj = function(x, fixed.only = F, random.only = F, ...){
+  
+  object = x
+  
   form = object$formula
   frame = object$data$frame
   if(fixed.only && random.only){
@@ -117,9 +149,17 @@ formula.pglmmObj = function(object, fixed.only = F, random.only = F){
   
 }
 
+#' @describeIn pglmmObj Returns the model frame
+#' 
+#' @param formula in the case of model.frame, a \code{pglmmObj} object
+#' 
 #' @importFrom stats model.frame
 #' @export
-model.frame.pglmmObj = function(object, fixed.only = F){
+model.frame.pglmmObj = function(formula, fixed.only = F, ...){
+  
+  object = formula
+  rm(formula)
+  
   frame = object$data$frame
   # Borrowed some code from lme4
   if(fixed.only){
@@ -131,18 +171,13 @@ model.frame.pglmmObj = function(object, fixed.only = F){
   return(frame)
 }
 
-# randomListRaw = function(object){
-#   # Assumption: only one group allowed
-#   bars = findbars(object$formula)
-#   ref = ranef(object)
-#   vars.random = lapply(ref, function(j) colnames(j))
-#   frame_rand = lapply(bars, function(j) object$data$frame[as.factor(vars.random[[j]])])
-#   return(frame_rand)
-# }
 
+#' @describeIn pglmmObj Returns the model matrix of either the fixed (type = "fixed") or 
+#' random effects (type = "random")
+#' 
 #' @importFrom stats model.matrix
 #' @export
-model.matrix.pglmmObj = function(object, type = c("fixed", "random")) {
+model.matrix.pglmmObj = function(object, type = c("fixed", "random"), ...) {
   
   switch(type[1],
          "fixed" = object$data$X,
@@ -151,12 +186,14 @@ model.matrix.pglmmObj = function(object, type = c("fixed", "random")) {
 
 etaCalc = function(X, Z, beta, U){
 
-  if(class(U) == "numeric"){ # U = vector instead of matrix; highly unlikely
+  # Calculate posterior modes
+  if(inherits(U, "numeric")){ # U = vector instead of matrix; highly unlikely. class(U) == "numeric"
     gamma = mean(U)
   }else{ # U is a matrix
     gamma = colMeans(U)
   }
   
+  # linear predictor calculated using posterior modes 'gamma'
   eta = X %*% beta + Z %*% gamma
   
   return(eta)
@@ -178,16 +215,20 @@ invLink = function(family, eta){
   return(mu)
 }
 
+#' @describeIn pglmmObj Fitted values
+#' 
+#' @inheritParams predict.pglmmObj
+#' 
 #' @importFrom stats fitted
 #' @export
-fitted.pglmmObj = function(object, fixed.only = T){
+fitted.pglmmObj = function(object, fixed.only = T, ...){
   
   offset = object$data$offset
   
   if(fixed.only){
     eta = object$data$X %*% matrix(object$fixef, ncol = 1) + offset
   }else{
-    eta = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, U = object$posterior_draws) + offset
+    eta = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, U = object$posterior_samples) + offset
   }
   
   mu = invLink(family = object$family, eta)
@@ -196,14 +237,27 @@ fitted.pglmmObj = function(object, fixed.only = T){
   
 }
 
+
+#' @describeIn pglmmObj Predictions for the pglmmObj output object from the glmmPen package functions.
+#' Argument \code{type}: character string for type of predictors: "link", which generates the linear predictor,
+#' and "response", which generates the expected mean values of the response.
+#' 
+#' @param object pglmmObj object output from \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}
+#' @param newdata optional new data.frame containing the same variables used in the model fit procedure
+#' @param type See details of \code{type} options for each function under "Functions" section.
+#' @param fixed.only logical value; default \code{TRUE} indicates that only the fixed effects 
+#' should be used in the fitted value/prediction, while \code{FALSE} indicates that both the fixed and 
+#' random effects should be used in the fitted value/prediction
+#' @param ... potentially further arguments passed from other methods
+#' 
 #' @importFrom stats predict drop.terms reformulate
 #' @importFrom lme4 nobars
 #' @export
 predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
-                            fixed.only = T, na.action = na.pass){
+                            fixed.only = T, ...){
   ## Other arguments used by lme4: re.form, random.only = F, allow.new.levels = F, newparams = NULL
   
-  if((!is.null(newdata)) & (class(newdata) != "data.frame")){
+  if((!is.null(newdata)) & (!inherits(newdata, "data.frame"))){ # class(newdata) != "data.frame"
     stop("newdata must be a dataframe")
   }
   
@@ -212,7 +266,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     if(!fixed.only){ # fixed.only = F
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
                     link = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, 
-                                   U = object$posterior_draws),
+                                   U = object$posterior_samples),
                     response = fitted(object, fixed.only = fixed_only))
     }else{ # fixed.only = T
       eta = object$data$X %*% object$fixef
@@ -272,13 +326,13 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     
   } # End if-else is.null(newdata)
   
-  if(class(pred) %in% c("Matrix","matrix")){
+  if(inherits(pred, "Matrix") | inherits(pred, "matrix")){ # class(pred) %in% c("Matrix","matrix")
     if(is.null(rownames(data))){
       rownames(pred) = seq_len(nrow(data))
     }else{
       rownames(pred) = rownames(data)
     }
-  }else if(class(pred) == "numeric"){
+  }else if(inherits(pred,"numeric")){ # class(pred) == "numeric"
     if(is.null(rownames(data))){
       names(pred) = seq_len(nrow(data))
     }else{
@@ -298,15 +352,23 @@ var_hat = function(family, mu, sig2 = NULL, phi = NULL){
     v_hat = mu
   }else if(family == "gaussian"){
     v_hat = sig2
-  }else if(family == "negbin"){
-    v_hat = mu + phi * mu^2 
   }
+  # else if(family == "negbin"){
+  #   v_hat = mu + phi * mu^2 
+  # }
   return(v_hat)
 }
 
+#' @describeIn pglmmObj Residuals for the pglmmObj output object from the glmmPen package functions.
+#' Argument \code{type}: character string for type of residuals to report. Options include "deviance" (default), 
+#' "pearson", "response", and "working", which specify the deviance residuals, Pearson residuals,
+#' the difference between the actual response y and the expected mean response (y - mu), and the
+#' working residuals (y - mu) / mu
+#' 
+#' @inherit predict.pglmmObj
 #' @export
-residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working")){
-  # What is working response?
+residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working"), ...){
+  
   y = object$data$y
   mu = Matrix::as.matrix(fitted(object))
   type = match.arg(type)
@@ -325,7 +387,7 @@ residuals.pglmmObj = function(object, type = c("deviance","pearson","response","
     }else if(family == "negbin"){
       # Note: a0 from mcemGLM = 1/phi
       stop("family not available")
-      res = sign(y - mu) * sqrt(2 * (ifelse(y > 0, y * log(y/mu), 0)) - 2 * (y + 1/phi) * log((y + 1/phi)/(mu + 1/phi)))
+      # res = sign(y - mu) * sqrt(2 * (ifelse(y > 0, y * log(y/mu), 0)) - 2 * (y + 1/phi) * log((y + 1/phi)/(mu + 1/phi)))
     }else{
       stop("family not available")
     }
@@ -397,10 +459,13 @@ prt_nobsgrps = function(object){
               nobs(object), names(object$data$group), nlevels(object$data$group[[1]])))
 }
 
+#' @describeIn pglmmObj Prints a selection of summary information of fitted model
+#' 
+#' @param x an R object of class \code{pglmmObj}
 #' @export 
-print.pglmmObj = function(object, digits = c(fef = 4, ref = 4)){
-  # ToDo: Add in (best) lambda values, BIC, logLik
+print.pglmmObj = function(x, digits = c(fef = 4, ref = 4), ...){
   
+  object = x
   # Title
   cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",  
       "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = T, sep = "")
@@ -449,9 +514,16 @@ prt_resids = function(resids, type = "Pearson", digits) {
   cat("\n")
 }
 
+#' @describeIn pglmmObj Returns a list of summary statistics of the fitted model. 
+#' 
+#' @param digits number of significant digits for printing; default of 4
+#' @param resid_type type of residuals to summarize in output. See \code{predict.pglmmObj}
+#' for residual options available.
+#' 
 #' @export
 summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), 
-                            resid_type = switch(object$family$family, gaussian = "pearson", "deviance")){
+                            resid_type = switch(object$family$family, gaussian = "pearson", "deviance"),
+                            ...){
   # ToDo: Add in (best) lambda values, BIC, logLik
   
   # Title
@@ -475,98 +547,13 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4),
   cat("\n")
 }
 
-# @export
-# posterior_draws = function(object, sampler = c("stan","random_walk","independence"), nMC = 10^4,
-#                            nMC_burnin = 250){
-#   
-#   if(length(sampler) > 1){
-#     sampler = sampler[1]
-#   }
-#   if(!(sampler %in% c("stan","random_walk","independence"))){
-#     stop("sampler must be 'stan', 'random_walk', or 'independence'")
-#   }
-#   
-#   # Converge group factor into a numeric factor
-#   group = as.factor(as.numeric(object$data$group[[1]]))
-#   d = nlevels(group)
-#   
-#   sigma = object$sigma
-#   # Specify which random effect variables are non-zero 
-#   ranef_idx = which(diag(sigma) > 0)
-#   
-#   # Adjust Z to incorporate the cholesky composition of the sigma matrix
-#   gamma = t(chol(sigma))
-#   Z_std = object$data$Z_std
-#   Znew2 = Z_std
-#   for(i in 1:d){
-#     Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i, seq(i, ncol(Z), by = d)] %*% gamma
-#   }
-#   
-#   family = object$family$family
-#   # if(family == "gaussian"){
-#   #   sig_g =
-#   # }
-#     
-#   # Needed arguments for E_step function
-#   # coef, ranef_idx, y, X, Znew2, group, nMC, nMC_burnin, family, link, phi, sig_g,
-#   # sampler, d, uold, proposal_SD, batch, batch_length,
-#   # offset_increment, trace, num_cores
-#   draws = E_step(coef = object$fixef, ranef_idx = ranef_idx, y = object$data$y, X = object$data$X,
-#                  Znew2 = Znew2, group = group, nMC = nMC, nMC_burnin = nMC_burnin,
-#                  family = family, link = object$family$link,
-#                  sampler = sampler, d = d)
-# }
-
-#' @importFrom ncvreg std
+#' @describeIn pglmmObj Returns the log-likelihood using the Corrected Arithmetic Mean estimator
+#' with importance sampling weights developed by Pajor (2017). 
+#' Citation: Pajor, A. (2017). Estimating the marginal likelihood using the arithmetic mean identity. 
+#' Bayesian Analysis, 12(1), 261-287.
+#' 
 #' @export
-pglmmObj_mod = function(object, trace = 0){
-  
-  X = object$data$X
-  X_std = cbind(1, std(X[,-1, drop = F]))
-  
-  y = object$data$y
-  Z = Matrix::as.matrix(object$data$Z_std)
-  group = object$data$group
-  group_num = as.factor(as.numeric(group[[1]]))
-  
-  dat = list(y = y, X = X_std, Z = Z, group = group_num)
-  
-  fam_fun = object$family
-  
-  fit = c(object$Estep_material, list(J = object$J, sigma = object$sigma, 
-             sigma_gaus = ifelse(fam_fun == "gaussian", sqrt(object$scale$Gaus_sig2), 1.0),
-             object$Gibbs_info))
-  
-  Estep_out = E_step_final(dat = dat, fit = fit, optim_options = object$control_info$optim_options, 
-                           fam_fun = fam_fun, extra_calc = T, 
-                           adapt_RW_options = object$control_info$adapt_RW_options, trace = trace)
-  
-  
-  object$posterior_draws = Estep_out$post_out
-  
-  # Random effects coefficients
-  rand = Estep_out$post_modes
-  d = nlevels(group_num)
-  q = ncol(Z) /d
-  
-  ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
-  ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
-  rownames(ref) = rownames(object$ranef[[1]])
-  colnames(ref) = colnames(object$ranef[[1]])
-  ranef = lapply(group, function(j) ref)
-  object$ranef = ranef
-  
-  optim_results = object$results_optim
-  idx = which(colnames(optim_results) %in% c("BICh","BIC","BICNgrp","LogLik"))
-  optim_results[,idx] = c(Estep_out$BICh, Estep_out$BIC, Estep_out$BICNgrp, Estep_out$ll)
-  object$results_optim = optim_results
-  
-  return(object)
-  
-}
-
-#' @export
-logLik.pglmmObj = function(object){ 
+logLik.pglmmObj = function(object, ...){ 
   
   results_optim = object$results_optim
   ll_elem = which(colnames(results_optim) == "LogLik")
@@ -574,19 +561,23 @@ logLik.pglmmObj = function(object){
   ll = results_optim[ll_elem]
   names(ll) = "logLik"
   
-  if(is.na(ll)){
-    print("Please perform the modification 'pglmmObj_mod(pglmmObj)' to the pglmmObj output object to calculate the log-likelihood")
-  }
-  
-  return(ll)
+  structure(ll, class = c("logLik"))
 
 }
 
 
-# @method extractBIC pglmmObj
+#' @describeIn pglmmObj Returns BIC, BICh (hybrid BIC developed by Delattre et al., citation:
+#' Delattre, M., Lavielle, M., & Poursat, M. A. (2014). A note on BIC in mixed-effects models. 
+#' Electronic journal of statistics, 8(1), 456-475.), BICNgrps (BIC using N = number of groups
+#' in the penalty term), and possibly BIC-ICQ (labeled as "BICq") if the argument \code{BIC_option}
+#' was set to "BICq" in \code{\link{selectControl}} (citation for BIC-ICQ: 
+#' Ibrahim, J. G., Zhu, H., Garcia, R. I., & Guo, R. (2011). 
+#' Fixed and random effects selection in mixed effects models. Biometrics, 67(2), 495-503.) 
+#' 
 #' @importFrom stringr str_detect
+#' @method BIC pglmmObj
 #' @export
-extractBIC = function(object){ # extractBIC.pglmmObj
+BIC.pglmmObj = function(object, ...){ 
   
   results_optim = object$results_optim
   BIC_elem = which(str_detect(colnames(results_optim), "BIC"))
@@ -598,6 +589,7 @@ extractBIC = function(object){ # extractBIC.pglmmObj
   
 }
 
+
 #' @title Plot Diagnostics for MCMC Posterior Draws of the Random Effects
 #' 
 #' @description Provides graphical diagnostics of the random effect posterior draws from the (best) model.
@@ -606,19 +598,26 @@ extractBIC = function(object){ # extractBIC.pglmmObj
 #' @param object an object of class \code{pglmmObj} output from either \code{\link{glmmPen}} 
 #' or \code{\link{glmmPen_FineSearch}}.
 #' @param plots a character string or a vector of character strings specifying which graphical
-#' diagnostics to provide. 
+#' diagnostics to provide. Options include a sample path plot (default, "sample.path"), 
+#' autocorrelation plots ("autocorr"), histograms ("histogram"), cumulative sum plots ("cumsum"),
+#' and all four possible plot options ("all"). While the "all" option will produce all four
+#' possible plots, subsets of the types of plots (e.g. sample path plots and autocorrelation plots
+#' only) can be specified with a vector of the relevant character strings 
+#' (e.g. c("sample.path","autocorr"))
 #' @param grps a character string or a vector of character strings specifying which groups 
 #' should have diagnostics provided. The names of the groups match the input group factor levels.
 #' Default is set to 'all' for all groups.
 #' @param vars a character string or a vector of character strings specifying which variables
-#' should have diagnostics provided. Tip: can find the names of the random effect variables in
-#' the output sigma matrix found in the \code{pglmmObj} object. Default is set to
-#' 'all', which picks all variables with non-zero random effects. 
-#' @param numeric.grps if TRUE, specifies that the groups factor should be converted to numeric 
+#' should have diagnostics provided. Default is set to
+#' 'all', which picks all variables with non-zero random effects.
+#' Tip: can find the names of the random effect variables in
+#' the output sigma matrix found in the \code{pglmmObj} object, run \code{sigma(object)}. 
+#' @param numeric_grp_order if TRUE, specifies that the groups factor should be converted to numeric 
 #' values. This option could be used to ensure that the organization of the groups is in the 
-#' proper numeric order.
+#' proper numeric order (e.g. groups with levels 1-10 are ordered 1-10, not 1, 10, 2-9).
 #' @param bin_width optional binwidth argument for \code{geom_histogram} from the \code{ggplot2} 
-#' package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth.
+#' package. Default set to \code{NULL}, which specifies the default \code{geom_histogram} binwidth. 
+#' This argument only applies if the "histogram" plot type is selected.
 #' 
 #' @return a list of ggplot graphics, each faceted by group and random effect variable. 
 #' Type of plots specified in the \code{plots} argument.
@@ -627,16 +626,22 @@ extractBIC = function(object){ # extractBIC.pglmmObj
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
 #' @import ggplot2 
 #' @export 
-plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum","autocorr"),
-                     grps = "all", vars = "all", numeric.grps = F, bin_width = NULL){ #plot_mcmc.pglmmObj
+plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocorr","histogram","cumsum","all")
+                     grps = "all", vars = "all", 
+                     numeric_grp_order = F, bin_width = NULL){ 
   
-  if(class(object) != "pglmmObj"){
+  ##############################################################################################
+  # Checks
+  ##############################################################################################
+  
+  if(!inherits(object, "pglmmObj")){ # class(object) != "pglmmObj"
     stop("'object' must be an object of class pglmmObj output from the glmmPen function")
   }
   
   if(!is.vector(grps) | !is.vector(vars)){
     stop("specified grps and vars must be vectors")
   }
+  
   if("all" %in% plots){
     type = c("sample.path","histogram","cumsum","autocorr")
   }else{
@@ -647,7 +652,7 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
     type = plots
   }
   
-  U = object$posterior_draws
+  U = object$posterior_samples
   U_cols = colnames(U)
   # colnames organization = var_name:grp_name
   if(any(is.na(U))){
@@ -842,15 +847,34 @@ plot_mcmc = function(object, plots = c("all","sample.path","histogram","cumsum",
   
 }
 
+#' @describeIn pglmmObj Plot residuals for the pglmmObj output object from the glmmPen package.
+#' Argument \code{type}: character string for type of residuals to report. Options include "deviance" 
+#' (default for non-Gaussian family), "pearson" (default for Gaussian family), 
+#' "response", and "working", which specify the deviance residuals, Pearson residuals,
+#' the difference between the actual response y and the expected mean response (y - mu), and the
+#' working residuals (y - mu) / mu
+#' 
+#' @inheritParams predict.pglmmObj
+#' 
 #' @importFrom stringr str_c str_to_title
 #' @import ggplot2 
 #' @method plot pglmmObj
 #' @export
-plot.pglmmObj = function(object, x = fitted(object, fixed.only = F), 
-                         y = switch(object$family$family,
-                                    gaussian = residuals(object, type = "pearson"),
-                                    residuals(object, type = "deviance")),
-                         x_label = "Fitted Values", y_label = NULL){
+plot.pglmmObj = function(x, fixed.only = F, type = NULL,
+                         ...){
+  
+  object = x
+  rm(x)
+  
+  x = fitted(object, fixed.only = fixed.only)
+  if(is.null(type)){
+    y = switch(object$family$family,
+               gaussian = residuals(object, type = "pearson"),
+               residuals(object, type = "deviance"))
+  }else{
+    y = residuals(object, type = type)
+  }
+  
   
   if(length(x) != length(y)){
     stop("x and y need to be of same length")
@@ -859,13 +883,14 @@ plot.pglmmObj = function(object, x = fitted(object, fixed.only = F),
   x_mat = Matrix::as.matrix(x)
   y_mat = Matrix::as.matrix(y)
   
-  if(is.null(y_label)){
-    if(!is.null(attr(y, "residual type"))){
-      y_label = str_c(str_to_title(attr(y, "residual type")), "Residuals", sep = " ")
-    }else{
-      y_label = "specify y_label in args"
-    }
+  if(!is.null(attr(y, "residual type"))){
+    y_label = str_c(str_to_title(attr(y, "residual type")), "Residuals", sep = " ")
+  }else{
+    y_label = "  "
   }
+  
+  x_label = "Fitted Values"
+  
   data = data.frame(x = x_mat, y = y_mat)
   
   p = ggplot(data = data) + geom_point(mapping = aes(x = x, y = y), color = "blue") +
@@ -875,10 +900,4 @@ plot.pglmmObj = function(object, x = fitted(object, fixed.only = F),
   }
   return(p)
 }
-
-
-# Functions to add:
-## offset() - will not have $offset option
-## weights() - will not have $weights option
-### Ideas for offset() and weights() - extract from model.frame ?
 

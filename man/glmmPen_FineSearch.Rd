@@ -68,8 +68,9 @@ values, and performs model selection on this finer grid search.
 }
 \details{
 The \code{glmmPen_FineSearch} function extracts the data, the penalty information (penalty type,
-gamma_penalty, and alpha), and some other argument specifications from the \code{pglmmObj} object
-created during a previous round of model selection. In this finer grid search, the user has
+gamma_penalty, and alpha), the pre-screening results from the initial variable selection
+procedure, and some other argument specifications from the \code{pglmmObj} object
+created during a previous round of variable/model selection. In this finer grid search, the user has
 the ability to make the following adjustments: the user can change the BIC option used for selection,
 any optimization control parameters, or any adaptive random walk parameters (if the sampler
 specified in the optimization parameters is "random_walk"). The user could manually specify the 
@@ -83,7 +84,11 @@ the finer lambda grid search: (i) The lambda combination from the best model is 
 from the earlier selection results saved in the \code{pglmmObj} object. (ii) For the fixed and
 random effects separately, the new max and min lambda values are the lambda values \code{idx_range} 
 positions away from the best lambda in the original lambda sequences for the fixed and random
-effects. 
+effects. For instance, suppose we consider a hypothetical lambda sequence of 
+\{0.1,0.2,0.3,0.4,0.5,0.6,0.7\} for both fixed and random effects, 
+and the best model was given by the (0.4,0.5) combination. If the \code{idx_lambda} = 2, then
+the fine search would use the fixed effects sequence would have (min,max) = (0.2,0.6) and
+the fixed effects sequence would have (min,max) = (0.3,0.7).
 
 Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
 number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients

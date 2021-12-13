@@ -14,12 +14,6 @@
 #' running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
 #' By default, these sequences are calculated using \code{\link{LambdaSeq}}.
 #' 
-#' For secondary rounds run using \code{\link{glmmPen_FineSearch}}, the optimal lambda combination 
-#' from the initial round (based on the specified \code{BIC_option}) will be used to calculate a 
-#' finer grid search. The new max and min lambda values are the lambda values \code{idx_lambda} 
-#' positions away from the best lambda in the original lambda sequences for the fixed and random
-#' effects.
-#' 
 #' The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
 #' non-zero penalty parameter combination. However, this is generally not recommended. 
 #' 
@@ -31,9 +25,8 @@
 #' following series of models: the random effects penalty parameter remains fixed at the value of
 #' the optimum random effect penalty parameter (from stage 1) and all fixed effects penalty
 #' parameters are considered. The best overall model is the best model from stage 2. This reduces the 
-#' number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). Although this
-#' can drastically increase the time of the algorithm to proceed, the authors found in simulations
-#' that this generally increases the false positive rate by a factor of between 1.5 and 2.
+#' number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). The authors found
+#' that this abbreviated grid search worked well in simulations.
 #' 
 #' @param lambda0 a non-negative numeric penalty parameter for the fixed effects parameters
 #' @param lambda1 a non-negative numeric penalty parameter for the (grouped) random effects
@@ -41,29 +34,33 @@
 #' @param lambda0_seq,lambda1_seq a sequence of non-negative numeric penalty parameters for the fixed 
 #' and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
 #' calculated. See 'Details' section for more details on these default calculations. 
-#' @param nlambda positive integer specifying number of penalty parameters (lambda) with which to fit a model.
+#' @param nlambda positive integer specifying number of penalty parameters (lambda) 
+#' to use for the fixed and random effects penalty parameters. Default set to 10.
 #' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
 #' @param BIC_option character string specifing the selection criteria used to select the 'best' model.
 #' Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
-#' a full model; a small penalty of 0.001*(lambda max) is used for the fixed and/or random effects if the number of 
-#' effects is 10 or greater. The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+#' a full model; a small penalty (the minimum of the penalty sequence) 
+#' is used for the fixed and random effects. 
+#' The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 #' observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 #' groups).
 #' @param search character string of "abbrev" (default) or "full_grid" indicating if the search of models over 
 #' the penalty parameter space should be the full grid search (total number of models equals
 #' `nlambda`^2 or length(`lambda0_seq`)*length(`lambda1_seq`)) or an abbreviated grid search.
-#' The abbreviated grid search is described in more detail in the Details section.
+#' The abbreviated grid search is described in more detail in the Details section. Te authors
+#' highly recommend the abbreviated grid search.
 #' @param logLik_calc logical value specifying if the log likelihood (and log-likelihood based 
 #' calculations BIC, BICh, and BICNgrp) should be calculated for all of the models in the selection procedure. 
-#' If BIC-ICQ is used for selection, the log-likelihood is not needed. However, if users are interested
+#' If BIC-ICQ is used for selection, the log-likelihood is not needed for each model. 
+#' However, if users are interested
 #' in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
-#' \code{logLik_calc} to \code{TRUE} will calculate these other options for all of the models.
+#' \code{logLik_calc} to \code{TRUE} will calculate these other quantities for all of the models.
 #' @param lambda.min numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
 #' ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
 #' a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
-#' \code{lambda.min} specifiex this fraction. Default value is set to \code{NULL}, which
-#' automatically selects \code{lambda.min} to equal 0.01 when n < p and 0.05 when p >= n.
+#' \code{lambda.min} specifies this fraction. Default value is set to \code{NULL}, which
+#' automatically selects \code{lambda.min} to equal 0.01 when p <= 10 and 0.05 when p > 10.
 #' @param pre_screen logical value indicating whether pre-screening should be performed before
 #' model selection (default \code{TRUE}). If the number of random effects considered less than 5,
 #' no pre-screening will be performed. Pre-screening removes random effects from consideration
@@ -160,7 +157,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
   
   if(!is.null(lambda.min)){
     if(!is.numeric(lambda.min)){
-      stop("lambda.min.seq must be numeric")
+      stop("lambda.min must be numeric")
     }
     if((lambda.min >= 1) | (lambda.min <=0 )){
       stop("lambda.min must be a fraction between 0 and 1")
@@ -174,10 +171,10 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
   
   if(!is.null(lambda.min.presc)){
     if(!is.numeric(lambda.min.presc)){
-      stop("lambda.min.seq must be numeric")
+      stop("lambda.min.presc must be numeric")
     }
     if((lambda.min.presc >= 1) | (lambda.min.presc <=0 )){
-      stop("lambda.min must be a fraction between 0 and 1")
+      stop("lambda.min.presc must be a fraction between 0 and 1")
     }
   }
   
@@ -193,9 +190,9 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
 #' 
 #' Controls the adaptive random walk Metropolis-within-Gibbs sampling procedure.
 #' 
-#' @param batch_length positive integer specifying the number of posterior draws to collect
+#' @param batch_length positive integer specifying the number of posterior samples to collect
 #' before the proposal variance is adjusted based on the acceptance rate of the last 
-#' \code{batch_length} accepted posterior draws. Default is set to 100. Batch length restricted
+#' \code{batch_length} accepted posterior samples. Default is set to 100. Batch length restricted
 #' to be no less than 50.
 #' @param offset non-negative integer specifying an offset value for the increment of the proposal
 #' variance adjustment. Optionally used to ensure the required diminishing adaptation condition. 
@@ -226,13 +223,14 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
 #' 
 #' @param conv_EM a non-negative numeric convergence criteria for the convergence of the 
-#' EM algorithm. Default is 0.001. EM algorithm is considered to have converge if the average Euclidean 
+#' EM algorithm. Default is 0.0015. 
+#' EM algorithm is considered to have converge if the average Euclidean 
 #' distance between the current coefficient estimates and the coefficient estimates from 
 #' \code{t} EM iterations back is less than \code{conv_EM} \code{mcc} times in a row.
 #' See \code{t} and \code{mcc} for more details.
 #' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
-#' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0001.
-#' @param nMC_burnin positive integer specifying the number of posterior draws to use as
+#' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0005.
+#' @param nMC_burnin positive integer specifying the number of posterior samples to use as
 #' burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
 #' the following defaults: Default 250 when the number of random effects 
 #' predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
@@ -245,14 +243,15 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' defaults: When the number of random effect predictors is 10 or less, 
 #' Default is set to 5000 when no selection is performed and 2500 when selection is performed.
 #' Default is set to 1000 when the number of random effect predictors is greater than 10.
-#' @param nMC_report a positive integer for the number of posterior draws to save from the final
-#' model. These posterior draws can be used for diagnostic purposes, see \code{\link{plot_mcmc}}
+#' @param nMC_report a positive integer for the number of posterior samples to save from the final
+#' model. These posterior samples can be used for diagnostic purposes, see \code{\link{plot_mcmc}}.
+#' Default set tp 5000.
 #' @param maxitEM a positive integer for the maximum number of allowed EM iterations. 
 #' If set to \code{NULL}, then the algorithm inputs the following defaults:
 #' Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.
 #' @param maxit_CD a positive integer for the maximum number of allowed interations for the
 #' coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.
-#' @param M positive integer specifying the number of posterior draws to use within the 
+#' @param M positive integer specifying the number of posterior samples to use within the 
 #' Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.
 #' @param t the convergence criteria is based on the average Euclidean distance between 
 #' the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
@@ -260,30 +259,25 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @param mcc the number of times the convergence critera must be met before the algorithm is
 #' seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
 #' to be no less than 2.
-#' @param sampler character string specifying whether the posterior draws of the random effects
+#' @param sampler character string specifying whether the posterior samples of the random effects
 #' should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
 #' incorporating an adaptive random walk sampler ("random_walk") or an
 #' independence sampler ("independence"). If using the random walk sampler, see \code{\link{adaptControl}}
 #' for some additional control structure parameters.
 #' @param var_start either the character string "recommend" or a positive number specifying the 
 #' starting values to initialize the variance of the covariance matrix. Default "recommend" first
-#' fits a simple model with a fixed and random intercept only using a Laplace estimate. The 
+#' fits a simple model with a fixed and random intercept only using a Laplace approximation. The 
 #' random intercept variance estimate from this model is then multiplied by 2 and used as the 
 #' starting variance. 
-#' @param max_cores integer describing the number of cores available for computation. If 
-#' \code{max_cores} is specified to be greater than 1 and the sampler is specified as "stan", then 
-#' parallel computation using multiple cores is used to calculate the Stan MCMC samples within
-#' each E step. The package authors do not advise using parallelization in the E step
-#' unless \code{nMC_max} is set to a large number, such as 10^4 or more.
 #' 
-#' @details When the \code{optim_options} arugment in \code{\link{glmm}} and \code{\link{glmmPen}}
-#' is set to "recommend", the default settings discussed in the given \code{optimControl} arguments are
-#' used. These default settings depend on both the family of the data structure and the number 
-#' of random effects predictors specified for use. If the user specifies 
-#' \code{optim_options = optimControl()} with any argument specifications, no additional
-#' adjustments will be performed on the arguments based on family or random effect predictors. 
+#' @details Several arguments are set to a default value of \code{NULL}. If these arguments 
+#' are left as \code{NULL} by the user, then these values will be filled in with appropriate
+#' default values as specified above, which may depend on the number of random effects,
+#' the family of the data, and/or whether selection is being performed. If the user
+#' specifies particular values for these arguments, no additional modifications to these 
+#' arguments will be done within the algorithm.
 #' 
-#' @return Function returns a list (inheriting from class "\code{optimControl}") 
+#' @return Function returns a list inheriting from class \code{optimControl}
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
 #' @export
@@ -292,34 +286,28 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
                         maxitEM = NULL, maxit_CD = 50, 
                         M = 10000, t = 2, mcc = 2,
                         sampler = c("stan","random_walk","independence"), 
-                        var_start = "recommend", max_cores = 1){
+                        var_start = "recommend"){
   
-  # conv_EM = 0.0015, conv_CD = 0.0005, 
-  # nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
-  # maxitEM = 50, maxit_CD = 50, 
-  # M = 10000, t = 2, mcc = 2,
-  # sampler = c("stan","random_walk","independence"), 
-  # var_start = "recommend", max_cores = 1
-  
-  call = match.call(expand.dots = F)
-  
-  # Acceptable input types and input restrictions - vectors, integers, positive numbers ...
+  # Acceptable input types and input restrictions
+  ## Arguments with default as NULL
   args_null = list(nMC_burnin = nMC_burnin, nMC_start = nMC_start, 
                    nMC_max = nMC_max, maxitEM = maxitEM)
+  ## x = vector of several arguments restricted to be positive integers, will check inputs
+  ##    in next steps.
   x = c(nMC_report, maxitEM, maxit_CD, M, t, mcc)
+  ## If user set some of the 'args_null' arguments to non-NULL values, check these input values
+  ##    as well (should be positive integers).
   for(a in 1:length(args_null)){
     if(!is.null(args_null[[a]])){
       x = c(x, args_null[[a]])
     }
   }
-  if((!all(floor(x)==x)) | (sum(x <= 0) > 0)){ # if any of the above values not positive integers
+  ## Check arguments that should be positive integers
+  if((!all(floor(x)==x)) | (sum(x <= 1) > 0)){ # if any of the above values not positive integers
     stop("M, t, mcc, and all entered nMC and maxit arguments must be positive integers")
   }
   
   # More restrictive checks
-  # if(M < 10^4){
-  #   stop("M must be greater than or equal to 10^4")
-  # }
   if(M < 5000){
     stop("M must be greater than or equal to 5000")
   }
@@ -345,10 +333,6 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
     }
   }
   
-  if((max_cores < 1) | (max_cores) %% 1 != 0){
-    stop("max_cores must be a positive integer")
-  }
-  
   sampler = checkSampler(sampler)
   
   if(mcc < 2){
@@ -358,26 +342,19 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report,
                  maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, mcc = mcc,
-                 sampler = sampler, var_start = var_start,
-                 max_cores = max_cores),
+                 sampler = sampler, var_start = var_start),
             class = "optimControl")
 }
 
-
+# optim_recommend: For input arguments of optimControl() that are set to NULL by default,
+#   recommend appropriate inputs that depend on the family, number of random effects,
+#   and whether or not variable selection is being performed.
 # q = number of random effects (including random intercept)
 # select: TRUE if running the selection algorithm
 optim_recommend = function(optim_options, family, q, select){
   
-  # Default values to use for 'binomial' and 'poisson' families when fitting single model 
-  #   (i.e. not using model selection):
-  # conv_EM = 0.0015, conv_CD = 0.0005, 
-  # nMC_burnin = 250, nMC_start = 250, nMC_max = 5000, nMC_report = 5000,
-  # maxitEM = 50, maxit_CD = 50, 
-  # M = 10000, t = 2, mcc = 2,
-  # sampler = c("stan","random_walk","independence"), 
-  # var_start = "recommend", max_cores = 1
+  # If selection and moderate/small q, or if large q (with or without selection):
   
-  # Depending on value of q and whether selection is being performed, adjusted default values
   if (q <= 11) { # q includes random intercept
     # For selection, decrease nMC_max to improve time
     ## Note: During selection, will initialize with good starting points, so
@@ -430,40 +407,3 @@ optim_recommend = function(optim_options, family, q, select){
   
 }
 
-# optim_recommend = function(family, q, select){
-#   
-#   optim_options = optimControl()
-#   # Default options for family = 'binomial' or 'poisson'
-#   if (family == "gaussian") {
-#     # increase maxitEM
-#     optim_options = optimControl()
-#     optim_options$maxitEM = 100
-#   }
-#   
-#   if (q <= 11) {
-#     # For selection, decrease nMC_max to improve time
-#     ## Note: During selection, will initialize with good starting points, so
-#     ## larger nMC_max not needed for convergence
-#     ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
-#     # Otherwise, keep everything else the same
-#     if (select == T) {
-#       optim_options$nMC_max = 2500
-#       # optim_options$maxitEM = optim_options$maxitEM + 15
-#     }
-#   }else{
-#     # Decrease nMC
-#     optim_options$nMC_burnin = 100
-#     optim_options$nMC = 100
-#     optim_options$nMC_max = 1000
-#     # optim_options$nMC_max = 1500
-#     # optim_options$maxitEM = optim_options$maxitEM + 15
-#     
-#   }
-#   
-#   # if(select == T){
-#   #   optim_options$conv_EM = 0.0015
-#   # }
-#   
-#   return(optim_options)
-#   
-# }

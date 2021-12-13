@@ -28,7 +28,6 @@ indicator_2 = function(bounds, samples){
 #   publisher={International Society for Bayesian Analysis}
 # }
 #' @importFrom mvtnorm rmvnorm dmvnorm
-#' @export
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL, trace){
   
   cat("Pajor Log-Likelihood Calculation \n")
@@ -36,7 +35,7 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
   family_info = family_export(family)
   fam_fun = family_info$family_fun
   link = family_info$link
-  link_int = family_info$link_int # Recoded link as integer
+  link_int = family_info$link_int # Recoded link as integer, see "family_export.R" for details
   family = family_info$family
   
   # Define variables
@@ -161,15 +160,15 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
         # Multiply together all elements belonging to same alpha_m
         dens_k = dens_k * dens_i
       } # End i loop
-    }else if(family == "negbin"){
-      for(i in 1:n_k){
-        dens_i = dnbinom(y_k[i], size = 1/phi, mu = mu[,i], log = F)
-        # Multiply together all elements belonging to same alpha_m
-        dens_k = dens_k * dens_i
-      } # End i loop
     }else{
       stop("specified family not currently available")
     }
+    # else if(family == "negbin"){
+    #   for(i in 1:n_k){
+    #     dens_i = dnbinom(y_k[i], size = 1/phi, mu = mu[,i], log = F)
+    #     # Multiply together all elements belonging to same alpha_m
+    #     dens_k = dens_k * dens_i
+    #   } # End i loop
     
     lik_k = mean(dens_k*indic*wt)
     ll_k = log(lik_k)

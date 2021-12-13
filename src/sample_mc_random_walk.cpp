@@ -8,7 +8,6 @@ using namespace Rcpp;
 
 // Adaptive (Burn-in Only) Random Walk Metropolis within Gibbs with Random Scan
 
-//' @export
 // [[Rcpp::export]]
 arma::mat sample_mc_gibbs_adapt_rw(arma::mat f, // matrix
                                    arma::mat z, // matrix

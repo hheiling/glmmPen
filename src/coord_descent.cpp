@@ -105,7 +105,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     // }
     
     for(i=0; i<N; i++){
-      if(weights(i) <= 1e-8 | mu_check(i) == 0){
+      if((weights(i) <= 1e-8) | (mu_check(i) == 0)){
         resid(i) = 0.0;
         weights(i) = 0.0;
       }

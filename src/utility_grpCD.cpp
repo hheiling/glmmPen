@@ -20,8 +20,8 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
   arma::vec weights(M);
   arma::vec const_ones(M); const_ones.ones();
   
-  const char* bin = "binomial";
-  const char* gaus = "gaussian";
+  // const char* bin = "binomial";
+  // const char* gaus = "gaussian";
   const char* pois = "poisson";
   
   double nu_tmp = 0.0;
