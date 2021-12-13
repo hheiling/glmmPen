@@ -233,7 +233,16 @@ fitted.pglmmObj = function(object, fixed.only = T, ...){
   
   mu = invLink(family = object$family, eta)
   
-  return(as.numeric(mu))
+  frame = object$data$frame
+  
+  mu_out = as.numeric(mu)
+  if(is.null(rownames(frame))){
+    names(mu_out) = seq_len(nrow(frame))
+  }else{
+    names(mu_out) = rownames(frame)
+  }
+  
+  return(mu_out)
   
 }
 
@@ -326,21 +335,15 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
     
   } # End if-else is.null(newdata)
   
-  if(inherits(pred, "Matrix") | inherits(pred, "matrix")){ # class(pred) %in% c("Matrix","matrix")
-    if(is.null(rownames(data))){
-      rownames(pred) = seq_len(nrow(data))
-    }else{
-      rownames(pred) = rownames(data)
-    }
-  }else if(inherits(pred,"numeric")){ # class(pred) == "numeric"
-    if(is.null(rownames(data))){
-      names(pred) = seq_len(nrow(data))
-    }else{
-      names(pred) = rownames(data)
-    }
+  pred_out = as.numeric(pred)
+  if(is.null(rownames(data))){
+    names(pred_out) = seq_len(nrow(data))
+  }else{
+    names(pred_out) = rownames(data)
   }
   
-  return(pred)
+  
+  return(pred_out)
 }
 
 
@@ -779,7 +782,7 @@ plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocor
     # var_names = vars
   }
   
-  if(numeric.grps){
+  if(numeric_grp_order){
     grp_names = as.numeric(grp_names)
   }
   
