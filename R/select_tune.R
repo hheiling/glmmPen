@@ -267,7 +267,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     coef_oldj0 = coef_pre
     uj0 = u_pre
   }else{
-    coef_old = NULL
     coef_oldj0 = NULL
     uj0 = NULL
   }
@@ -314,6 +313,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       if(!is.null(coef_old0)){
         if(any(is.na(coef_old0)) | any(abs(coef_old0) > 10^5)){
           coef_old0 = NULL
+          coef_oldj0 = NULL
           uold = NULL
         }
       }

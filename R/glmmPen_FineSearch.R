@@ -279,13 +279,13 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     ###########################################################################################
     # Two-stage (abbreviated) grid search
     ###########################################################################################
-    
     print("Start of stage 1 of abbreviated grid search")
     fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
                               covar = covar, group_X = group_X,
                               lambda0_seq = min(lambda0_seq), lambda1_seq = lambda1_seq,
                               penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                               trace = trace, coef_old = coef_old, 
+                              u_init = object$Estep_init$u_init,
                               adapt_RW_options = adapt_RW_options, 
                               optim_options = optim_options, logLik_calc = logLik_calc,
                               BICq_calc = (BIC_option == "BICq"),
@@ -345,7 +345,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                              lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              trace = trace, 
-                             coef_old = coef_old, u_init = NULL, 
+                             coef_old = coef_old, u_init = object$Estep_out$u_init, 
                              adapt_RW_options = adapt_RW_options, 
                              optim_options = optim_options, 
                              logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),

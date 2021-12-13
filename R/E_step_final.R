@@ -102,7 +102,7 @@ E_step_final= function(dat, offset_fit, fit, optim_options,
     BICNgrp = -2*ll + sum(coef != 0)*log(d)
     
     return(list(u0 = Estep_out$u0, post_modes = post_modes, post_out = post_out, 
-                u_init = matrix(u0[nrow(u0),]),
+                u_init = matrix(u0[nrow(u0),], nrow = 1),
                 ll = ll, BICh = BICh, BIC = BIC, BICNgrp = BICNgrp))
     
   }else{
