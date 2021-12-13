@@ -120,7 +120,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   y = object$data$y 
   X = object$data$X 
   Z_std = object$data$Z_std
-  group = object$data$group[[1]] # Assume only grouping by a single variable
+  # Use 'numeric' version of grouping factor
+  group = factor(as.numeric(object$data$group[[1]])) # Assume only grouping by a single variable
   offset = object$data$offset
   family = object$family
   fixef_names = names(object$fixef)
@@ -402,7 +403,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   output = c(fit, 
              list(Estep_out = Estep_out, call = call, formula = object$formula, 
                   y = y, fixed_vars = object$fixed_vars,
-                   X = X, Z_std = Z_std, group = group,
+                   X = X, Z_std = Z_std, group = object$data$group,
                    coef_names = list(fixed = names(object$fixef), random = colnames(object$sigma)), 
                    family = object$family, offset = offset, frame = object$data$frame, 
                    sampling = sampling, std_out = object$data$std_info, 
