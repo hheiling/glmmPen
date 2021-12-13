@@ -191,7 +191,7 @@ arma::vec linkfun(int link, arma::vec mu){
   int i=0;
   arma::vec out(N);
   arma::vec ones_vec = out.ones();
-  double tmp;
+  // double tmp;
   
   if(link == 11){ // probit
     out.zeros();
@@ -403,7 +403,7 @@ double sig_gaus(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP
   int H = J_q.n_cols; // From paper, J_q
   
   int i=0;
-  int m=0;
+  // int m=0;
   arma::uvec m0(1);
   int k=0;
   int f=0;
@@ -603,16 +603,16 @@ void score_info_init(double theta, arma::vec mu, arma::vec y, int link,
 // [[Rcpp::export]]
 double phi_ml(arma::vec y, arma::mat eta, int link, int limit, double eps, double phi){
   
-  int N = y.n_elem;
+  // int N = y.n_elem;
   
-  double theta0, del, tmp;
+  double theta0, del;
   double score=0.0;
   double info=0.0;
   // double n=0;
-  int i, it=0;
+  int it=0;
   double minTheta = 1e-5;
   double maxTheta = 1.0/minTheta;
-  int fail = 0;
+  // int fail = 0;
   
   double phi_new;
   
@@ -672,7 +672,7 @@ double phi_ml_init(arma::vec y, arma::vec eta, int link, int limit, double eps){
   int i, it=0;
   double minTheta = 1e-5;
   double maxTheta = 1.0/minTheta;
-  int fail = 0;
+  // int fail = 0;
   
   arma::vec mu(N);
   

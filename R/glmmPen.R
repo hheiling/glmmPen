@@ -346,8 +346,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   #   cnms (names of random effects), and flist (list of the groups) 
   # Note: restrict na.action to be na.omit
   fD_out0 = glFormula_edit(formula = formula, data = data, family = fam_fun, subset = NULL,
-                           weights = NULL, na.action = na.omit, offset = offset,
-                           contrasts = NULL)
+                           weights = NULL, na.action = na.omit, offset = offset)
   
   # Perform additional checks/restrictions/modifications of data input
   # See fD_adj() function earlier in this document

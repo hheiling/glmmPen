@@ -19,6 +19,21 @@
 #' @param group_X vector describing the grouping of the covariates in the model matrix.
 #' @param nMC a positive integer for the initial number of Monte Carlo draws. See the \code{nMC_start}
 #' argument in \code{\link{optimControl}} for more details.
+#' @param u_init matrix giving values to initialize samples from the posterior. If 
+#' Binomial or Poisson families, only need a single row to initialize samples from
+#' the posterior; if Gaussian family, multiple rows needed to initialize the estimate
+#' of the residual error (needed for the E-step). Columns correspond to the 
+#' columns of the Z random effect model matrix.
+#' @param coef_old vector giving values to initialized the coefficients (both fixed
+#' and random effects)
+#' @param ufull_describe output from \code{bigmemory::describe} (which returns a list 
+#' of the information needed to attach to a big.matrix object) applied to the
+#' big.matrix of posterior samples from the 'full' model. The big.matrix 
+#' described by the object is used to calculate the BIC-ICQ value for the model.
+#' @param ranef_keep vector of 0s and 1s indicating which random effects should 
+#' be considered as non-zero at the start of the algorithm. For each random effect,
+#' 1 indicates the random effect should be considered non-zero at start of algorithm,
+#' 0 indicates otherwise. The first element for the random intercept should always be 1.
 #' @param checks_complete boolean value indicating whether the function has been called within
 #' \code{glmm} or \code{glmmPen} or whether the function has been called by itself. 
 #' Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,

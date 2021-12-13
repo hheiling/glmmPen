@@ -1,9 +1,49 @@
+
+
+#' @title Simulates data to use for the \code{\link{glmmPen}} package
+#' 
+#' Simulates data to use for testing the \code{\link{glmmPen}} package.
+#' Possible parameters to specify includes number of total covariates,
+#' number of non-zero fixed and random effects, and the magnitude
+#' of the random effect covariance values.
+#' 
+#' @param n integer specifying total number of samples to generate
+#' @param ptot integer specifying total number of covariates to generate 
+#' (values randomly generated from the standard normal distribution)
+#' @param pnonzero integer specifying how may of the covariates should have
+#' non-zero fixed and random effects
+#' @param nstudies number of studies/groups to have in the data
+#' @param sd_raneff non-negative value specifying the standard deviation of the
+#' random effects covariance matrix (applied to the non-zero random effects)
+#' @param family character string specifying which family to generate data from.
+#' Family options include "binomial" (default), "poisson", and "gaussian".
+#' @param corr optional value to specify correlation in the random effects
+#' covariance matrix. Default \code{NULL}
+#' @param seed integer to use for the setting of a random seed
+#' @param imbalance integer of 0 or 1 indicating whether the observations should
+#' be equally distributed among the groups (0) or unequally distributed (1).
+#' @param beta numeric vector of the fixed effects (including intercept)
+#' @param pnonzerovar non-negative integer specifying the number of 
+#' covariates with a zero-valued fixed effect but a non-zero random effect.
+#' 
+#' @return list containing the following elements:
+#' \item{y}{vector of the response}
+#' \item{X}{model matrix for the fixed effects}
+#' \item{Z}{model matrix for the random effects, organized first by variable
+#' and then by group}
+#' \item{pnonzero}{number of non-zero fixed effects}
+#' \item{z1}{values of the random effects for each variable for each level of 
+#' the grouping factor}
+#' \item{group}{grouping factor}
+#' \item{X0}{model matrix for just the non-zero fixed effects}
+#' 
 #' @importFrom stringr str_c str_detect
 #' @importFrom ncvreg std
 #' @importFrom mvtnorm rmvnorm
 #' @export
-sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", corr = NULL, 
-                     slopes = F, seed, imbalance = 0, beta = NULL,pnonzerovar = 0, trace = 0){
+sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", 
+                    corr = NULL, seed, imbalance = 0, 
+                    beta = NULL, pnonzerovar = 0){
   
   set.seed(seed = seed)
   
@@ -18,6 +58,8 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
   link = family_info$link
   link_int = family_info$link_int # Recoded link as integer
   family = family_info$family
+  
+  slopes = T
   
   if(pnonzero + pnonzerovar > ptot) stop("pnonzero + pnonzerovar > ptot")
   # create fixed effects covariate matrix

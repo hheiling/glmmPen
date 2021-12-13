@@ -87,6 +87,15 @@ Default is 4.0 for SCAD and 3.0 for MCP.}
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
 
+\item{u_init}{matrix giving values to initialize samples from the posterior. If 
+Binomial or Poisson families, only need a single row to initialize samples from
+the posterior; if Gaussian family, multiple rows needed to initialize the estimate
+of the residual error (needed for the E-step). Columns correspond to the 
+columns of the Z random effect model matrix.}
+
+\item{coef_old}{vector giving values to initialized the coefficients (both fixed
+and random effects)}
+
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
 containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
 Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
@@ -130,6 +139,11 @@ and the file-backed big matrix.}
 model selection (default \code{TRUE}). If the number of random effects considered less than 5,
 no pre-screening will be performed. Pre-screening removes random effects from consideration
 during the model selection process, which can significantly speed up the algorithm.}
+
+\item{ranef_keep}{vector of 0s and 1s indicating which random effects should 
+be considered as non-zero at the start of the algorithm. For each random effect,
+1 indicates the random effect should be considered non-zero at start of algorithm,
+0 indicates otherwise. The first element for the random intercept should always be 1.}
 
 \item{lambda.min.full}{a vector of two numeric values that gives the fixed and random effect penalty 
 values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 

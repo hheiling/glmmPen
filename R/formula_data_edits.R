@@ -125,8 +125,16 @@ checkXmatrix = function(X){
 #' @param data an optional data frame containing the variables named in \code{formula}. Although 
 #' \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
 #' omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).
+#' @param family a description of the error distribution and link function to be used in the model 
+#' (a family function or the result of a call to a family function).
+#' (See \link{family} for details of family functions.)
+#' @param subset an optional vector specifying a subset of observations to be used in the fitting process.
+#' @param weights an optional vector of ‘prior weights’ to be used in the fitting process. Should be NULL or a numeric vector.
 #' @param na.action a function that indicates what should happen when the data contain NAs. The default
 #' option \code{na.omit} removes observations with any missing values in any of the variables
+#' @param offset this can be used to specify an a priori known component to be included in the linear predictor during fitting. 
+#' This should be NULL or a numeric vector of length equal to the number of cases.
+#' @param ... potential further arguments
 #' 
 #' @return a list with the following elements:
 #' \item{fr}{a model frame including all fixed and random covariates, the response, and the 
@@ -140,8 +148,7 @@ checkXmatrix = function(X){
 #' 
 #' @importFrom lme4 factorize mkReTrms nobars subbars findbars
 glFormula_edit <- function(formula, data=NULL, family,
-                           subset, weights, na.action, offset,
-                           contrasts = NULL, ...) {
+                           subset, weights, na.action, offset, ...) {
   
   # glFormula_edit is an edited version of glFormula from the lme4 package. 
   # Edit summary:
@@ -188,7 +195,7 @@ glFormula_edit <- function(formula, data=NULL, family,
   
   ## fixed-effects model matrix X - remove random effect parts from formula:
   fixedform <- nobars(formula)
-  X <- model.matrix(fixedform, fr, contrasts)#, sparse = FALSE, row.names = FALSE) ## sparseX not yet
+  X <- model.matrix(fixedform, fr, contrasts = NULL)#, sparse = FALSE, row.names = FALSE) ## sparseX not yet
   checkXmatrix(X)
   # all fixed effects variables used in analysis
   fixed_vars = colnames(get_all_vars(fixedform[-2], data = data))

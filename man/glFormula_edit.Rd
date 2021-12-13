@@ -12,7 +12,6 @@ glFormula_edit(
   weights,
   na.action,
   offset,
-  contrasts = NULL,
   ...
 )
 }
@@ -29,8 +28,21 @@ The offset must be specified outside of the formula in the 'offset' argument.}
 \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
 omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).}
 
+\item{family}{a description of the error distribution and link function to be used in the model 
+(a family function or the result of a call to a family function).
+(See \link{family} for details of family functions.)}
+
+\item{subset}{an optional vector specifying a subset of observations to be used in the fitting process.}
+
+\item{weights}{an optional vector of ‘prior weights’ to be used in the fitting process. Should be NULL or a numeric vector.}
+
 \item{na.action}{a function that indicates what should happen when the data contain NAs. The default
 option \code{na.omit} removes observations with any missing values in any of the variables}
+
+\item{offset}{this can be used to specify an a priori known component to be included in the linear predictor during fitting. 
+This should be NULL or a numeric vector of length equal to the number of cases.}
+
+\item{...}{potential further arguments}
 }
 \value{
 a list with the following elements:

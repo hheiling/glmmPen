@@ -44,53 +44,64 @@ package \code{glmmPen}}
 
 \method{ranef}{pglmmObj}(object)
 
-\method{sigma}{pglmmObj}(object)
+\method{sigma}{pglmmObj}(object, ...)
 
-\method{coef}{pglmmObj}(object)
+\method{coef}{pglmmObj}(object, ...)
 
-\method{family}{pglmmObj}(object)
+\method{family}{pglmmObj}(object, ...)
 
-\method{nobs}{pglmmObj}(object)
+\method{nobs}{pglmmObj}(object, ...)
 
-\method{ngrps}{pglmmObj}(object)
+\method{ngrps}{pglmmObj}(object, ...)
 
-\method{formula}{pglmmObj}(object, fixed.only = F, random.only = F)
+\method{formula}{pglmmObj}(x, fixed.only = F, random.only = F, ...)
 
-\method{model.frame}{pglmmObj}(object, fixed.only = F)
+\method{model.frame}{pglmmObj}(formula, fixed.only = F, ...)
 
-\method{model.matrix}{pglmmObj}(object, type = c("fixed", "random"))
+\method{model.matrix}{pglmmObj}(object, type = c("fixed", "random"), ...)
 
-\method{fitted}{pglmmObj}(object, fixed.only = T)
+\method{fitted}{pglmmObj}(object, fixed.only = T, ...)
 
-\method{predict}{pglmmObj}(object, newdata = NULL, type = c("link", "response"), fixed.only = T)
+\method{predict}{pglmmObj}(
+  object,
+  newdata = NULL,
+  type = c("link", "response"),
+  fixed.only = T,
+  ...
+)
 
-\method{residuals}{pglmmObj}(object, type = c("deviance", "pearson", "response", "working"))
+\method{residuals}{pglmmObj}(object, type = c("deviance", "pearson", "response", "working"), ...)
 
-\method{print}{pglmmObj}(object, digits = c(fef = 4, ref = 4))
+\method{print}{pglmmObj}(x, digits = c(fef = 4, ref = 4), ...)
 
 \method{summary}{pglmmObj}(
   object,
   digits = c(fef = 4, ref = 4),
-  resid_type = switch(object$family$family, gaussian = "pearson", "deviance")
+  resid_type = switch(object$family$family, gaussian = "pearson", "deviance"),
+  ...
 )
 
-\method{logLik}{pglmmObj}(object)
+\method{logLik}{pglmmObj}(object, ...)
 
-\method{BIC}{pglmmObj}(object)
+\method{BIC}{pglmmObj}(object, ...)
 
-\method{plot}{pglmmObj}(
-  object,
-  x = fitted(object, fixed.only = F),
-  y = switch(object$family$family, gaussian = residuals(object, type = "pearson"),
-    residuals(object, type = "deviance"))
-)
+\method{plot}{pglmmObj}(x, fixed.only = F, type = NULL, ...)
 }
 \arguments{
 \item{object}{pglmmObj object output from \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}}
 
+\item{...}{potentially further arguments passed from other methods}
+
+\item{x}{an R object of class \code{pglmmObj}}
+
 \item{fixed.only}{logical value; default \code{TRUE} indicates that only the fixed effects 
 should be used in the fitted value/prediction, while \code{FALSE} indicates that both the fixed and 
 random effects should be used in the fitted value/prediction}
+
+\item{random.only}{logical value used in \code{formula}; \code{TRUE} indicates that 
+only the formula elements relating to the random effects should be returned}
+
+\item{formula}{in the case of model.frame, a \code{pglmmObj} object}
 
 \item{type}{See details of \code{type} options for each function under "Functions" section.}
 
@@ -100,9 +111,6 @@ random effects should be used in the fitted value/prediction}
 
 \item{resid_type}{type of residuals to summarize in output. See \code{predict.pglmmObj}
 for residual options available.}
-
-\item{y}{numeric vector of residuals to plot, which are automatically calculated using the
-\code{residuals} function}
 }
 \value{
 The pglmmObj object returns the following items:
@@ -210,7 +218,12 @@ was set to "BICq" in \code{\link{selectControl}} (citation for BIC-ICQ:
 Ibrahim, J. G., Zhu, H., Garcia, R. I., & Guo, R. (2011). 
 Fixed and random effects selection in mixed effects models. Biometrics, 67(2), 495-503.)
 
-\item \code{plot.pglmmObj}: Plot residuals for the pglmmObj output object from the glmmPen package
+\item \code{plot.pglmmObj}: Plot residuals for the pglmmObj output object from the glmmPen package.
+Argument \code{type}: character string for type of residuals to report. Options include "deviance" 
+(default for non-Gaussian family), "pearson" (default for Gaussian family), 
+"response", and "working", which specify the deviance residuals, Pearson residuals,
+the difference between the actual response y and the expected mean response (y - mu), and the
+working residuals (y - mu) / mu
 }}
 
 

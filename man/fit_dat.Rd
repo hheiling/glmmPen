@@ -113,6 +113,20 @@ Positive integer, default equals 2.}
 seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
 to be no less than 2.}
 
+\item{u_init}{matrix giving values to initialize samples from the posterior. If 
+Binomial or Poisson families, only need a single row to initialize samples from
+the posterior; if Gaussian family, multiple rows needed to initialize the estimate
+of the residual error (needed for the E-step). Columns correspond to the 
+columns of the Z random effect model matrix.}
+
+\item{coef_old}{vector giving values to initialized the coefficients (both fixed
+and random effects)}
+
+\item{ufull_describe}{output from \code{bigmemory::describe} (which returns a list 
+of the information needed to attach to a big.matrix object) applied to the
+big.matrix of posterior samples from the 'full' model. The big.matrix 
+described by the object is used to calculate the BIC-ICQ value for the model.}
+
 \item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
 If set to \code{NULL}, then the algorithm inputs the following defaults:
 Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
@@ -160,6 +174,11 @@ in comparing the best models from BIC-ICQ and other BIC-type selection criteria,
 Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,
 performs additional checks on the input data. If false, assumes data input checks have 
 already been performed.}
+
+\item{ranef_keep}{vector of 0s and 1s indicating which random effects should 
+be considered as non-zero at the start of the algorithm. For each random effect,
+1 indicates the random effect should be considered non-zero at start of algorithm,
+0 indicates otherwise. The first element for the random intercept should always be 1.}
 
 \item{conv_type}{integer specifying which type of convergence criteria to use. Default 1 specifies
 using the average Eucledian distance, and 2 specifies using relative change in the Q-function

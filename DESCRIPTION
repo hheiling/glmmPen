@@ -38,11 +38,10 @@ LinkingTo:
     bigmemory,
     Rcpp (>= 0.12.0),
     RcppArmadillo,
-    RcppDist,
     RcppEigen (>= 0.3.3.3.0),
     rstan (>= 2.18.1),
     StanHeaders (>= 2.18.0)
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 NeedsCompilation: yes
 Packaged: 2019-01-25 20:03:59 UTC; hheiling
 Author: Hillary Heiling [aut, cre],

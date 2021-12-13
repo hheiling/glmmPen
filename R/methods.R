@@ -27,7 +27,7 @@ ranef.pglmmObj = function(object){
 #'
 #' @importFrom stats sigma
 #' @export
-sigma.pglmmObj = function(object){
+sigma.pglmmObj = function(object, ...){
   
   fam_fun = object$family
   family = fam_fun$family
@@ -52,7 +52,7 @@ sigma.pglmmObj = function(object){
 #' 
 #' @importFrom stats coef
 #' @export
-coef.pglmmObj = function(object){
+coef.pglmmObj = function(object, ...){
   # Find combined coefficients
   ## Borrowed code elements from coef.merMod in lme4
   
@@ -90,21 +90,22 @@ coef.pglmmObj = function(object){
 #'
 #' @importFrom stats family
 #' @export
-family.pglmmObj = function(object){
+family.pglmmObj = function(object, ...){
   object$family
 }
 
 #' @describeIn pglmmObj Number of observations used in the model fit
 #'
 #' @export
-nobs.pglmmObj = function(object){
+nobs.pglmmObj = function(object, ...){
   nrow(object$data$X)
 }
 
 #' @describeIn pglmmObj Number of levels in the grouping factor
 #' 
+#' @importFrom lme4 ngrps
 #' @export
-ngrps.pglmmObj = function(object){
+ngrps.pglmmObj = function(object, ...){
   nlevels(object$data$group[[1]])
 }
 
@@ -121,10 +122,16 @@ reOnly <- function(f, response=FALSE) {
 #' @describeIn pglmmObj Formula used for the model fit. Can return the full
 #' formula, or just the formula elements relating to the fixed effects
 #' (fixed.only = T) or random effects (random.only = T)
+#'
+#' @param random.only logical value used in \code{formula}; \code{TRUE} indicates that 
+#' only the formula elements relating to the random effects should be returned
 #' 
 #' @importFrom stats formula
 #' @export
-formula.pglmmObj = function(object, fixed.only = F, random.only = F){
+formula.pglmmObj = function(x, fixed.only = F, random.only = F, ...){
+  
+  object = x
+  
   form = object$formula
   frame = object$data$frame
   if(fixed.only && random.only){
@@ -144,9 +151,15 @@ formula.pglmmObj = function(object, fixed.only = F, random.only = F){
 
 #' @describeIn pglmmObj Returns the model frame
 #' 
+#' @param formula in the case of model.frame, a \code{pglmmObj} object
+#' 
 #' @importFrom stats model.frame
 #' @export
-model.frame.pglmmObj = function(object, fixed.only = F){
+model.frame.pglmmObj = function(formula, fixed.only = F, ...){
+  
+  object = formula
+  rm(formula)
+  
   frame = object$data$frame
   # Borrowed some code from lme4
   if(fixed.only){
@@ -164,7 +177,7 @@ model.frame.pglmmObj = function(object, fixed.only = F){
 #' 
 #' @importFrom stats model.matrix
 #' @export
-model.matrix.pglmmObj = function(object, type = c("fixed", "random")) {
+model.matrix.pglmmObj = function(object, type = c("fixed", "random"), ...) {
   
   switch(type[1],
          "fixed" = object$data$X,
@@ -208,7 +221,7 @@ invLink = function(family, eta){
 #' 
 #' @importFrom stats fitted
 #' @export
-fitted.pglmmObj = function(object, fixed.only = T){
+fitted.pglmmObj = function(object, fixed.only = T, ...){
   
   offset = object$data$offset
   
@@ -235,12 +248,13 @@ fitted.pglmmObj = function(object, fixed.only = T){
 #' @param fixed.only logical value; default \code{TRUE} indicates that only the fixed effects 
 #' should be used in the fitted value/prediction, while \code{FALSE} indicates that both the fixed and 
 #' random effects should be used in the fitted value/prediction
+#' @param ... potentially further arguments passed from other methods
 #' 
 #' @importFrom stats predict drop.terms reformulate
 #' @importFrom lme4 nobars
 #' @export
 predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
-                            fixed.only = T){
+                            fixed.only = T, ...){
   ## Other arguments used by lme4: re.form, random.only = F, allow.new.levels = F, newparams = NULL
   
   if((!is.null(newdata)) & (!inherits(newdata, "data.frame"))){ # class(newdata) != "data.frame"
@@ -353,7 +367,7 @@ var_hat = function(family, mu, sig2 = NULL, phi = NULL){
 #' 
 #' @inherit predict.pglmmObj
 #' @export
-residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working")){
+residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working"), ...){
   
   y = object$data$y
   mu = Matrix::as.matrix(fitted(object))
@@ -447,10 +461,11 @@ prt_nobsgrps = function(object){
 
 #' @describeIn pglmmObj Prints a selection of summary information of fitted model
 #' 
+#' @param x an R object of class \code{pglmmObj}
 #' @export 
-print.pglmmObj = function(object, digits = c(fef = 4, ref = 4)){
-  # ToDo: Add in (best) lambda values, BIC, logLik
+print.pglmmObj = function(x, digits = c(fef = 4, ref = 4), ...){
   
+  object = x
   # Title
   cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",  
       "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = T, sep = "")
@@ -507,7 +522,8 @@ prt_resids = function(resids, type = "Pearson", digits) {
 #' 
 #' @export
 summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4), 
-                            resid_type = switch(object$family$family, gaussian = "pearson", "deviance")){
+                            resid_type = switch(object$family$family, gaussian = "pearson", "deviance"),
+                            ...){
   # ToDo: Add in (best) lambda values, BIC, logLik
   
   # Title
@@ -537,7 +553,7 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4),
 #' Bayesian Analysis, 12(1), 261-287.
 #' 
 #' @export
-logLik.pglmmObj = function(object){ 
+logLik.pglmmObj = function(object, ...){ 
   
   results_optim = object$results_optim
   ll_elem = which(colnames(results_optim) == "LogLik")
@@ -561,7 +577,7 @@ logLik.pglmmObj = function(object){
 #' @importFrom stringr str_detect
 #' @method BIC pglmmObj
 #' @export
-BIC.pglmmObj = function(object){ # extractBIC.pglmmObj
+BIC.pglmmObj = function(object, ...){ 
   
   results_optim = object$results_optim
   BIC_elem = which(str_detect(colnames(results_optim), "BIC"))
@@ -831,20 +847,34 @@ plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocor
   
 }
 
-#' @describeIn pglmmObj Plot residuals for the pglmmObj output object from the glmmPen package
+#' @describeIn pglmmObj Plot residuals for the pglmmObj output object from the glmmPen package.
+#' Argument \code{type}: character string for type of residuals to report. Options include "deviance" 
+#' (default for non-Gaussian family), "pearson" (default for Gaussian family), 
+#' "response", and "working", which specify the deviance residuals, Pearson residuals,
+#' the difference between the actual response y and the expected mean response (y - mu), and the
+#' working residuals (y - mu) / mu
 #' 
 #' @inheritParams predict.pglmmObj
-#' @param y numeric vector of residuals to plot, which are automatically calculated using the
-#' \code{residuals} function
 #' 
 #' @importFrom stringr str_c str_to_title
 #' @import ggplot2 
 #' @method plot pglmmObj
 #' @export
-plot.pglmmObj = function(object, x = fitted(object, fixed.only = F), 
-                         y = switch(object$family$family,
-                                    gaussian = residuals(object, type = "pearson"),
-                                    residuals(object, type = "deviance"))){
+plot.pglmmObj = function(x, fixed.only = F, type = NULL,
+                         ...){
+  
+  object = x
+  rm(x)
+  
+  x = fitted(object, fixed.only = fixed.only)
+  if(is.null(type)){
+    y = switch(object$family$family,
+               gaussian = residuals(object, type = "pearson"),
+               residuals(object, type = "deviance"))
+  }else{
+    y = residuals(object, type = type)
+  }
+  
   
   if(length(x) != length(y)){
     stop("x and y need to be of same length")
