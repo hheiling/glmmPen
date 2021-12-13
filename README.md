@@ -13,22 +13,30 @@ Windows users must perform an additional step to create/edit a "~/.R/Makevars.wi
 For Windows users using a version of R earlier than 4.0, first run the following lines of code:
 
 ```
+# Create "~/.R/Makevars.win" file if it does not currently exist
 dotR <- file.path(Sys.getenv("HOME"), ".R")
 if (!file.exists(dotR)) dir.create(dotR)
 M <- file.path(dotR, "Makevars.win")
 if (!file.exists(M)) file.create(M)
+# Run code below to add the appropriate lines to the Makevars.win file:
 cat("\nCXX14FLAGS=-O3 -march=corei7 -mtune=corei7",
     "CXX14 = $(BINPREF)g++ -m$(WIN) -std=c++1y",
     "CXX11FLAGS=-O3 -march=corei7 -mtune=corei7",
     file = M, sep = "\n", append = TRUE)
 ```
 
-For Windows users using a version of R 4.0 or later, first run the following lines of code: (instructions and further comments also given by the Stan team here: <<https://discourse.mc-stan.org/t/dealing-with-r-4-0/14586>>)
+For Windows users using a version of R 4.0 or later (and the corresponding Rtools40), first run the following lines of code: (instructions and further comments also given by the Stan team here: <<https://discourse.mc-stan.org/t/dealing-with-r-4-0/14586>>)
 
 ```
-file.rename(from = "~/.R/Makevars.win", to = "~/.R/Makevars_old")
+# If file "~/.R/Makevars.win" already exists, rename or delete and 
+#   create a new Makevars.win file (uncomment and run following line).
+# file.rename(from = "~/.R/Makevars.win", to = "~/.R/Makevars_old")
+
+# If file "~/.R/Makevars.win" does not exist, first run the first four 
+#   lines in the previous code chunck to create such a file.
+#   Then run the code below to add the appropriate line
+#   to the Makevars.win file:
 cat("CXX14FLAGS += -mtune=native -march=native -Wno-ignored-attributes -Wno-deprecated-declarations \n", file = "~/.R/Makevars.win")
-pkgbuild::has_build_tools(debug = TRUE)
 ```
 
 The package can then be installed using the following lines of code:

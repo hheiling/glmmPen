@@ -548,10 +548,12 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4),
 }
 
 #' @describeIn pglmmObj Returns the log-likelihood using the Corrected Arithmetic Mean estimator
-#' with importance sampling weights developed by Pajor (2017). 
+#' with importance sampling weights developed by Pajor (2017). Degrees of freedom
+#' give the sum of the non-zero fixed and random effects coefficients.
 #' Citation: Pajor, A. (2017). Estimating the marginal likelihood using the arithmetic mean identity. 
 #' Bayesian Analysis, 12(1), 261-287.
 #' 
+#' @importFrom stringr str_detect
 #' @export
 logLik.pglmmObj = function(object, ...){ 
   
@@ -560,6 +562,11 @@ logLik.pglmmObj = function(object, ...){
   
   ll = results_optim[ll_elem]
   names(ll) = "logLik"
+  
+  # degrees of freedom (df): number of non-zero fixed and random effects coefficients
+  gamma_idx = which(str_detect(colnames(object$results_optim),"Gamma"))
+  df = sum(object$fixef != 0) + sum(object$results_optim[,gamma_idx] != 0)
+  attributes(ll) = list(df = df)
   
   structure(ll, class = c("logLik"))
 
