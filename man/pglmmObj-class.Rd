@@ -206,7 +206,8 @@ working residuals (y - mu) / mu
 \item \code{summary.pglmmObj}: Returns a list of summary statistics of the fitted model.
 
 \item \code{logLik.pglmmObj}: Returns the log-likelihood using the Corrected Arithmetic Mean estimator
-with importance sampling weights developed by Pajor (2017). 
+with importance sampling weights developed by Pajor (2017). Degrees of freedom
+give the sum of the non-zero fixed and random effects coefficients.
 Citation: Pajor, A. (2017). Estimating the marginal likelihood using the arithmetic mean identity. 
 Bayesian Analysis, 12(1), 261-287.
 
