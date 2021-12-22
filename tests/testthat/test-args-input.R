@@ -12,7 +12,7 @@ test_that("test mis-specification of glmmPen arguments",{
   
   dat = sim.data(n = 500, ptot = 4, pnonzero = 4, nstudies = 5,
                  sd_raneff = 1.0, family = 'binomial',
-                 slopes = T, seed = 1618, imbalance = 1, 
+                 seed = 1618, imbalance = 1, 
                  pnonzerovar = 0, beta = c(0,rep(1,4)))
   
   y = dat$y
@@ -49,7 +49,7 @@ test_that("test mis-specification of optimControl arguments",{
   
   dat = sim.data(n = 500, ptot = 4, pnonzero = 4, nstudies = 5,
                  sd_raneff = 1.0, family = 'binomial',
-                 slopes = T, seed = 1618, imbalance = 1, 
+                 seed = 1618, imbalance = 1, 
                  pnonzerovar = 0, beta = c(0,rep(1,4)))
   
   y = dat$y
@@ -82,7 +82,7 @@ test_that("test mis-specification of selectControl arguments",{
   
   dat = sim.data(n = 500, ptot = 4, pnonzero = 4, nstudies = 5,
                  sd_raneff = 1.0, family = 'binomial',
-                 slopes = T, seed = 1618, imbalance = 1, 
+                 seed = 1618, imbalance = 1, 
                  pnonzerovar = 0, beta = c(0,rep(1,4)))
   
   y = dat$y
