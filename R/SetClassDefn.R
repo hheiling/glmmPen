@@ -63,6 +63,7 @@
 #' methods(class = "pglmmObj")
 #' 
 #' @importFrom stringr str_c
+#' @importFrom methods new
 #' @export
 pglmmObj = setRefClass("pglmmObj",
             fields = list(

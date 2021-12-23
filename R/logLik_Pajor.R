@@ -28,6 +28,7 @@ indicator_2 = function(bounds, samples){
 #   publisher={International Society for Bayesian Analysis}
 # }
 #' @importFrom mvtnorm rmvnorm dmvnorm
+#' @importFrom stats acf var dbinom dpois dnorm
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL, trace){
   
   cat("Pajor Log-Likelihood Calculation \n")

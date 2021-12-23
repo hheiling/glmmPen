@@ -61,9 +61,9 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
   
   output$call = call
   out_object = pglmmObj$new(output)
+  
   return(out_object)
   
-  return(out)
   
 }
 
@@ -86,6 +86,7 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
 ##    - cnms: see above
 ##    - flist: a list of grouping factors using inf the random-effects terms
 ## fixed_vars: vector of variables used for the fixed effects covariates
+#' @importFrom stats model.response
 fD_adj = function(out){
   frame = out$fr
   y = model.response(frame)
@@ -296,6 +297,8 @@ fD_adj = function(out){
 #' @importFrom stringr str_to_lower str_c str_detect
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
+#' @importFrom stats model.offset na.omit
+#' @import BH Rcpp RcppArmadillo RcppEigen
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL,

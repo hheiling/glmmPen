@@ -25,6 +25,7 @@ checkGrpLevels = function(flist, n){
 
 # check if bad formula or data input
 # Borrowed from lme4 'utilities.R' file https://github.com/lme4/lme4/blob/master/R/utilities.R
+#' @importFrom stats as.formula
 checkFormulaData <- function(formula, data, checkLHS=TRUE,
                              checkData=TRUE, debug=FALSE) {
   wd <- tryCatch(force(data), error = identity)
@@ -93,6 +94,7 @@ checkFormulaData <- function(formula, data, checkLHS=TRUE,
 # checks for model.matrix X
 # Note: these checks of X will also provide a check for Z because Z is later restricted to 
 # contain variables that are a subset of X (see fD_adj function in glmmPen.R R script)
+#' @importFrom stats var
 checkXmatrix = function(X){
   # For now, do not allow input of character variables into X model matrix
   if (typeof(X)=="character") stop("input variables must be numeric", call.=FALSE)
@@ -147,6 +149,7 @@ checkXmatrix = function(X){
 #' \item{fwmsgs}{indicator for a check of the group levels}
 #' 
 #' @importFrom lme4 factorize mkReTrms nobars subbars findbars
+#' @importFrom stats get_all_vars
 glFormula_edit <- function(formula, data=NULL, family,
                            subset, weights, na.action, offset, ...) {
   
