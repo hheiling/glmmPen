@@ -40,6 +40,7 @@
 #' @importFrom stringr str_c str_detect
 #' @importFrom ncvreg std
 #' @importFrom mvtnorm rmvnorm
+#' @importFrom stats rnorm rpois rbinom rnbinom
 #' @export
 sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", 
                     corr = NULL, seed, imbalance = 0, 

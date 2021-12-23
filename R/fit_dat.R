@@ -74,6 +74,7 @@
 #' @useDynLib glmmPen
 #' @importFrom bigmemory attach.big.matrix describe as.big.matrix
 #' @importFrom mvtnorm dmvnorm
+#' @importFrom stats glm rnorm 
 #' @importFrom Matrix Matrix
 fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
                      family = "binomial", offset_fit = NULL,
@@ -273,7 +274,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     
     # Coordinate descent ignoring random effects: naive fit
     ## See "Mstep.R" for CD function
-    fit_naive = CD(y, X, family = family, link = link_int, offset = offset_fit, coef_init = coef_init,
+    fit_naive = CD(y, X, family = family, link_int = link_int, offset = offset_fit, coef_init = coef_init,
                    maxit_CD = maxit_CD, conv = conv_CD, penalty = penalty, lambda = lambda0,
                    gamma = gamma_penalty, alpha = alpha, penalty_factor = penalty_factor, trace = trace)
     
@@ -546,15 +547,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
         out$coef_naive = fit_naive
       }
       
-      if(nrow(u0) >= nMC_report){
-        # Take last nMC_report rows
-        r_start = nrow(u0) - nMC_report + 1
-        r_end = nrow(u0)
-        u0_out = bigmemory::as.matrix(u0[c(r_start:r_end),])
-      }else{
-        # Use all available u0 entries
-        u0_out = bigmemory::as.matrix(u0)
-      }
+      u0_out = bigmemory::as.matrix(u0)
       out$u = u0_out
       
       if(family == "gaussian"){

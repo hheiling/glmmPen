@@ -50,7 +50,7 @@ sigma.pglmmObj = function(object, ...){
 #' @describeIn pglmmObj Computes the sum of the random and fixed effects 
 #' coefficients for each explanatory variable for each level of each grouping factor.
 #' 
-#' @importFrom stats coef
+#' @importFrom stats coef setNames
 #' @export
 coef.pglmmObj = function(object, ...){
   # Find combined coefficients
@@ -96,6 +96,7 @@ family.pglmmObj = function(object, ...){
 
 #' @describeIn pglmmObj Number of observations used in the model fit
 #'
+#' @importFrom stats nobs
 #' @export
 nobs.pglmmObj = function(object, ...){
   nrow(object$data$X)
@@ -153,7 +154,7 @@ formula.pglmmObj = function(x, fixed.only = F, random.only = F, ...){
 #' 
 #' @param formula in the case of model.frame, a \code{pglmmObj} object
 #' 
-#' @importFrom stats model.frame
+#' @importFrom stats model.frame terms.formula
 #' @export
 model.frame.pglmmObj = function(formula, fixed.only = F, ...){
   
@@ -276,7 +277,7 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
                     link = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, 
                                    U = object$posterior_samples),
-                    response = fitted(object, fixed.only = fixed_only))
+                    response = fitted(object, fixed.only = fixed.only))
     }else{ # fixed.only = T
       eta = object$data$X %*% object$fixef
       pred = switch(type[1],
@@ -368,6 +369,7 @@ var_hat = function(family, mu, sig2 = NULL, phi = NULL){
 #' the difference between the actual response y and the expected mean response (y - mu), and the
 #' working residuals (y - mu) / mu
 #' 
+#' @importFrom stats residuals
 #' @inherit predict.pglmmObj
 #' @export
 residuals.pglmmObj = function(object, type = c("deviance","pearson","response","working"), ...){
@@ -508,6 +510,7 @@ summary_ranef = function(object, digits = 4){
 }
 
 #' @importFrom stringr str_to_title
+#' @importFrom stats quantile
 prt_resids = function(resids, type = "Pearson", digits) {
   cat(str_to_title(type), "residuals: ", "\n", sep = " ")
   
@@ -557,6 +560,7 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4),
 #' Bayesian Analysis, 12(1), 261-287.
 #' 
 #' @importFrom stringr str_detect
+#' @importFrom stats logLik
 #' @export
 logLik.pglmmObj = function(object, ...){ 
   
@@ -585,7 +589,7 @@ logLik.pglmmObj = function(object, ...){
 #' Fixed and random effects selection in mixed effects models. Biometrics, 67(2), 495-503.) 
 #' 
 #' @importFrom stringr str_detect
-#' @method BIC pglmmObj
+#' @importFrom stats BIC
 #' @export
 BIC.pglmmObj = function(object, ...){ 
   
@@ -634,6 +638,7 @@ BIC.pglmmObj = function(object, ...){
 #' 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
+#' @importFrom stats acf
 #' @import ggplot2 
 #' @export 
 plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocorr","histogram","cumsum","all")
