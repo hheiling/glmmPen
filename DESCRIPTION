@@ -3,15 +3,16 @@ Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
 Version: 1.5.1.7
-Date: 2018-10-26
+Date: 2022-01-10
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
     person("Naim", "Rashid", email = "naim@unc.edu", role = c("aut")),
     person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")))
 Maintainer: Hillary Heiling <hheiling@live.unc.edu>
-Description: Fits penalized high and low dimensional generalized linear mixed models using 
-    the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm and coordinate descent. 
-    Supports fitting of logistic regression models and MCP penalties.
+Description: Fits high dimensional penalized generalized linear mixed models using 
+    the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm. 
+    Supports fitting of Binomial, Gaussian, and Poisson data with canonical links, and
+    supports penalization using the MCP, SCAD, or LASSO penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
 Imports: 
