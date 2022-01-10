@@ -67,6 +67,30 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
   return(output);
 }
 
+
+// Calculates fixed effects zetaj using residuals matrix
+arma::vec zeta_fixef_calc(arma::mat X, arma::mat resid, arma::uvec idxj){
+  
+  arma::vec zetaj(idxj.n_elem); zetaj.zeros();
+  int N = resid.n_cols;
+  
+  int i = 0;
+  
+  arma::mat Xj = X.cols(idxj);
+  arma::vec Xji(idxj.n_elem); Xji.zeros();
+  
+  for(i=0;i<N;i++){
+    // Update zetaj sum
+    Xji = trans(Xj.row(i));
+    zetaj = zetaj + Xji * sum(resid.col(i));
+    
+  } // End i for loop
+  
+  return(zetaj);
+}
+
+
+
 // Non-canconical link options
 // arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, double nu, double phi){
 //   
@@ -124,26 +148,6 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
 //   return(output);
 // }
 
-// Calculates fixed effects zetaj using residuals matrix
-arma::vec zeta_fixef_calc(arma::mat X, arma::mat resid, arma::uvec idxj){
-  
-  arma::vec zetaj(idxj.n_elem); zetaj.zeros();
-  int N = resid.n_cols;
-  
-  int i = 0;
-  
-  arma::mat Xj = X.cols(idxj);
-  arma::vec Xji(idxj.n_elem); Xji.zeros();
-  
-  for(i=0;i<N;i++){
-    // Update zetaj sum
-    Xji = trans(Xj.row(i));
-    zetaj = zetaj + Xji * sum(resid.col(i));
-    
-  } // End i for loop
-  
-  return(zetaj);
-}
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
