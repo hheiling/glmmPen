@@ -467,7 +467,8 @@ prt_nobsgrps = function(object){
 #' @describeIn pglmmObj Prints a selection of summary information of fitted model
 #' 
 #' @param x an R object of class \code{pglmmObj}
-#' @export 
+#' @method print pglmmObj
+#' @export
 print.pglmmObj = function(x, digits = c(fef = 4, ref = 4), ...){
   
   object = x
@@ -638,7 +639,7 @@ BIC.pglmmObj = function(object, ...){
 #' 
 #' @importFrom reshape2 melt
 #' @importFrom stringr str_c str_detect str_sub str_remove str_locate
-#' @importFrom stats acf
+#' @importFrom stats acf lag
 #' @import ggplot2 
 #' @export 
 plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocorr","histogram","cumsum","all")
@@ -797,9 +798,11 @@ plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocor
             immediate. = T)
   }
   
+  value = NULL
+  
   U_t = data.frame(U_keep, t = 1:nrow(U_keep))
   colnames(U_t) = c(colnames(U_keep), "t")
-  U_long = melt(U_t, id = "t")
+  U_long = melt(U_t, id = "t", value.name = "value")
   U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
                       grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = var_num))
   
@@ -825,7 +828,7 @@ plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocor
     U_cumsum = apply(U_tdiff, 2, cumsum)
     U_t = data.frame(U_cumsum, t = 1:nrow(U_cumsum))
     colnames(U_t) = c(colnames(U_keep), "t")
-    U_long = melt(U_t, id = "t")
+    U_long = melt(U_t, id = "t", value.name = "value")
     U_plot = data.frame(U_long, var_names = rep(var_names, each = d*nrow(U_keep)),
                         grp_names = rep(rep(grp_names, each = nrow(U_keep)), times = var_num)) 
     plot_cumsum = ggplot(U_plot) + 

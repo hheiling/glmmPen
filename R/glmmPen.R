@@ -298,7 +298,7 @@ fD_adj = function(out){
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @importFrom stats model.offset na.omit
-#' @import BH Rcpp RcppArmadillo RcppEigen
+#' @import bigmemory Rcpp
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL,
@@ -339,6 +339,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   if(!inherits(optim_options, "optimControl")){ 
     stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
   }
+  
+  out = NULL
   
   # Convert formula and data to useful forms
   # Code glFormula_edit() edited version of glFormula() from lme4 package, 
