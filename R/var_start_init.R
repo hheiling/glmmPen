@@ -15,6 +15,7 @@ var_init = function(data, fam_fun){
   
   # Protect against case when variance estimate above is 0 or very small
   var_start = max(0.5, var_start) 
+  message(sprintf("recommended starting variance: %f", var_start))
   
   return(var_start)
 }

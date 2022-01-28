@@ -29,7 +29,8 @@
 glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
                 offset = NULL, 
                 optim_options = optimControl(), adapt_RW_options = adaptControl(),
-                trace = 0, tuning_options = lambdaControl(), ...){
+                trace = 0, tuning_options = lambdaControl(),
+                progress = TRUE, ...){
   
   # Check that (...) arguments are subsets of glmmPen arguments
   args_extra = list(...)
@@ -48,7 +49,7 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
          "  In order to use selectControl for model selection, please use glmmPen function")
   }
   
-  call = match.call(expand.dots = F)
+  call = match.call(expand.dots = FALSE)
   
   # Call glmmPen() (tuning_options = lambdaControl() specifies the fitting of a single model 
   #     and not model selection)
@@ -57,7 +58,7 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
   output = glmmPen(formula = formula, data = data, family = family, covar = covar,
                    offset = offset, optim_options = optim_options,
                    adapt_RW_options = adapt_RW_options, trace = trace,
-                   tuning_options = tuning_options, ...)
+                   tuning_options = tuning_options, progress = progress, ...)
   
   output$call = call
   out_object = pglmmObj$new(output)
@@ -162,7 +163,7 @@ fD_adj = function(out){
   
   d = nlevels(group)
   numvars = nrow(Zt)/d
-  Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = T)
+  Z = Matrix(0, nrow = ncol(Zt), ncol = nrow(Zt), sparse = TRUE)
   # mkReTrms Zt rows: organized first by level of group, then vars 
   # Want Z columns organized first by vars, then levels of group within vars
   for(lev in 1:numvars){
@@ -189,8 +190,12 @@ fD_adj = function(out){
 #' @title Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
 #' Minimization (MCECM)
 #' 
-#' \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-#' Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
+#' @description \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
+#' Conditional Minimization (MCECM). The purpose of the function is to perform 
+#' variable selection on both the fixed and random effects simultaneously for the
+#' generalized linear mixed model. \code{glmmPen} selects the best model using 
+#' BIC-type selection criteria (see \code{\link{selectControl}} documentation for 
+#' further details)
 #' 
 #' @param formula a two-sided linear formula object describing both the fixed effects and 
 #' random effects part of the model, with the response on the left of a ~ operator and the terms, 
@@ -247,7 +252,9 @@ fD_adj = function(out){
 #' @param BICq_posterior an optional character string expressing the path and file basename of a file combination that 
 #' will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 #' These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-#' are requested. If this argument is
+#' are requested (BIC-ICQ reference: Ibrahim et al (2011)
+#' <doi:https://doi.org/10.1111/j.1541-0420.2010.01463.x>). 
+#' If this argument is
 #' specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
 #' will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
 #' in the working directory.
@@ -255,6 +262,17 @@ fD_adj = function(out){
 #' and the file-backed big matrix. 
 #' @param trace an integer specifying print output to include as function runs. Default value is 0. 
 #' See Details for more information about output provided when trace = 0, 1, or 2.
+#' @param progress a logical value indicating if additional output should be given showing the
+#' progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+#' for the fit procedure (iteration number EM_iter,
+#' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+#' from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+#' and number of non-zero fixed and random effects
+#' including the intercept). Additionally, \code{progress = TRUE}
+#' gives some other information regarding the progress of the variable selection 
+#' procedure, including the model selection criteria and log-likelihood estimates
+#' for each model fit.
+#' Default is \code{TRUE}.
 #' 
 #' @details Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
 #' (\code{tuning_options}) is specified 
@@ -281,12 +299,12 @@ fD_adj = function(out){
 #' is specified as \code{NULL}, the full model will be fit and the full model posterior
 #' draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
 #'  
-#' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
-#' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-#' from t iterations back EM_conv, and number of non-zero fixed and random effects). The value of 1
+#' Trace details: The value of 0 (default) does not output any extra information. The value of 1
 #' additionally outputs the updated coefficients, updated covariance matrix values, and the
 #' number of coordinate descent iterations used for the M step for each
-#' EM iteration. If Stan is not used as the E-step sampling mechanism, 
+#' EM iteration. When pre-screening procedure is used and/or if the BIC-ICQ criterion is
+#' requested, trace = 1 gives additional information about the penalties used
+#' for the 'full model' fit procedure. If Stan is not used as the E-step sampling mechanism, 
 #' the value of 2 outputs all of the above plus gibbs acceptance rate information
 #' for the adaptive random walk and independence samplers and the updated proposal standard deviation
 #' for the adaptive random walk. 
@@ -298,14 +316,15 @@ fD_adj = function(out){
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @importFrom stats model.offset na.omit
-#' @import BH Rcpp RcppArmadillo RcppEigen
+#' @import bigmemory Rcpp
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL,
                    fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
-                   trace = 0, tuning_options = selectControl(), BICq_posterior = NULL){
+                   trace = 0, tuning_options = selectControl(), BICq_posterior = NULL,
+                   progress = TRUE){
   
   ###########################################################################################
   # Input argument checks and modifications
@@ -339,6 +358,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   if(!inherits(optim_options, "optimControl")){ 
     stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
   }
+  
+  out = NULL
   
   # Convert formula and data to useful forms
   # Code glFormula_edit() edited version of glFormula() from lme4 package, 
@@ -403,17 +424,17 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   # If covar specified as NULL, recommend a covariance structure based on the size of the 
   # random effects.
   if(is.null(covar) & (ncol(data_input$Z)/nlevels(data_input$group) >= 11)){
-    cat("Setting random effect covariance structure to 'independent' \n")
+    message("Setting random effect covariance structure to 'independent'")
     covar = "independent"
   }else if(is.null(covar) & (ncol(data_input$Z)/nlevels(data_input$group) < 11)){
-    cat("Setting random effect covariance structure to 'unstructured' \n")
+    message("Setting random effect covariance structure to 'unstructured'")
     covar = "unstructured"
   }
   
   if((covar == "unstructured") & (ncol(data_input$Z)/nlevels(data_input$group) >= 11)){
     warning("The random effect covariance matrix is currently specified as 'unstructured'. 
             Due to dimension of sigma covariance matrix, we suggest using covar = 'independent' to simplify computation",
-            immediate. = T)
+            immediate. = TRUE)
   }
   
   ###########################################################################################
@@ -442,7 +463,6 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     # Recommend starting variance  for random effects covariance matrix (if necessary)
     if(optim_options$var_start == "recommend"){
       var_start = var_init(data_input, fam_fun)
-      cat("recommended starting variance: ", var_start, "\n")
       optim_options$var_start = var_start
     }
     
@@ -470,8 +490,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                     nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                     t = t, mcc = mcc, maxitEM = maxitEM, maxit_CD = maxit_CD,
                     M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, var_start = var_start, logLik_calc = F,
-                    checks_complete = T)
+                    covar = covar, var_start = var_start, logLik_calc = FALSE,
+                    checks_complete = TRUE, progress = progress)
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     
@@ -577,7 +597,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       lam_min = min(lambda0_seq)
       
       # Fit first stage of abbreviated grid search
-      cat("Start of stage 1 of abbreviated grid search \n")
+      if(progress == TRUE) cat("Start of stage 1 of abbreviated grid search \n")
       fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
                                 lambda0_seq = lam_min, lambda1_seq = lambda1_seq,
                                 penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -586,9 +606,10 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                                 optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                                 BICq_calc = (BIC_option == "BICq"),
                                 BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                                checks_complete = T, pre_screen = pre_screen, 
-                                lambda.min.full = lambda.min.full, stage1 = T)
-      cat("End of stage 1 of abbreviated grid search \n")
+                                checks_complete = TRUE, pre_screen = pre_screen, 
+                                lambda.min.full = lambda.min.full, stage1 = TRUE,
+                                progress = progress)
+      if(progress == TRUE) cat("End of stage 1 of abbreviated grid search \n")
       
       # Extract stage 1 results needed for stage 2
       
@@ -615,7 +636,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       }
       
       # Fit second stage of 'abbreviated' model fit
-      cat("Start of stage 2 of abbreviated grid search \n")
+      if(progress == TRUE) cat("Start of stage 2 of abbreviated grid search \n")
       fit_select = select_tune(dat = data_input, offset = offset, family = family,
                                lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
                                penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -625,10 +646,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                                optim_options = optim_options, covar = covar, 
                                logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
                                BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
-                               checks_complete = T, pre_screen = F,
+                               checks_complete = TRUE, pre_screen = FALSE,
                                ranef_keep = as.numeric((vars > 0)), 
-                               lambda.min.full = lambda.min.full, stage1 = F)
-      cat("End of stage 2 of abbreviated grid search \n")
+                               lambda.min.full = lambda.min.full, stage1 = FALSE,
+                               progress = progress)
+      if(progress == TRUE) cat("End of stage 2 of abbreviated grid search \n")
       
       resultsA = rbind(fit_fixfull$results, fit_select$results)
       coef_results = rbind(fit_fixfull$coef, fit_select$coef)
@@ -647,8 +669,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                                optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                                BICq_calc = (tuning_options$BIC_option == "BICq"),
                                BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                               checks_complete = T, pre_screen = pre_screen, 
-                               lambda.min.full = lambda.min.full, stage1 = F)
+                               checks_complete = TRUE, pre_screen = pre_screen, 
+                               lambda.min.full = lambda.min.full, stage1 = FALSE,
+                               progress = progress)
       
       resultsA = fit_select$results
       coef_results = fit_select$coef
@@ -708,10 +731,27 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   
   # Perform a final E-step
   ## Use results to calculate logLik and posterior draws, and save draws for MCMC diagnostics
-  Estep_out = E_step_final(dat = data_input, offset_fit = offset, fit = fit, optim_options = optim_options, 
-                           fam_fun = fam_fun, extra_calc = T, 
-                           adapt_RW_options = adapt_RW_options, trace = trace)
-  
+  Estep_final_complete = FALSE
+  # if problematic model fit, do not perform final calculations for 
+  #   logLik and posterior draws and give NA values for appropriate output
+  if(!is.null(fit$warnings)){
+    if(str_detect(fit$warnings, "coefficient values diverged") | str_detect(fit$warnings, "coefficient estimates contained NA values")){
+     
+      Estep_out = list(u0 = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)), 
+                       post_modes = rep(NA, times = ncol(data_input$Z)), 
+                       post_out = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)), 
+                       u_init = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)),
+                       ll = NA, BICh = NA, BIC = NA, BICNgrp = NA)
+      Estep_final_complete = TRUE
+    }
+  }
+  # if model fit completed without serious issues, perform final computations
+  if(Estep_final_complete == FALSE){
+    Estep_out = E_step_final(dat = data_input, offset_fit = offset, fit = fit, optim_options = optim_options, 
+                             fam_fun = fam_fun, extra_calc = TRUE, 
+                             adapt_RW_options = adapt_RW_options, trace = trace, 
+                             progress = progress)
+  }
   
   
   # save optim_results:
@@ -778,7 +818,7 @@ XZ_std = function(fD_out){
   
   # Standardize X - ncvreg::std method
   X = fD_out$X
-  X_noInt_std = std(X[,-1, drop = F])
+  X_noInt_std = std(X[,-1, drop = FALSE])
   X_std = cbind(1, X_noInt_std)
   X_center = attr(X_noInt_std, "center")
   X_scale = attr(X_noInt_std, "scale")

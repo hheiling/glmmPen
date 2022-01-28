@@ -37,11 +37,14 @@
 #' @param nlambda positive integer specifying number of penalty parameters (lambda) 
 #' to use for the fixed and random effects penalty parameters. Default set to 10.
 #' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
-#' @param BIC_option character string specifing the selection criteria used to select the 'best' model.
-#' Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+#' @param BIC_option character string specifying the selection criteria used to select the 'best' model.
+#' Default "BICq" option specifies the BIC-ICQ criterion (Ibrahim et al (2011)
+#' <doi:10.1111/j.1541-0420.2010.01463.x>),
+#' which requires a fit of 
 #' a full model; a small penalty (the minimum of the penalty sequence) 
 #' is used for the fixed and random effects. 
-#' The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+#' The "BICh" option utilizes the hybrid BIC value described in 
+#' Delattre, Lavielle, and Poursat (2014) <doi:10.1214/14-EJS890>.
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 #' observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 #' groups).
@@ -91,8 +94,8 @@ lambdaControl = function(lambda0 = 0, lambda1 = 0){
 selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
                          search = c("abbrev","full_grid"),
                          BIC_option = c("BICq","BICh","BIC","BICNgrp"), 
-                         logLik_calc = switch(BIC_option[1], BICq = F, T), 
-                         lambda.min = NULL, pre_screen = T, lambda.min.presc = NULL){
+                         logLik_calc = switch(BIC_option[1], BICq = FALSE, TRUE), 
+                         lambda.min = NULL, pre_screen = TRUE, lambda.min.presc = NULL){
   
   # Perform input checks
   
@@ -147,7 +150,7 @@ selectControl = function(lambda0_seq = NULL, lambda1_seq = NULL, nlambda = 10,
     stop("'logLik_calc' must be a logical value (T or F)")
   }
   
-  if((BIC_option %in% c("BICh","BIC","BICNgrp")) & (logLik_calc == F)){
+  if((BIC_option %in% c("BICh","BIC","BICNgrp")) & (logLik_calc == FALSE)){
     stop("When 'BIC_option' is BICh, BIC, or BICNgroup, 'logLik_calc' must be TRUE")
   }
   
@@ -313,7 +316,7 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
   }
   if(!is.null(nMC_burnin)){
     if(nMC_burnin < 100){
-      warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = T)
+      warning("nMC_burnin not allowed to be less than 100. Value set to 100", immediate. = TRUE)
       nMC_burnin = 100
     }
   }
@@ -361,7 +364,7 @@ optim_recommend = function(optim_options, family, q, select){
     ## larger nMC_max not needed for convergence
     ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
     # Otherwise, keep everything else the same
-    if (select == T) {
+    if (select == TRUE) {
       if(is.null(optim_options$nMC_max)){
         optim_options$nMC_max = 2500
       }

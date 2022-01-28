@@ -9,7 +9,7 @@ plot_mcmc(
   plots = "sample.path",
   grps = "all",
   vars = "all",
-  numeric_grp_order = F,
+  numeric_grp_order = FALSE,
   bin_width = NULL
 )
 }

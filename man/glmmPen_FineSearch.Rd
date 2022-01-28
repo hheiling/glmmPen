@@ -16,7 +16,8 @@ glmmPen_FineSearch(
   optim_options = NULL,
   adapt_RW_options = NULL,
   trace = 0,
-  BICq_posterior = NULL
+  BICq_posterior = NULL,
+  progress = TRUE
 )
 }
 \arguments{
@@ -47,12 +48,25 @@ If set to the default \code{NULL}, will use the adaptive random walk paraters us
 previous round of selection stored within the \code{pglmmObj} object.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
-See Details for more information about output provided when trace = 0, 1, or 2.}
+See Details of \code{\link{glmmPen}} for more information about output 
+provided when trace = 0, 1, or 2.}
 
 \item{BICq_posterior}{an optional character string specifying the file-backed \code{big.matrix} 
 containing the posterior draws used to calculate the BIC-ICQ selection criterion if such a 
 \code{big.matrix} was created in the previous round of selection. See \code{\link{glmmPen}} 
 documentation for further details.}
+
+\item{progress}{a logical value indicating if additional output should be given showing the
+progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+for the fit procedure (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+and number of non-zero fixed and random effects
+including the intercept). Additionally, \code{progress = TRUE}
+gives some other information regarding the progress of the variable selection 
+procedure, including the model selection criteria and log-likelihood estimates
+for each model fit.
+Default is \code{TRUE}.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 
@@ -89,13 +103,4 @@ effects. For instance, suppose we consider a hypothetical lambda sequence of
 and the best model was given by the (0.4,0.5) combination. If the \code{idx_lambda} = 2, then
 the fine search would use the fixed effects sequence would have (min,max) = (0.2,0.6) and
 the fixed effects sequence would have (min,max) = (0.3,0.7).
-
-Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
-number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-from t iterations back EM_diff, and number of non-zero coefficients Non0 Coef). The value of 1
-additionally outputs the updated coefficients, updated covariance matrix values, and the
-number of coordinate descent iterations used for the M step for each
-EM iteration. The value of 2 outputs all of the above plus gibbs acceptance rate information
-for the adaptive random walk and independence samplers and the updated proposal standard deviation
-for the adaptive random walk.
 }

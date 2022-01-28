@@ -27,14 +27,15 @@ select_tune(
   adapt_RW_options = adaptControl(),
   optim_options = optimControl(),
   BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
-  BICq_calc = T,
-  logLik_calc = switch(BIC_option[1], BICq = F, T),
+  BICq_calc = TRUE,
+  logLik_calc = switch(BIC_option[1], BICq = FALSE, TRUE),
   BICq_posterior = NULL,
-  checks_complete = F,
-  pre_screen = T,
+  checks_complete = FALSE,
+  pre_screen = TRUE,
   ranef_keep = NULL,
   lambda.min.full,
-  stage1 = F
+  stage1 = FALSE,
+  progress = TRUE
 )
 }
 \arguments{
@@ -104,16 +105,19 @@ Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" 
 from function \code{\link{optimControl}} that specifies optimization parameters. See the 
 documentation for \code{\link{optimControl}} for more details on defaults.}
 
-\item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
-Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+\item{BIC_option}{character string specifying the selection criteria used to select the 'best' model.
+Default "BICq" option specifies the BIC-ICQ criterion (Ibrahim et al (2011)
+<doi:10.1111/j.1541-0420.2010.01463.x>),
+which requires a fit of 
 a full model; a small penalty (the minimum of the penalty sequence) 
 is used for the fixed and random effects. 
-The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+The "BICh" option utilizes the hybrid BIC value described in 
+Delattre, Lavielle, and Poursat (2014) <doi:10.1214/14-EJS890>.
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 groups).}
 
-\item{BICq_calc}{boolean value indicating if the BIC-ICQ criterion should be used to select the
+\item{BICq_calc}{logical value indicating if the BIC-ICQ criterion should be used to select the
 best model.}
 
 \item{logLik_calc}{logical value specifying if the log likelihood (and log-likelihood based 
@@ -126,14 +130,16 @@ in comparing the best models from BIC-ICQ and other BIC-type selection criteria,
 \item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
 will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-are requested. If this argument is
+are requested (BIC-ICQ reference: Ibrahim et al (2011)
+<doi:https://doi.org/10.1111/j.1541-0420.2010.01463.x>). 
+If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
 will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
 in the working directory.
 See 'Details' section for additional details about the required format of \code{BICq_posterior}
 and the file-backed big matrix.}
 
-\item{checks_complete}{boolean value indicating if several data checks have been completed.}
+\item{checks_complete}{logical value indicating if several data checks have been completed.}
 
 \item{pre_screen}{logical value indicating whether pre-screening should be performed before
 model selection (default \code{TRUE}). If the number of random effects considered less than 5,
@@ -149,10 +155,22 @@ be considered as non-zero at the start of the algorithm. For each random effect,
 values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
 (if applicable)}
 
-\item{stage1}{boolean value indicating if the first stage of the abbreviated two-stage grid
+\item{stage1}{logical value indicating if the first stage of the abbreviated two-stage grid
 search in the model selection procedure is being performed. \code{FALSE} if either 
 performing the second stage of the abbreviated two-stage grid search or if performing the
 full grid search over all possible penalty parameter combinations.}
+
+\item{progress}{a logical value indicating if additional output should be given showing the
+progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+for the fit procedure (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+and number of non-zero fixed and random effects
+including the intercept). Additionally, \code{progress = TRUE}
+gives some other information regarding the progress of the variable selection 
+procedure, including the model selection criteria and log-likelihood estimates
+for each model fit.
+Default is \code{TRUE}.}
 }
 \value{
 A list with the following elements:

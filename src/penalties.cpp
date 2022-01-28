@@ -5,6 +5,7 @@
 using namespace Rcpp;
 
 // zeta, nu, gamma, and lambda defined in coord_desc and grp_CD functions
+// contained in files "coord_descent.cpp" and "grp_CD_XZ_fast.cpp"
 
 // Soft-thresholding function (used in Lasso, MCP, and SCAD penalties)
 // [[Rcpp::export]]

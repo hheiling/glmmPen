@@ -34,7 +34,7 @@
 #' be considered as non-zero at the start of the algorithm. For each random effect,
 #' 1 indicates the random effect should be considered non-zero at start of algorithm,
 #' 0 indicates otherwise. The first element for the random intercept should always be 1.
-#' @param checks_complete boolean value indicating whether the function has been called within
+#' @param checks_complete logical value indicating whether the function has been called within
 #' \code{glmm} or \code{glmmPen} or whether the function has been called by itself. 
 #' Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,
 #' performs additional checks on the input data. If false, assumes data input checks have 
@@ -86,9 +86,9 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
                      ufull_describe = NULL, maxitEM = 50, maxit_CD = 250,
                      M = 10^4, sampler = c("stan","random_walk","independence"),
                      adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 1.0, logLik_calc = F, checks_complete = F,
+                     var_start = 1.0, logLik_calc = FALSE, checks_complete = FALSE,
                      ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group))),
-                     conv_type = 1){
+                     conv_type = 1, progress = TRUE){
   
   ############################################################################################
   # Data input checks
@@ -210,7 +210,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   
   if(!is.null(coef_old)){
     
-    cat("using coef from past model to intialize \n")
+    if(progress == TRUE) cat("using coef from past model to intialize \n")
     gamma = matrix(J%*%matrix(coef_old[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     
@@ -401,7 +401,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   ranef_idx = which(diag(cov) != 0)
   
   if(!is.null(u_init)){
-    cat("using results from previous model to initialize posterior samples \n")
+    if(progress == TRUE) cat("using results from previous model to initialize posterior samples \n")
     if(is.matrix(u_init)){
       uold = as.numeric(u_init[nrow(u_init),])
     }else{
@@ -510,16 +510,17 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     
     if(any(is.na(coef)) | any(abs(coef) > 10^5)){ # !is.finite(ll0) | 
       # For now, assume divergent in any abs(coefficient) > 10^5
-      problem = T
-      cat("Updated coef: \n")
-      cat(coef, "\n")
+      problem = TRUE
+      if(trace >= 1){
+        cat("Updated coef: \n")
+        cat(coef, "\n")
+      }
     }
     
     # Check for errors in M step
     ## If errors, output warnings and enough relevant output to let select_tune() 
     ## (or glmm()) continue 
-    if(problem == T){
-      warning("Error in M step, see optinfo$warnings in output for details", immediate. = T)
+    if(problem == TRUE){
       out = list(coef = coef, sigma = cov, Gamma_mat = gamma,
                  lambda0 = lambda0, lambda1 = lambda1, 
                  covgroup = covgroup, J = J, ll = -Inf, 
@@ -528,12 +529,14 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
                  u_init = NULL)
       # !is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)
       if(any(is.na(coef))){
+        warning(sprintf("coefficient estimates contained NA values at iteration %i",i), immediate. = T)
         out$warnings = sprintf("coefficient estimates contained NA values at iteration %i",i)
       }else if(any(abs(coef) > 10^5)){
         if(family == "gaussian"){
           warning("Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl", immediate. = T)
           out$warnings = "Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl"
         }else{
+          warning("Error in M step: coefficient values diverged", immediate. = T)
           out$warnings = "Error in M step: coefficient values diverged"
         }
       }
@@ -581,9 +584,11 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     coef_record = rbind(coef_record[-1,], t(coef))
     
     # now update EM iteration information  
-    update_limits = c(i, nMC , round(diff[i],6), (sum(coef[1:ncol(X)] !=0)), (sum(diag(cov) != 0))) # (sum(coef[-c(1:ncol(X))] != 0))
-    names(update_limits) = c("Iter","nMC","EM conv","Non0 Fixef", "Non0 Ranef")
-    print(update_limits)
+    if(progress == TRUE){
+      update_limits = c(i, nMC , round(diff[i],6), (sum(coef[1:ncol(X)] !=0)), (sum(diag(cov) != 0))) # (sum(coef[-c(1:ncol(X))] != 0))
+      names(update_limits) = c("Iter","nMC","EM conv","Non0 Fixef", "Non0 Ranef")
+      print(update_limits)
+    }
     
     if(sum(diff[max(i-mcc+1,1):i] < conv_EM) >= mcc){
       EM_converged = 1
@@ -644,7 +649,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   ############################################################################################
   
   if(EM_converged == 0){
-    warning("glmmPen algorithm did not converge within maxitEM iterations, conv = ", round(diff[i],6), 
+    warning("glmmPen algorithm did not converge within maxitEM iterations of ", i, ", conv = ", round(diff[i],6), 
             "\n Consider increasing maxitEM iterations or nMC_max in optimControl()", immediate. = T)
   }
   
@@ -681,7 +686,8 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   # importance sampling weights (see "logLik_Pajor.R")
   if(logLik_calc){
     ll = CAME_IS(posterior = u0, y = y, X = X, Z = Z, group = group,
-                 coef = coef, sigma = cov, family = fam_fun, M = M, gaus_sig = sig_g, trace = trace)
+                 coef = coef, sigma = cov, family = fam_fun, M = M, 
+                 gaus_sig = sig_g, trace = trace, progress = progress)
     
     # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
     # d = nlevels(group) = number independent subjects/groups

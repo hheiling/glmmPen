@@ -16,7 +16,7 @@
 
 #' @importFrom bigmemory big.matrix attach.big.matrix
 E_step_final= function(dat, offset_fit, fit, optim_options, 
-                       fam_fun, extra_calc, adapt_RW_options, trace){
+                       fam_fun, extra_calc, adapt_RW_options, trace, progress){
   
   # Extract terms from dat list object
   y = dat$y
@@ -56,7 +56,7 @@ E_step_final= function(dat, offset_fit, fit, optim_options,
     Znew2[group == k,seq(k, ncol(Z), by = d)] = Z[group == k,seq(k, ncol(Z), by = d)]%*%Gamma_mat
   }
   
-  cat("Start of sampling from posterior \n")
+  if(progress == TRUE) cat("Start of sampling from posterior \n")
   Estep_out = E_step(coef = coef, ranef_idx = which(diag(sigma > 0)), y = y,
                      X = X, Znew2 = Znew2, group = group, offset_fit = offset_fit,
                      nMC = M, nMC_burnin = nMC_burnin,
@@ -65,7 +65,7 @@ E_step_final= function(dat, offset_fit, fit, optim_options,
                      proposal_SD = fit$proposal_SD, batch = fit$updated_batch, 
                      batch_length = adapt_RW_options$batch_length, 
                      offset_increment = adapt_RW_options$offset, trace = trace)
-  cat("Finished sampling from posterior \n")
+  if(progress == TRUE) cat("Finished sampling from posterior \n")
   
   if(extra_calc){
     
@@ -91,7 +91,7 @@ E_step_final= function(dat, offset_fit, fit, optim_options,
     # Calculate logLik
     ll = CAME_IS(posterior = u0, y = y, X = X, Z = Z, group = group, 
                  coef = coef, sigma = sigma, family = fam_fun, 
-                 M = M, gaus_sig = sig_g, trace = trace)
+                 M = M, gaus_sig = sig_g, trace = trace, progress = progress)
     
     # Hybrid BIC (Delattre, Lavielle, and Poursat (2014))
     # d = nlevels(group) = number independent subjects/groups
