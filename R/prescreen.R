@@ -7,7 +7,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
                      penalty, alpha, gamma_penalty, 
                      lambda0_min, lambda1_min, group_X,
                      sampler, adapt_RW_options, covar,
-                     var_start, checks_complete){
+                     var_start, checks_complete, progress){
   
   
   # fixed effects penalty
@@ -15,7 +15,7 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   # random effect penalty 
   lam1 = lambda1_min
   
-  cat(sprintf("Pre-screening penalty parameters: fixed effects %f, random effects %f", lam0, lam1), "\n")
+  if((trace >= 1)) cat(sprintf("Pre-screening penalty parameters: fixed effects %f, random effects %f", lam0, lam1), "\n")
   
   # Determine nMC ranges
   q = ncol(dat$Z) / nlevels(dat$group)
@@ -40,8 +40,8 @@ prescreen = function(dat, family, offset_fit, trace = 0,
                       coef_old = NULL, u_init = NULL, ufull_describe = NULL,
                       maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                       sampler = sampler, adapt_RW_options = adapt_RW_options,
-                      covar = covar, var_start = var_start, logLik_calc = F,
-                      checks_complete = checks_complete))
+                      covar = covar, var_start = var_start, logLik_calc = FALSE,
+                      checks_complete = checks_complete, progress = progress))
   
   if(is.character(out)){
     stop("Issue with pre-screening step in model selection procedure")

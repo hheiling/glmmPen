@@ -13,9 +13,9 @@ selectControl(
   nlambda = 10,
   search = c("abbrev", "full_grid"),
   BIC_option = c("BICq", "BICh", "BIC", "BICNgrp"),
-  logLik_calc = switch(BIC_option[1], BICq = F, T),
+  logLik_calc = switch(BIC_option[1], BICq = FALSE, TRUE),
   lambda.min = NULL,
-  pre_screen = T,
+  pre_screen = TRUE,
   lambda.min.presc = NULL
 )
 }
@@ -39,11 +39,14 @@ the penalty parameter space should be the full grid search (total number of mode
 The abbreviated grid search is described in more detail in the Details section. Te authors
 highly recommend the abbreviated grid search.}
 
-\item{BIC_option}{character string specifing the selection criteria used to select the 'best' model.
-Default "BICq" option specifies the BIC-ICQ criterion, which requires a fit of 
+\item{BIC_option}{character string specifying the selection criteria used to select the 'best' model.
+Default "BICq" option specifies the BIC-ICQ criterion (Ibrahim et al (2011)
+<doi:10.1111/j.1541-0420.2010.01463.x>),
+which requires a fit of 
 a full model; a small penalty (the minimum of the penalty sequence) 
 is used for the fixed and random effects. 
-The "BICh" option utilizes the hybrid BIC value described in Delattre, Lavielle, and Poursat (2014).
+The "BICh" option utilizes the hybrid BIC value described in 
+Delattre, Lavielle, and Poursat (2014) <doi:10.1214/14-EJS890>.
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
 observations). The "BICNgrp" option penalty term uses (total non-zero coefficients)*(nlevels(group) = number
 groups).}

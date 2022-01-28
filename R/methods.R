@@ -56,7 +56,7 @@ coef.pglmmObj = function(object, ...){
   # Find combined coefficients
   ## Borrowed code elements from coef.merMod in lme4
   
-  fixef = data.frame(rbind(object$fixef), check.names = F)
+  fixef = data.frame(rbind(object$fixef), check.names = FALSE)
   ranef = object$ranef
   group = object$data$group
   
@@ -122,14 +122,14 @@ reOnly <- function(f, response=FALSE) {
 
 #' @describeIn pglmmObj Formula used for the model fit. Can return the full
 #' formula, or just the formula elements relating to the fixed effects
-#' (fixed.only = T) or random effects (random.only = T)
+#' (fixed.only = TRUE) or random effects (random.only = TRUE)
 #'
 #' @param random.only logical value used in \code{formula}; \code{TRUE} indicates that 
 #' only the formula elements relating to the random effects should be returned
 #' 
 #' @importFrom stats formula
 #' @export
-formula.pglmmObj = function(x, fixed.only = F, random.only = F, ...){
+formula.pglmmObj = function(x, fixed.only = FALSE, random.only = FALSE, ...){
   
   object = x
   
@@ -141,7 +141,7 @@ formula.pglmmObj = function(x, fixed.only = F, random.only = F, ...){
   if(fixed.only){
     formula = nobars(form)
   }else if(random.only){
-    formula = reOnly(form, response = T)
+    formula = reOnly(form, response = TRUE)
   }else{
     formula = form
   }
@@ -156,7 +156,7 @@ formula.pglmmObj = function(x, fixed.only = F, random.only = F, ...){
 #' 
 #' @importFrom stats model.frame terms.formula
 #' @export
-model.frame.pglmmObj = function(formula, fixed.only = F, ...){
+model.frame.pglmmObj = function(formula, fixed.only = FALSE, ...){
   
   object = formula
   rm(formula)
@@ -164,7 +164,7 @@ model.frame.pglmmObj = function(formula, fixed.only = F, ...){
   frame = object$data$frame
   # Borrowed some code from lme4
   if(fixed.only){
-    form = formula(object, fixed.only = T)
+    form = formula(object, fixed.only = TRUE)
     vars.fixed = rownames(attr(terms.formula(form), "factors"))
     frame = frame[vars.fixed]
   }
@@ -182,7 +182,7 @@ model.matrix.pglmmObj = function(object, type = c("fixed", "random"), ...) {
   
   switch(type[1],
          "fixed" = object$data$X,
-         "random" = Matrix(object$data$Z_std, sparse = T))
+         "random" = Matrix(object$data$Z_std, sparse = TRUE))
 }
 
 etaCalc = function(X, Z, beta, U){
@@ -222,7 +222,7 @@ invLink = function(family, eta){
 #' 
 #' @importFrom stats fitted
 #' @export
-fitted.pglmmObj = function(object, fixed.only = T, ...){
+fitted.pglmmObj = function(object, fixed.only = TRUE, ...){
   
   offset = object$data$offset
   
@@ -264,8 +264,8 @@ fitted.pglmmObj = function(object, fixed.only = T, ...){
 #' @importFrom lme4 nobars
 #' @export
 predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
-                            fixed.only = T, ...){
-  ## Other arguments used by lme4: re.form, random.only = F, allow.new.levels = F, newparams = NULL
+                            fixed.only = TRUE, ...){
+  ## Other arguments used by lme4: re.form, random.only = FALSE, allow.new.levels = FALSE, newparams = NULL
   
   if((!is.null(newdata)) & (!inherits(newdata, "data.frame"))){ # class(newdata) != "data.frame"
     stop("newdata must be a dataframe")
@@ -273,12 +273,12 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
   
   if(is.null(newdata)){
     # Calculate prediction result for original data
-    if(!fixed.only){ # fixed.only = F
+    if(!fixed.only){ # fixed.only = FALSE
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
                     link = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, 
                                    U = object$posterior_samples),
                     response = fitted(object, fixed.only = fixed.only))
-    }else{ # fixed.only = T
+    }else{ # fixed.only = TRUE
       eta = object$data$X %*% object$fixef
       pred = switch(type[1],
                     link = eta,
@@ -413,22 +413,22 @@ residuals.pglmmObj = function(object, type = c("deviance","pearson","response","
 
 prt_family = function(object){
   f = object$family
-  cat(" Family:", f$family, paste(" (", f$link, ")"), fill = T)
+  cat(" Family:", f$family, paste(" (", f$link, ")"), fill = TRUE)
 }
 
 prt_call <- function(object) {
   # Copied some code from lme4 source code
   call = object$call
   if (!is.null(cc <- call$formula))
-    cat("Formula:", deparse(cc), fill = T)
+    cat("Formula:", deparse(cc), fill = TRUE)
   if (!is.null(cc <- call$data))
-    cat("   Data:", deparse(cc), fill = T)
+    cat("   Data:", deparse(cc), fill = TRUE)
   if (!is.null(cc <- call$weights))
-    cat("Weights:", deparse(cc), fill = T)
+    cat("Weights:", deparse(cc), fill = TRUE)
   if (!is.null(cc <- call$offset))
-    cat(" Offset:", deparse(cc), fill = T)
+    cat(" Offset:", deparse(cc), fill = TRUE)
   # if (!is.null(cc <- call$subset))
-  #   cat(" Subset:", deparse(cc), fill = T)
+  #   cat(" Subset:", deparse(cc), fill = TRUE)
 }
 
 prt_fixef = function(object, digits){
@@ -456,7 +456,7 @@ prt_ranef = function(object, digits = 4){
   colnames(output) = cnms
   rownames(output) = rep("", nrow(output))
   
-  print(output, quote = F)
+  print(output, quote = FALSE)
 }
 
 prt_nobsgrps = function(object){
@@ -474,7 +474,7 @@ print.pglmmObj = function(x, digits = c(fef = 4, ref = 4), ...){
   object = x
   # Title
   cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",  
-      "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = T, sep = "")
+      "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = TRUE, sep = "")
   # Family
   prt_family(object)
   # Call information: formula, data, weights, offset, (subset?)
@@ -507,7 +507,7 @@ summary_ranef = function(object, digits = 4){
   colnames(output) = cnms
   rownames(output) = rep("", nrow(output))
   
-  print(output, quote = F)
+  print(output, quote = FALSE)
 }
 
 #' @importFrom stringr str_to_title
@@ -535,7 +535,7 @@ summary.pglmmObj = function(object, digits = c(fef = 4, ref = 4),
   
   # Title
   cat("Penalized generalized linear mixed model fit by Monte Carlo Expectation Conditional Minimization (MCECM)",
-      "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = T, sep = "")
+      "  algorithm", " (", object$sampling, ") ", " ['", class(object), "'] ", fill = TRUE, sep = "")
   # Family
   prt_family(object)
   # Call information: formula, data, weights, offset, (subset?)
@@ -596,7 +596,7 @@ BIC.pglmmObj = function(object, ...){
   
   results_optim = object$results_optim
   BIC_elem = which(str_detect(colnames(results_optim), "BIC"))
-  BIC_names = colnames(results_optim[,BIC_elem, drop = F])
+  BIC_names = colnames(results_optim[,BIC_elem, drop = FALSE])
   BIC_out = results_optim[,BIC_elem]
   names(BIC_out) = BIC_names
   
@@ -644,7 +644,7 @@ BIC.pglmmObj = function(object, ...){
 #' @export 
 plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocorr","histogram","cumsum","all")
                      grps = "all", vars = "all", 
-                     numeric_grp_order = F, bin_width = NULL){ 
+                     numeric_grp_order = FALSE, bin_width = NULL){ 
   
   ##############################################################################################
   # Checks
@@ -795,7 +795,7 @@ plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocor
   num_plots = d*var_num
   if(num_plots > 100){
     warning("Number plots specified will be > 100. Consider limiting the groups or variables \n",
-            immediate. = T)
+            immediate. = TRUE)
   }
   
   value = NULL
@@ -878,7 +878,7 @@ plot_mcmc = function(object, plots = "sample.path", # , c("sample.path","autocor
 #' @import ggplot2 
 #' @method plot pglmmObj
 #' @export
-plot.pglmmObj = function(x, fixed.only = F, type = NULL,
+plot.pglmmObj = function(x, fixed.only = FALSE, type = NULL,
                          ...){
   
   object = x

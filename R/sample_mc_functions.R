@@ -127,7 +127,7 @@ sample_mc2_BigMat = function(coef, ranef_idx, y, X, Z, offset_fit, nMC, family, 
   fitted_mat = as.matrix(X %*% matrix(coef, ncol=1) + matrix(offset_fit, ncol=1))
   #generate samples for each i
   
-  error_out = F
+  error_out = FALSE
   q = ncol(Z) / d
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = q)
   

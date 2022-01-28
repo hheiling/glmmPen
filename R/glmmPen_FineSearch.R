@@ -29,11 +29,23 @@
 #' If set to the default \code{NULL}, will use the adaptive random walk paraters used for the 
 #' previous round of selection stored within the \code{pglmmObj} object.
 #' @param trace an integer specifying print output to include as function runs. Default value is 0. 
-#' See Details for more information about output provided when trace = 0, 1, or 2.
+#' See Details of \code{\link{glmmPen}} for more information about output 
+#' provided when trace = 0, 1, or 2.
 #' @param BICq_posterior an optional character string specifying the file-backed \code{big.matrix} 
 #' containing the posterior draws used to calculate the BIC-ICQ selection criterion if such a 
 #' \code{big.matrix} was created in the previous round of selection. See \code{\link{glmmPen}} 
 #' documentation for further details.
+#' @param progress a logical value indicating if additional output should be given showing the
+#' progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+#' for the fit procedure (iteration number EM_iter,
+#' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+#' from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+#' and number of non-zero fixed and random effects
+#' including the intercept). Additionally, \code{progress = TRUE}
+#' gives some other information regarding the progress of the variable selection 
+#' procedure, including the model selection criteria and log-likelihood estimates
+#' for each model fit.
+#' Default is \code{TRUE}.
 #'   
 #' @details 
 #' The \code{glmmPen_FineSearch} function extracts the data, the penalty information (penalty type,
@@ -59,15 +71,6 @@
 #' the fine search would use the fixed effects sequence would have (min,max) = (0.2,0.6) and
 #' the fixed effects sequence would have (min,max) = (0.3,0.7).
 #' 
-#' Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
-#' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-#' from t iterations back EM_diff, and number of non-zero coefficients Non0 Coef). The value of 1
-#' additionally outputs the updated coefficients, updated covariance matrix values, and the
-#' number of coordinate descent iterations used for the M step for each
-#' EM iteration. The value of 2 outputs all of the above plus gibbs acceptance rate information
-#' for the adaptive random walk and independence samplers and the updated proposal standard deviation
-#' for the adaptive random walk. 
-#' 
 #' @return A reference class object of class \code{\link{pglmmObj}} for which many methods are 
 #' available (e.g. \code{methods(class = "pglmmObj")})
 #' 
@@ -75,7 +78,7 @@
 #' @export
 glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_range = 2,
                               optim_options = NULL, adapt_RW_options = NULL, 
-                              trace = 0, BICq_posterior = NULL){
+                              trace = 0, BICq_posterior = NULL, progress = TRUE){
   
   ###########################################################################################
   # Input checks and/or extraction of control settings from pglmmObj object
@@ -90,7 +93,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   }
   
   if(is.null(optim_options)){
-    cat("Using optimization parameters stored in pglmmObj object from past selection \n")
+    message("Using optimization parameters stored in pglmmObj object from past selection")
     optim_options = object$control_info$optim_options
   }else{
     if(is.character(optim_options)){ # "recommend"
@@ -104,7 +107,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   
   if(is.null(adapt_RW_options)){
     if(optim_options$sampler == "random_walk"){
-      cat("Using adaptive random walk parameters stored in pglmmObj object from past selection \n")
+      message("Using adaptive random walk parameters stored in pglmmObj object from past selection")
     }
     adapt_RW_options = object$control_info$adapt_RW_options
   }else{
@@ -135,7 +138,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   data_input = list(y = y, X = X_std, Z = Z_std, group = as.factor(group))
   
   penalty = object$penalty_info$penalty
-  cat("Using penalty from pglmmObj object: ",penalty,"\n")
+  message("Using penalty from pglmmObj object: ",penalty)
   if(!(penalty %in% c("MCP","SCAD","lasso"))){
     stop("penalty must be 'MCP','SCAD', or 'lasso'")
   }
@@ -280,7 +283,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     ###########################################################################################
     # Two-stage (abbreviated) grid search
     ###########################################################################################
-    print("Start of stage 1 of abbreviated grid search")
+    if(progress == TRUE) cat("Start of stage 1 of abbreviated grid search \n")
     fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
                               covar = covar, group_X = group_X,
                               lambda0_seq = min(lambda0_seq), lambda1_seq = lambda1_seq,
@@ -291,9 +294,10 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                               optim_options = optim_options, logLik_calc = logLik_calc,
                               BICq_calc = (BIC_option == "BICq"),
                               BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
-                              checks_complete = T, pre_screen = F, ranef_keep = ranef_keep,
-                              lambda.min.full = lambda.min.full, stage1 = T)
-    print("End of stage 1 of abbreviated grid search")
+                              checks_complete = TRUE, pre_screen = F, ranef_keep = ranef_keep,
+                              lambda.min.full = lambda.min.full, stage1 = TRUE,
+                              progress = progress)
+    if(progress == TRUE) cat("End of stage 1 of abbreviated grid search \n")
     
     res_pre = fit_fixfull$results
     coef_pre = fit_fixfull$coef
@@ -316,7 +320,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     }
     
     # Fit second stage of 'abbreviated' model fit
-    print("Start of stage 2 of abbreviated grid search")
+    if(progress == TRUE) cat("Start of stage 2 of abbreviated grid search \n")
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
                              covar = object$call$covar, group_X = group_X, 
                              lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
@@ -327,10 +331,11 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                              optim_options = optim_options,
                              logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
                              BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
-                             checks_complete = T, pre_screen = F,
+                             checks_complete = TRUE, pre_screen = FALSE,
                              ranef_keep = as.numeric((vars > 0)), 
-                             lambda.min.full = lambda.min.full, stage1 = F)
-    print("End of stage 2 of abbreviated grid search")
+                             lambda.min.full = lambda.min.full, stage1 = FALSE,
+                             progress = progress)
+    if(progress == TRUE) cat("End of stage 2 of abbreviated grid search \n")
     
     resultsA = rbind(fit_fixfull$results, fit_select$results)
     coef_results = rbind(fit_fixfull$coef, fit_select$coef)
@@ -351,8 +356,9 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                              optim_options = optim_options, 
                              logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
                              BIC_option = BIC_option, BICq_posterior = BICq_posterior,
-                             checks_complete = T, pre_screen = F, ranef_keep = ranef_keep,
-                             lambda.min.full = lambda.min.full, stage1 = F)
+                             checks_complete = TRUE, pre_screen = FALSE, ranef_keep = ranef_keep,
+                             lambda.min.full = lambda.min.full, stage1 = FALSE,
+                             progress = progress)
     
     resultsA = fit_select$results
     coef_results = fit_select$coef
@@ -385,8 +391,9 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   # Perform a final E-step
   ## Use results to calculate logLik and posterior draws, and save draws for MCMC diagnostics
   Estep_out = E_step_final(dat = data_input, fit = fit, offset_fit = offset, optim_options = optim_options, 
-                           fam_fun = object$family, extra_calc = T, 
-                           adapt_RW_options = adapt_RW_options, trace = trace)
+                           fam_fun = object$family, extra_calc = TRUE, 
+                           adapt_RW_options = adapt_RW_options, trace = trace,
+                           progress = progress)
   
   # update optim_results:
   optim_results[,c("BICh","BIC","BICNgrp","LogLik")] = c(Estep_out$BICh, Estep_out$BIC, 
@@ -398,7 +405,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                     random_walk = "Metropolis-within-Gibbs Adaptive Random Walk Sampler",
                     independence = "Metropolis-within-Gibbs Independence Sampler")
   
-  call = match.call(expand.dots = F)
+  call = match.call(expand.dots = FALSE)
   
   output = c(fit, 
              list(Estep_out = Estep_out, call = call, formula = object$formula, 

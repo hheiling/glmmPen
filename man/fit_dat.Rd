@@ -38,10 +38,11 @@ fit_dat(
   adapt_RW_options = adaptControl(),
   covar = c("unstructured", "independent"),
   var_start = 1,
-  logLik_calc = F,
-  checks_complete = F,
+  logLik_calc = FALSE,
+  checks_complete = FALSE,
   ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group))),
-  conv_type = 1
+  conv_type = 1,
+  progress = TRUE
 )
 }
 \arguments{
@@ -169,7 +170,7 @@ However, if users are interested
 in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
 \code{logLik_calc} to \code{TRUE} will calculate these other quantities for all of the models.}
 
-\item{checks_complete}{boolean value indicating whether the function has been called within
+\item{checks_complete}{logical value indicating whether the function has been called within
 \code{glmm} or \code{glmmPen} or whether the function has been called by itself. 
 Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,
 performs additional checks on the input data. If false, assumes data input checks have 
@@ -186,6 +187,18 @@ estimate. For now, all calls to \code{fit_dat} within the \code{glmmPen} framewo
 restrict this convergence type to be the average Euclidean distance. However,
 we keep this argument in case we decide to allow multiple convergence type options in
 future versions of the package.}
+
+\item{progress}{a logical value indicating if additional output should be given showing the
+progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+for the fit procedure (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+and number of non-zero fixed and random effects
+including the intercept). Additionally, \code{progress = TRUE}
+gives some other information regarding the progress of the variable selection 
+procedure, including the model selection criteria and log-likelihood estimates
+for each model fit.
+Default is \code{TRUE}.}
 }
 \value{
 a list with the following elements:

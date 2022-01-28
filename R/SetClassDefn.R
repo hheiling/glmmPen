@@ -143,7 +143,7 @@ pglmmObj = setRefClass("pglmmObj",
                 q = ncol(Z_std) / d
                 
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
-                ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = F) )
+                ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = FALSE) )
                 rownames(ref) = levs
                 colnames(ref) = x$coef_names$random
                 ranef <<- lapply(group, function(j) ref)

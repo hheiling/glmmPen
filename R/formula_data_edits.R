@@ -1,5 +1,5 @@
 
-# Edited versions of lFormula and glFormula functions from lme4 package
+# Edited version of glFormula function from lme4 package
 # lme4 code source: https://github.com/lme4/lme4/blob/master/R/modular.R
 # Additional helper functions: https://github.com/lme4/lme4/blob/master/R/utilities.R 
 # Edits:
@@ -166,7 +166,7 @@ glFormula_edit <- function(formula, data=NULL, family,
     stop('"quasi" families cannot be used in glmmPen package')
   }
   
-  denv <- checkFormulaData(formula, data, checkLHS = T, checkData = T, debug = F)
+  denv <- checkFormulaData(formula, data, checkLHS = TRUE, checkData = TRUE, debug = FALSE)
   mc$formula <- formula <- as.formula(formula, env = denv)    ## substitute evaluated version
   
   

@@ -153,7 +153,7 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
       # Avoid excessive warnings when nMC_chain is low in early EM iterations
       stan_fit = suppressWarnings(rstan::sampling(stan_file, data = dat_list, init = init_lst, 
                                          iter = nMC_chain + nMC_burnin,
-                                         warmup = nMC_burnin, show_messages = F, refresh = 0,
+                                         warmup = nMC_burnin, show_messages = FALSE, refresh = 0,
                                          chains = 1, cores = 1))
       
       stan_out = as.matrix(stan_fit)

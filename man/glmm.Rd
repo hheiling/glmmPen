@@ -14,6 +14,7 @@ glmm(
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = lambdaControl(),
+  progress = TRUE,
   ...
 )
 }
@@ -66,6 +67,18 @@ penalty parameters \code{lambda0} and \code{lambda1} by specifying such values i
 The default for \code{glmm} is to run the model fit with no penalization (\code{lambda0} = \code{lambda1} = 0).
 When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
+
+\item{progress}{a logical value indicating if additional output should be given showing the
+progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+for the fit procedure (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+and number of non-zero fixed and random effects
+including the intercept). Additionally, \code{progress = TRUE}
+gives some other information regarding the progress of the variable selection 
+procedure, including the model selection criteria and log-likelihood estimates
+for each model fit.
+Default is \code{TRUE}.}
 
 \item{...}{additional arguments that could be passed into \code{glmmPen}. See \code{\link{glmmPen}}
 for further details.}

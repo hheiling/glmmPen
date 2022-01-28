@@ -11,13 +11,13 @@
 #' @inheritParams fit_dat
 #' @inheritParams selectControl
 #' @inheritParams optimControl
-#' @param BICq_calc boolean value indicating if the BIC-ICQ criterion should be used to select the
+#' @param BICq_calc logical value indicating if the BIC-ICQ criterion should be used to select the
 #' best model.
-#' @param checks_complete boolean value indicating if several data checks have been completed.
+#' @param checks_complete logical value indicating if several data checks have been completed.
 #' @param lambda.min.full a vector of two numeric values that gives the fixed and random effect penalty 
 #' values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
 #' (if applicable)
-#' @param stage1 boolean value indicating if the first stage of the abbreviated two-stage grid
+#' @param stage1 logical value indicating if the first stage of the abbreviated two-stage grid
 #' search in the model selection procedure is being performed. \code{FALSE} if either 
 #' performing the second stage of the abbreviated two-stage grid search or if performing the
 #' full grid search over all possible penalty parameter combinations.
@@ -37,10 +37,11 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                        alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                        trace = 0, u_init = NULL, coef_old = NULL, 
                        adapt_RW_options = adaptControl(),optim_options = optimControl(), 
-                       BIC_option = c("BICq","BICh","BIC","BICNgrp"), BICq_calc = T, 
-                       logLik_calc = switch(BIC_option[1], BICq = F, T),
-                       BICq_posterior = NULL, checks_complete = F, pre_screen = T, 
-                       ranef_keep = NULL, lambda.min.full, stage1 = F){
+                       BIC_option = c("BICq","BICh","BIC","BICNgrp"), BICq_calc = TRUE, 
+                       logLik_calc = switch(BIC_option[1], BICq = FALSE, TRUE),
+                       BICq_posterior = NULL, checks_complete = FALSE, pre_screen = TRUE, 
+                       ranef_keep = NULL, lambda.min.full, stage1 = FALSE,
+                       progress = TRUE){
   
   ###########################################################################################
   # Input checks and modifications
@@ -68,7 +69,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   # Initialize starting variance for random effect covariance matrix
   if(optim_options$var_start == "recommend"){
     var_start = var_init(dat, fam_fun)
-    cat("recommended starting variance: ", var_start, "\n")
     # record starting variance 
     optim_options$var_start = var_start
   }else{
@@ -85,15 +85,16 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   ## If number of random effects in model (including intercept) is 6 or more
   ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
   if((ncol(dat$Z)/nlevels(dat$group) >= 6) & (pre_screen == T)){
-    cat("begin prescreening procedure \n")
+    message("Running prescreening procedure")
+    # cat("begin prescreening procedure \n")
     out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 
                         lambda0_min = lambda.min.full[1], lambda1_min = lambda.min.full[2], 
                         group_X = group_X, sampler = sampler, 
                         adapt_RW_options = adapt_RW_options, covar = covar,
                         var_start = var_start, 
-                        checks_complete = checks_complete)
-    cat("end prescreening procedure \n")
+                        checks_complete = checks_complete, progress = progress)
+    # cat("end prescreening procedure \n")
     ranef_keep = out_pre$ranef_keep
     coef_pre = out_pre$coef_pre
     u_pre = out_pre$u_pre
@@ -111,7 +112,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   # If any optimization arguments set to NULL, fill in defaults
   optim_options = optim_recommend(optim_options = optim_options, family = family, 
-                                  q = sum(ranef_keep), select = T)
+                                  q = sum(ranef_keep), select = TRUE)
   
   # Extract variables from optimControl
   conv_EM = optim_options$conv_EM
@@ -141,20 +142,20 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     # Otherwise, read in the prevoiusly fit full model posterior draw results
     if(!is.null(BICq_posterior)){
       if(file.exists(sprintf("%s.desc",BICq_posterior)) & file.exists(sprintf("%s.bin",BICq_posterior))){
-        cat("Using saved posterior draws from full model for BIC-ICQ calculation: \n")
-        cat(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior), "\n")
-        fitfull_needed = F
+        message("Using saved posterior draws from full model for BIC-ICQ calculation: ")
+        message(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior))
+        fitfull_needed = FALSE
       }else{
-        cat(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior), "\n")
-        cat(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc",
-                      BICq_posterior, BICq_posterior), "\n")
-        fitfull_needed = T
+        message(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior))
+        message(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc",
+                      BICq_posterior, BICq_posterior))
+        fitfull_needed = TRUE
       }
     }else{ # if is.null(BICq_posterior)
       BICq_posterior = "BICq_Posterior_Draws"
-      cat(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc within working directory",
-                    BICq_posterior, BICq_posterior), "\n")
-      fitfull_needed = T
+      message(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc within working directory",
+                    BICq_posterior, BICq_posterior))
+      fitfull_needed = TRUE
     } # End if-else !is.null(BICq_posterior)
     
     # If in previous code chunk specified that full model needed to be fit, run full model
@@ -166,8 +167,10 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       ## There is a general sparsity assumption for random effects, so we may
       ## assume a higher penalty on the random effects for a 'full' model
       if(ncol(dat$Z)/nlevels(dat$group) >= 6) lam1 = lambda.min.full[2] else lam1 = 0
-      cat("Penalty parameters used to calculate full model for BIC-ICQ calculation: \n")
-      cat(sprintf("fixed effects %f, random effects %f", lam0, lam1), "\n")
+      if((trace >= 1)){
+        cat("Penalty parameters used to calculate full model for BIC-ICQ calculation: \n")
+        cat(sprintf("fixed effects %f, random effects %f", lam0, lam1), "\n")
+      }
       # Fit 'full' model
       ## Note: M default set to 10^4 in optimControl(). Will report M posterior draws from full model
       out = try(fit_dat(dat, lambda0 = lam0, lambda1 = lam1, 
@@ -178,13 +181,14 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
                           maxitEM = maxitEM + 15, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start, logLik_calc = F,
+                          covar = covar, var_start = var_start, logLik_calc = FALSE,
                           checks_complete = checks_complete,
-                          ranef_keep = ranef_keep))
+                          ranef_keep = ranef_keep, progress = progress))
       
       if(is.character(out)){
-        cat("Issue with full model fit, no BICq calculation will be completed \n")
-        cat("Setting model selection criteria to BICh")
+        warning("Issue with full model fit, no BICq calculation will be completed \n",
+                immediate. = TRUE)
+        message("Setting model selection criteria to BICh")
         BIC_option = "BICh"
         ufull_describe = NULL
       }else{
@@ -192,8 +196,9 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         # Using full model fit parameters, sample from the posterior (posterior samples used for
         # BIC-ICQ calculation)
         Estep_out = E_step_final(dat = dat, offset_fit = offset, fit = out, optim_options = optim_options, 
-                                 fam_fun = fam_fun, extra_calc = F, 
-                                 adapt_RW_options = adapt_RW_options, trace = trace)
+                                 fam_fun = fam_fun, extra_calc = FALSE, 
+                                 adapt_RW_options = adapt_RW_options, trace = trace,
+                                 progress = progress)
         # ufull_big: big.matrix of posterior samples from full model
         ufull_big = attach.big.matrix(Estep_out$u0)
         # File-back the posterior samples of the full model
@@ -215,7 +220,9 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       }
       
     }else{ # if fitfull_needed = F
-      cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
+      if(progress == TRUE){
+        cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
+      }
       # ufull_big: big.matrix of posterior samples from full model
       ufull_big = attach.big.matrix(sprintf("%s.desc",BICq_posterior))
       # ufull_describe: describe() output for the big.matrix of posterior samples
@@ -227,7 +234,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       }
       if(nrow(ufull_big) < 10^4){
         warning("The number of posterior draws saved in ",BICq_posterior, "\n",
-                "  is less than the recommended 10^4",immediate. = T)
+                "  is less than the recommended 10^4",immediate. = TRUE)
       }
     } # End if-else fitfull_needed
     
@@ -334,7 +341,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start, logLik_calc = logLik_calc,
                           checks_complete = checks_complete,
-                          ranef_keep = ranef_keep))
+                          ranef_keep = ranef_keep, progress = progress))
       
 
       if(is.character(out)) next
@@ -374,9 +381,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       BIC = out$BIC
       BICq = out$BICq
       BICNgrp = out$BICNgrp
-      BIC_report = c(BICh,BIC,BICq,BICNgrp)
-      names(BIC_report) = c("BICh","BIC","BICq","BICNgrp")
-      print(BIC_report)
       
       # Store some 'summary' results
       res[(j-1)*n1+i,1] = lambda0_seq[i]
@@ -395,7 +399,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       res[(j-1)*n1+i,10] = sum(out$coef != 0)
       res[(j-1)*n1+i,11] = out$EM_iter
       res[(j-1)*n1+i,12] = out$converged
-      print(res[(j-1)*n1+i,])
+      if(progress == TRUE) print(round(res[(j-1)*n1+i,], digits = 5))
       # Store coefficients
       coef = rbind(coef, out$coef)
       

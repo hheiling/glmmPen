@@ -29,9 +29,10 @@ indicator_2 = function(bounds, samples){
 # }
 #' @importFrom mvtnorm rmvnorm dmvnorm
 #' @importFrom stats acf var dbinom dpois dnorm
-CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig = NULL, trace){
+CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, 
+                   gaus_sig = NULL, trace, progress){
   
-  cat("Pajor Log-Likelihood Calculation \n")
+  if(progress == TRUE) cat("Pajor Log-Likelihood Calculation \n")
   
   family_info = family_export(family)
   fam_fun = family_info$family_fun
@@ -142,13 +143,13 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
     
     if(family == "binomial"){
       for(i in 1:n_k){
-        dens_i = dbinom(y_k[i], size = 1, prob = mu[,i], log = F)
+        dens_i = dbinom(y_k[i], size = 1, prob = mu[,i], log = FALSE)
         # Multiply together all elements belonging to same alpha_m
         dens_k = dens_k * dens_i
       } # End i loop
     }else if(family == "poisson"){
       for(i in 1:n_k){
-        dens_i = dpois(y_k[i], lambda = mu[,i], log = F)
+        dens_i = dpois(y_k[i], lambda = mu[,i], log = FALSE)
         # Multiply together all elements belonging to same alpha_m
         dens_k = dens_k * dens_i
       } # End i loop
@@ -157,7 +158,7 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
         stop("gaus_sig must be specified for gaussian family")
       }
       for(i in 1:n_k){
-        dens_i = dnorm(y_k[i], mean = mu[,i], sd = gaus_sig, log = F)
+        dens_i = dnorm(y_k[i], mean = mu[,i], sd = gaus_sig, log = FALSE)
         # Multiply together all elements belonging to same alpha_m
         dens_k = dens_k * dens_i
       } # End i loop
@@ -166,7 +167,7 @@ CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, gaus_sig =
     }
     # else if(family == "negbin"){
     #   for(i in 1:n_k){
-    #     dens_i = dnbinom(y_k[i], size = 1/phi, mu = mu[,i], log = F)
+    #     dens_i = dnbinom(y_k[i], size = 1/phi, mu = mu[,i], log = FALSE)
     #     # Multiply together all elements belonging to same alpha_m
     #     dens_k = dens_k * dens_i
     #   } # End i loop

@@ -2,17 +2,28 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.5.1.7
-Date: 2022-01-10
+Version: 1.5.1.8
+Date: 2022-01-19
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
     person("Naim", "Rashid", email = "naim@unc.edu", role = c("aut")),
     person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")))
 Maintainer: Hillary Heiling <hheiling@live.unc.edu>
-Description: Fits high dimensional penalized generalized linear mixed models using 
+Description: Fits high dimensional penalized generalized linear 
+    mixed models using 
     the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm. 
-    Supports fitting of Binomial, Gaussian, and Poisson data with canonical links, and
-    supports penalization using the MCP, SCAD, or LASSO penalties.
+    The purpose of the package is to perform variable selection on both the fixed and 
+    random effects simultaneously for generalized linear mixed models.
+    The package supports fitting of Binomial, Gaussian, and Poisson data with canonical links, and
+    supports penalization using the MCP, SCAD, or LASSO penalties. The MCECM algorithm
+    is described in Rashid et al. (2020) <doi:10.1080/01621459.2019.1671197>.
+    The techniques used in the minimization portion of the procedure (the M-step) are
+    derived from the procedures of the 'ncvreg' package (Breheny and Huang (2011) 
+    <doi:10.1214/10-AOAS388>) and 'grpreg' package (Breheny and Huang (2015)
+    <doi:10.1007/s11222-013-9424-2>), with
+    appropriate modifications to account for the estimation and penalization of
+    the random effects. The 'ncvreg' and 'grpreg' packages also describe the MCP, SCAD, 
+    and LASSO penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
 Imports: 

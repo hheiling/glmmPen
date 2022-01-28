@@ -60,7 +60,7 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
   link_int = family_info$link_int # Recoded link as integer
   family = family_info$family
   
-  slopes = T
+  slopes = TRUE
   
   if(pnonzero + pnonzerovar > ptot) stop("pnonzero + pnonzerovar > ptot")
   # create fixed effects covariate matrix
@@ -94,7 +94,7 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
     }
   }
   Z = model.matrix(~drep-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
-  if(slopes == T) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
+  if(slopes == TRUE) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   
   if(is.null(beta)){
     if(pnonzerovar > 0){
@@ -108,7 +108,7 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
     if(length(beta) < p1+pnonzerovar+1) beta = c(beta, rep(0, pnonzerovar))
     X0 = X[,1:(p1+pnonzerovar+1)]
   }
-  if(slopes == T) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
+  if(slopes == TRUE) Z0 = model.matrix(~drep:X0-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   z1 = as.numeric(rmvnorm(d, mean = rep(0,ncol(Z0)/d), 
                           sigma = diag(rep(sd_raneff^2, ncol(Z0)/d), nrow = ncol(Z0)/d, ncol = ncol(Z0)/d)))
   
@@ -162,7 +162,7 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
   ## 10/26/2016 scaling predictors and remaking Z matrix on scaled predictors
   #X = cbind(X[,1], scale(X[,-1]))
   #Z = model.matrix(~drep-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
-  if(slopes == T) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
+  if(slopes == TRUE) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   ##
   
   colnames(Z) = str_c(rep(colnames(X), each = d), ":", 1:d)

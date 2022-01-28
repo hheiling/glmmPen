@@ -3,10 +3,7 @@
 \name{glmmPen}
 \alias{glmmPen}
 \title{Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
-Minimization (MCECM)
-
-\code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria}
+Minimization (MCECM)}
 \usage{
 glmmPen(
   formula,
@@ -22,7 +19,8 @@ glmmPen(
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = selectControl(),
-  BICq_posterior = NULL
+  BICq_posterior = NULL,
+  progress = TRUE
 )
 }
 \arguments{
@@ -96,23 +94,38 @@ See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentatio
 \item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
 will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
 These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-are requested. If this argument is
+are requested (BIC-ICQ reference: Ibrahim et al (2011)
+<doi:https://doi.org/10.1111/j.1541-0420.2010.01463.x>). 
+If this argument is
 specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
 will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
 in the working directory.
 See 'Details' section for additional details about the required format of \code{BICq_posterior}
 and the file-backed big matrix.}
+
+\item{progress}{a logical value indicating if additional output should be given showing the
+progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
+for the fit procedure (iteration number EM_iter,
+number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
+and number of non-zero fixed and random effects
+including the intercept). Additionally, \code{progress = TRUE}
+gives some other information regarding the progress of the variable selection 
+procedure, including the model selection criteria and log-likelihood estimates
+for each model fit.
+Default is \code{TRUE}.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 
 available (e.g. \code{methods(class = "pglmmObj")}, see ?pglmmObj for additional documentation)
 }
 \description{
-Fit Penalized Generalized Mixed Models via Monte Carlo Expectation Conditional 
-Minimization (MCECM)
-
 \code{glmmPen} is used to fit penalized generalized mixed models via Monte Carlo Expectation 
-Conditional Minimization (MCECM) and select the best model using BIC-type selection criteria
+Conditional Minimization (MCECM). The purpose of the function is to perform 
+variable selection on both the fixed and random effects simultaneously for the
+generalized linear mixed model. \code{glmmPen} selects the best model using 
+BIC-type selection criteria (see \code{\link{selectControl}} documentation for 
+further details)
 }
 \details{
 Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
@@ -140,12 +153,12 @@ calcuations. If the appropriate files do not exist or \code{BICq_posterior}
 is specified as \code{NULL}, the full model will be fit and the full model posterior
 draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
  
-Trace details: The value of 0 outputs some general updates for each EM iteration (iteration number EM_iter,
-number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
-from t iterations back EM_conv, and number of non-zero fixed and random effects). The value of 1
+Trace details: The value of 0 (default) does not output any extra information. The value of 1
 additionally outputs the updated coefficients, updated covariance matrix values, and the
 number of coordinate descent iterations used for the M step for each
-EM iteration. If Stan is not used as the E-step sampling mechanism, 
+EM iteration. When pre-screening procedure is used and/or if the BIC-ICQ criterion is
+requested, trace = 1 gives additional information about the penalties used
+for the 'full model' fit procedure. If Stan is not used as the E-step sampling mechanism, 
 the value of 2 outputs all of the above plus gibbs acceptance rate information
 for the adaptive random walk and independence samplers and the updated proposal standard deviation
 for the adaptive random walk.

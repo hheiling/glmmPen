@@ -54,19 +54,19 @@ package \code{glmmPen}}
 
 \method{ngrps}{pglmmObj}(object, ...)
 
-\method{formula}{pglmmObj}(x, fixed.only = F, random.only = F, ...)
+\method{formula}{pglmmObj}(x, fixed.only = FALSE, random.only = FALSE, ...)
 
-\method{model.frame}{pglmmObj}(formula, fixed.only = F, ...)
+\method{model.frame}{pglmmObj}(formula, fixed.only = FALSE, ...)
 
 \method{model.matrix}{pglmmObj}(object, type = c("fixed", "random"), ...)
 
-\method{fitted}{pglmmObj}(object, fixed.only = T, ...)
+\method{fitted}{pglmmObj}(object, fixed.only = TRUE, ...)
 
 \method{predict}{pglmmObj}(
   object,
   newdata = NULL,
   type = c("link", "response"),
-  fixed.only = T,
+  fixed.only = TRUE,
   ...
 )
 
@@ -85,7 +85,7 @@ package \code{glmmPen}}
 
 \method{BIC}{pglmmObj}(object, ...)
 
-\method{plot}{pglmmObj}(x, fixed.only = F, type = NULL, ...)
+\method{plot}{pglmmObj}(x, fixed.only = FALSE, type = NULL, ...)
 }
 \arguments{
 \item{object}{pglmmObj object output from \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}}
@@ -182,7 +182,7 @@ coefficients for each explanatory variable for each level of each grouping facto
 
 \item \code{formula.pglmmObj}: Formula used for the model fit. Can return the full
 formula, or just the formula elements relating to the fixed effects
-(fixed.only = T) or random effects (random.only = T)
+(fixed.only = TRUE) or random effects (random.only = TRUE)
 
 \item \code{model.frame.pglmmObj}: Returns the model frame
 
