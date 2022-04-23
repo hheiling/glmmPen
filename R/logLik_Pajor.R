@@ -32,7 +32,7 @@ indicator_2 = function(bounds, samples){
 CAME_IS = function(posterior, y, X, Z, group, coef, sigma, family, M, 
                    gaus_sig = NULL, trace, progress){
   
-  if(progress == TRUE) cat("Pajor Log-Likelihood Calculation \n")
+  if(progress == TRUE) message("Pajor Log-Likelihood Calculation")
   
   family_info = family_export(family)
   fam_fun = family_info$family_fun

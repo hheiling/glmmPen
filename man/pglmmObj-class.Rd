@@ -94,9 +94,10 @@ package \code{glmmPen}}
 
 \item{x}{an R object of class \code{pglmmObj}}
 
-\item{fixed.only}{logical value; default \code{TRUE} indicates that only the fixed effects 
+\item{fixed.only}{logical value; default \code{TRUE} indicates that only the 
+fixed effects 
 should be used in the fitted value/prediction, while \code{FALSE} indicates that both the fixed and 
-random effects should be used in the fitted value/prediction}
+random effects posterior modes should be used in the fitted value/prediction}
 
 \item{random.only}{logical value used in \code{formula}; \code{TRUE} indicates that 
 only the formula elements relating to the random effects should be returned}
@@ -152,6 +153,10 @@ use in \code{glmmPen_FineSearch})}
 sample chains, including the Gibbs acceptance rates (included for both the independence
 and adaptive random walk samplers) and the final proposal standard deviations 
 (included for the adaptive random walk sampler only))}
+\item{r_estimation}{list of output related to estimation of number of latent common 
+factors, r. Only relevant for the output of functions \code{glmm_FA} and 
+\code{glmmPen_FA}, which are currently in development and are not yet ready for
+general use.}
 
 showClass("pglmmObj")
 methods(class = "pglmmObj")
@@ -165,14 +170,15 @@ output the reference class object of type \code{pglmmObj}.
 \itemize{
 \item \code{fixef.pglmmObj}: Provides the fixed effects coefficients
 
-\item \code{ranef.pglmmObj}: Provides the random effects coefficients for each explanatory variable
+\item \code{ranef.pglmmObj}: Provides the random effects posterior modes for each explanatory variable
 for each level of the grouping factor
 
 \item \code{sigma.pglmmObj}: Provides the random effect covariance matrix. If family is Gaussian,
 also returns the standard deviation of the residual error.
 
-\item \code{coef.pglmmObj}: Computes the sum of the random and fixed effects 
-coefficients for each explanatory variable for each level of each grouping factor.
+\item \code{coef.pglmmObj}: Computes the sum of the fixed effects 
+coefficients and the random effect posterior modes 
+for each explanatory variable for each level of each grouping factor.
 
 \item \code{family.pglmmObj}: Family of the fitted GLMM
 
@@ -189,10 +195,14 @@ formula, or just the formula elements relating to the fixed effects
 \item \code{model.matrix.pglmmObj}: Returns the model matrix of either the fixed (type = "fixed") or 
 random effects (type = "random")
 
-\item \code{fitted.pglmmObj}: Fitted values
+\item \code{fitted.pglmmObj}: Fitted values, i.e., the linear predictor of the model.
 
-\item \code{predict.pglmmObj}: Predictions for the pglmmObj output object from the glmmPen package functions.
-Argument \code{type}: character string for type of predictors: "link", which generates the linear predictor,
+\item \code{predict.pglmmObj}: Predictions for the model corresponding to 
+the pglmmObj output object from the glmmPen package functions. The function
+\code{predict} can predict either the linear predictor of the model or the
+expected mean of the response, as specified by the \code{type} argument.
+Argument \code{type}: character string for type of predictors: "link" (default), 
+which generates the linear predictor,
 and "response", which generates the expected mean values of the response.
 
 \item \code{residuals.pglmmObj}: Residuals for the pglmmObj output object from the glmmPen package functions.

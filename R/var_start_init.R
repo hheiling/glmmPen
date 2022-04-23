@@ -13,6 +13,13 @@ var_init = function(data, fam_fun){
   
   var_start = VarCorr(int_only)$grp[[1]] * 2.0
   
+  # Alternative starting variance specification: 
+  # if(fam_fun$family == "gaussian"){
+  #   var_start = VarCorr(int_only)$grp[[1]] * 2.0
+  # }else{
+  #   var_start = VarCorr(int_only)$grp[[1]]
+  # }
+  
   # Protect against case when variance estimate above is 0 or very small
   var_start = max(0.5, var_start) 
   message(sprintf("recommended starting variance: %f", var_start))

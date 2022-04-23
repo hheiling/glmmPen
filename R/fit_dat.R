@@ -210,7 +210,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   
   if(!is.null(coef_old)){
     
-    if(progress == TRUE) cat("using coef from past model to intialize \n")
+    if(progress == TRUE) message("using coef from past model to intialize")
     gamma = matrix(J%*%matrix(coef_old[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     
@@ -401,7 +401,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   ranef_idx = which(diag(cov) != 0)
   
   if(!is.null(u_init)){
-    if(progress == TRUE) cat("using results from previous model to initialize posterior samples \n")
+    if(progress == TRUE) message("using results from previous model to initialize posterior samples")
     if(is.matrix(u_init)){
       uold = as.numeric(u_init[nrow(u_init),])
     }else{
@@ -459,21 +459,16 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     ############################################################################################
     # M Step
     ############################################################################################
-    if(sum(diag(cov) > 0) > 15){
-      # Alternative maxit_CD for when q is large (to speed up start of algorithm when
-      # few random effects penalized out of model)
-      maxit_CD_use = 25
+    if(sum(diag(cov) != 0) >= 16){ # number random effects in model >= 15
+      maxit_CD_use = max(round(maxit_CD/2), 25)
     }else{
       maxit_CD_use = maxit_CD
     }
-    
-    # cat("Start M-step \n")
     coef = M_step(y=y, X=X, Z=Z, u_address=u0@address, M=nrow(u0), J=J, 
                   group=group, family=family, link_int=link_int, coef=coef, offset=offset_fit,
                   phi=phi, maxit_CD=maxit_CD_use, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
                   covgroup=covgroup, penalty=penalty, lambda0=lambda0, lambda1=lambda1, 
                   gamma=gamma_penalty, alpha=alpha, trace=trace)
-    # cat("End M-step \n")
     
     if(trace >= 1){
       cat("Fixed effects (scaled X): \n")
@@ -585,7 +580,9 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     
     # now update EM iteration information  
     if(progress == TRUE){
-      update_limits = c(i, nMC , round(diff[i],6), (sum(coef[1:ncol(X)] !=0)), (sum(diag(cov) != 0))) # (sum(coef[-c(1:ncol(X))] != 0))
+      update_limits = c(i, nMC , round(diff[i],6), 
+                        max((sum(coef[1:ncol(X)] !=0))-1,0), 
+                        max((sum(diag(cov) != 0))-1,0))
       names(update_limits) = c("Iter","nMC","EM conv","Non0 Fixef", "Non0 Ranef")
       print(update_limits)
     }
@@ -630,13 +627,13 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     # if random effect penalized out in past model / in previous M-step, do not
     # collect posterior samples for this random effect
     ranef_idx = which(diag(cov) > 0)
-    # cat("Start E-step \n")
+    
     Estep_out = E_step(coef = coef, ranef_idx = ranef_idx, y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset_fit,
                        nMC=nMC, nMC_burnin=nMC_burnin, family=family, link=link, phi=phi, sig_g=sig_g,
                        sampler=sampler, d=d, uold=uold, proposal_SD=proposal_SD, 
                        batch=batch, batch_length=batch_length, offset_increment=offset_increment, 
                        trace=trace)
-    # cat("End E-step \n")
+    
     u0 = attach.big.matrix(Estep_out$u0)
     proposal_SD = Estep_out$proposal_SD
     gibbs_accept_rate = Estep_out$gibbs_accept_rate

@@ -19,6 +19,10 @@
 #' fixed and random effect lambda penalty parameters used in the previous coarse grid search
 #' will be used as the new fixed and random effect lambda penalty parameter ranges. See Details 
 #' for more information.
+#' @param BIC_option character string specifying the selection criteria used to select the 'best' model.
+#' If left as the default \code{NULL}, then will use the same selection criteria used
+#' during the grid search used to produce the input \code{pglmmObj} object. 
+#' See further details in the \code{BIC_option} description of \code{\link{selectControl}}.
 #' @param optim_options an optional list of class "optimControl" created from function \code{\link{optimControl}}
 #' that specifies optimization parameters. If set to the default \code{NULL}, will use the 
 #' optimization parameters used for the previous round of selection stored within the 
@@ -76,7 +80,8 @@
 #' 
 #' @importFrom stringr str_c
 #' @export
-glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_range = 2,
+glmmPen_FineSearch = function(object, tuning_options = selectControl(), 
+                              BIC_option = NULL, idx_range = 2,
                               optim_options = NULL, adapt_RW_options = NULL, 
                               trace = 0, BICq_posterior = NULL, progress = TRUE){
   
@@ -177,9 +182,16 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   
   # Determine 'best' method by best BIC_option criteria
   # BIC_option from selectControl() argument, not pglmmObj
-  crit = tuning_options$BIC_option
+  if(is.null(BIC_option)){
+    crit = object$control_info$tuning_options$BIC_option
+  }else{
+    crit = BIC_option
+  }
   if(length(crit) > 1){
     crit = crit[1]
+  }
+  if(!(crit %in% c("BICh","BIC","BICq","BICNgrp"))){
+    stop("BIC_option must be 'BICq', 'BICh', 'BIC', or 'BICNgrp'")
   }
   
   if((crit == "BICq") & (any(is.na(select_coarse[,crit])))){
@@ -194,7 +206,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   opt_res = select_coarse[which.min(select_coarse[,crit]),]
   
   # Specify fine lambda grid search - function
-  lam_choice = function(select_coarse, opt_res, tuning_options, type = c(0,1)){
+  lam_choice = function(select_coarse, opt_res, tuning_options, type = c(0,1), idx_range){
     type = type[1]
     if(type == 0){
       coarse = unique(select_coarse[,"lambda0"])
@@ -204,9 +216,19 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
       lam_best = opt_res["lambda1"]
     }
     idx_best = which(coarse == lam_best)
-    lam_seq = exp(seq(from = log(coarse[max(idx_best-idx_range,1)]), 
-                      to = log(coarse[min(idx_best+idx_range,length(coarse))]),
-                      length.out = tuning_options$nlambda))
+    # Some checks
+    ## If range does not include 0 (generally the case), sequence members are equidistant on log scale
+    ## If range includes value of 0, sequence members are equidistant on regular scale
+    if(coarse[max(idx_best-idx_range,1)] == 0){
+      lam_seq = seq(from = coarse[max(idx_best-idx_range,1)], 
+                    to = coarse[min(idx_best+idx_range,length(coarse))],
+                    length.out = tuning_options$nlambda)
+    }else{
+      lam_seq = exp(seq(from = log(coarse[max(idx_best-idx_range,1)]), 
+                        to = log(coarse[min(idx_best+idx_range,length(coarse))]),
+                        length.out = tuning_options$nlambda))
+    }
+    
     
     return(lam_seq)
     
@@ -215,19 +237,33 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   # If user inputs their own penalty parameter sequence, extract and use
   # If not, determine penalty parameters for fine search using function above
   if(is.null(tuning_options$lambda0_seq)){
-    lambda0_seq = lam_choice(select_coarse, opt_res, tuning_options, type = 0)
+    lambda0_seq = lam_choice(select_coarse, opt_res, tuning_options, type = 0, idx_range)
   }else{
     lambda0_seq = tuning_options$lambda0_seq
   }
   
   if(is.null(tuning_options$lambda1_seq)){
-    lambda1_seq = lam_choice(select_coarse, opt_res, tuning_options, type = 1)
+    lambda1_seq = lam_choice(select_coarse, opt_res, tuning_options, type = 1, idx_range)
   }else{
     lambda1_seq = tuning_options$lambda1_seq
   }
   
+  # Checks in case only single value input for either lambda0 or lambda1 in coarse grid search
+  ## Example: if random effect penalty lambda1_seq set to 0 in coarse grid search 
+  lambda0_seq = unique(lambda0_seq)
+  lambda1_seq = unique(lambda1_seq)
+  
+  # Note: no pre-screening should be performed in this fine grid search
+  ## pre_screen = F always
+  # Potentially need small penalties for minimum penalty model specification 
+  #   when the BIC-ICQ selection criterion is specified for model selection
+  #   and the posterior samples from the minimum penalty model were not saved
+  # Use minimum penalty values from input sequences
+  lambda.min.full = c(min(select_coarse[,"lambda0"]), min(select_coarse[,"lambda1"]))
+  names(lambda.min.full) = c("fixef","ranef")
+  
   BIC_option = tuning_options$BIC_option
-  covar = object$call$covar
+  covar = object$covar
   logLik_calc = tuning_options$logLik_calc
   
   # Specify starting coefficient - unstandardized result from final model in coarse search
@@ -257,33 +293,12 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
   ranef_keep = object$penalty_info$prescreen_ranef
   names(ranef_keep) = NULL
   
-  # Note: no pre-screening should be performed in this fine grid search
-  ## pre_screen = F always
-  # Use lambda.min.presc for full model penalty parameter specification (if needed)
-  lambda.min.presc = tuning_options$lambda.min.presc
-  if(is.null(lambda.min.presc)){
-    if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
-      lambda.min.presc = 0.01
-    }else{
-      lambda.min.presc = 0.05
-    }
-  }
-  # Minimum lambda values to use for pre-screening and BIC-ICQ full model fit
-  # Fixed effects: use minimum fixed effects penalty parameters
-  # Random effects: calculate penalty to use using lambda.min.presc 
-  ##    (penalty = lambda.min.presc * max random effect penalty parameter)
-  full_ranef = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = family$family, 
-                         alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
-                         lambda.min = lambda.min.presc)
-  lambda.min.full = c(lambda0_seq[1], full_ranef[1])
-  names(lambda.min.full) = c("fixef","ranef")
-  
   if(tuning_options$search == "abbrev"){
     
     ###########################################################################################
     # Two-stage (abbreviated) grid search
     ###########################################################################################
-    if(progress == TRUE) cat("Start of stage 1 of abbreviated grid search \n")
+    if(progress == TRUE) message("Start of stage 1 of abbreviated grid search")
     fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
                               covar = covar, group_X = group_X,
                               lambda0_seq = min(lambda0_seq), lambda1_seq = lambda1_seq,
@@ -297,7 +312,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                               checks_complete = TRUE, pre_screen = F, ranef_keep = ranef_keep,
                               lambda.min.full = lambda.min.full, stage1 = TRUE,
                               progress = progress)
-    if(progress == TRUE) cat("End of stage 1 of abbreviated grid search \n")
+    if(progress == TRUE) message("End of stage 1 of abbreviated grid search")
     
     res_pre = fit_fixfull$results
     coef_pre = fit_fixfull$coef
@@ -309,7 +324,6 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     # Extract coefficient and posterior results from 'best' model from first step
     coef_old = coef_pre[which(res_pre[,2] == lam_ref),]
     u_init = fit_fixfull$out$u_init
-    
     # Extract other relevant info
     vars = diag(fit_fixfull$out$sigma)
     ## BIC-ICQ full model results to avoid repeat calculation of full model
@@ -320,9 +334,9 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     }
     
     # Fit second stage of 'abbreviated' model fit
-    if(progress == TRUE) cat("Start of stage 2 of abbreviated grid search \n")
+    if(progress == TRUE) message("Start of stage 2 of abbreviated grid search")
     fit_select = select_tune(dat = data_input, offset = offset, family = family,
-                             covar = object$call$covar, group_X = group_X, 
+                             covar = covar, group_X = group_X, 
                              lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              trace = trace,
@@ -335,7 +349,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                              ranef_keep = as.numeric((vars > 0)), 
                              lambda.min.full = lambda.min.full, stage1 = FALSE,
                              progress = progress)
-    if(progress == TRUE) cat("End of stage 2 of abbreviated grid search \n")
+    if(progress == TRUE) message("End of stage 2 of abbreviated grid search")
     
     resultsA = rbind(fit_fixfull$results, fit_select$results)
     coef_results = rbind(fit_fixfull$coef, fit_select$coef)
@@ -347,7 +361,7 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
     ###########################################################################################
     
     fit_select = select_tune(dat = data_input, offset = offset, family = family, 
-                             covar = object$call$covar, group_X = group_X, 
+                             covar = covar, group_X = group_X, 
                              lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
                              penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                              trace = trace, 
@@ -412,7 +426,8 @@ glmmPen_FineSearch = function(object, tuning_options = selectControl(), idx_rang
                   y = y, fixed_vars = object$fixed_vars,
                    X = X, Z_std = Z_std, group = object$data$group,
                    coef_names = list(fixed = names(object$fixef), random = colnames(object$sigma)), 
-                   family = object$family, offset = offset, frame = object$data$frame, 
+                   family = object$family, covar = covar,
+                  offset = offset, frame = object$data$frame, 
                    sampling = sampling, std_out = object$data$std_info, 
                    selection_results = selection_results, optim_results = optim_results,
                    penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 

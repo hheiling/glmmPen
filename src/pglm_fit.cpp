@@ -1,3 +1,5 @@
+// Fit a penalized generalized linear mixed model (no random effects)
+
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include <RcppArmadillo.h>

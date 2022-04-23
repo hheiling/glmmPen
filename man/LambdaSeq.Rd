@@ -21,19 +21,25 @@ documenation). X should not include intercept.}
 \item{y}{numeric vector of response values}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
 with canonical links only.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
-from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
-the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+from the MCP/SCAD/LASSO penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+the MCP/SCAD/LASSO penalty, while \code{alpha=0} is equivalent to ridge regression. However,
 \code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
 \item{lambda.min}{numeric fraction between 0 and 1. The sequence of the lambda penalty parameters
 ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
 a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
 \code{lambda.min} specifies this fraction. Default value is set to \code{NULL}, which
-automatically selects \code{lambda.min} to equal 0.01 when p <= 10 and 0.05 when p > 10.}
+automatically selects \code{lambda.min} to equal 0.01 when the number of observations is
+greater than the number of fixed effects predictors and 0.05 otherwise.
+Only used
+if either \code{lambda0_seq} or \code{lambda1_seq} remain unspecified by the user
+(one or both of these sequence arguments set to \code{NULL}) and, consequently, 
+one or more default sequences need
+to be calculated.}
 
 \item{nlambda}{positive integer specifying number of penalty parameters (lambda) with 
 which to fit a model.}

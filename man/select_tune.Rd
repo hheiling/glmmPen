@@ -45,12 +45,13 @@ the study, batch, or other group identity to which on observation belongs)}
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
-argument is \code{NULL}, this should be a numeric vector of length equal to the 
-number of cases (the response). If the data argument specifies a data.frame, the offset
+argument is not \code{NULL}, this should be a numeric vector of length equal to the 
+number of cases (the length of the response vector). 
+If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
 with canonical links only.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
@@ -66,24 +67,30 @@ algorithm automatically assumes an unstructured covariance structure and \code{c
 
 \item{penalty}{character describing the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
-matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
-random effects coefficients.}
+matrix is "unstructured", then a group MCP, group SCAD, or group LASSO penalty is used on the 
+random effects coefficients. See Breheny and Huang (2011) <doi:10.1214/10-AOAS388> 
+and Breheny and Huang (2015) <doi:10.1007/s11222-013-9424-2> for details of these penalties.}
 
-\item{lambda0_seq}{a sequence of non-negative numeric penalty parameters for the fixed 
-and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
+\item{lambda0_seq}{a sequence of non-negative numeric penalty parameters for 
+the fixed 
+and random effect coefficients (\code{lambda0_seq} and \code{lambda1_seq}, respectively). 
+If \code{NULL}, then a sequence will be automatically 
 calculated. See 'Details' section for more details on these default calculations.}
 
-\item{lambda1_seq}{a sequence of non-negative numeric penalty parameters for the fixed 
-and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
+\item{lambda1_seq}{a sequence of non-negative numeric penalty parameters for 
+the fixed 
+and random effect coefficients (\code{lambda0_seq} and \code{lambda1_seq}, respectively). 
+If \code{NULL}, then a sequence will be automatically 
 calculated. See 'Details' section for more details on these default calculations.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
-from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
-the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+from the MCP/SCAD/LASSO penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+the MCP/SCAD/LASSO penalty, while \code{alpha=0} is equivalent to ridge regression. However,
 \code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
-\item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
-Default is 4.0 for SCAD and 3.0 for MCP.}
+\item{gamma_penalty}{The scaling factor of the MCP and SCAD penalties. Not used by LASSO penalty.
+Default is 4.0 for SCAD and 3.0 for MCP. See Breheny and Huang (2011) <doi:10.1214/10-AOAS388> 
+and Breheny and Huang (2015) <doi:10.1007/s11222-013-9424-2> for further details.}
 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
@@ -102,15 +109,16 @@ containing the control parameters for the adaptive random walk Metropolis-within
 Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".}
 
 \item{optim_options}{a structure of class "optimControl" created 
-from function \code{\link{optimControl}} that specifies optimization parameters. See the 
+from function \code{\link{optimControl}} that specifies several optimization parameters. See the 
 documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{BIC_option}{character string specifying the selection criteria used to select the 'best' model.
 Default "BICq" option specifies the BIC-ICQ criterion (Ibrahim et al (2011)
 <doi:10.1111/j.1541-0420.2010.01463.x>),
 which requires a fit of 
-a full model; a small penalty (the minimum of the penalty sequence) 
-is used for the fixed and random effects. 
+a 'minimum penalty' model; a small penalty (the minimum of the penalty sequence) 
+is used for the fixed and random effects. See "Details" section for what these 
+small penalties will be.
 The "BICh" option utilizes the hybrid BIC value described in 
 Delattre, Lavielle, and Poursat (2014) <doi:10.1214/14-EJS890>.
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
@@ -127,13 +135,15 @@ However, if users are interested
 in comparing the best models from BIC-ICQ and other BIC-type selection criteria, setting
 \code{logLik_calc} to \code{TRUE} will calculate these other quantities for all of the models.}
 
-\item{BICq_posterior}{an optional character string expressing the path and file basename of a file combination that 
-will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
-These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-are requested (BIC-ICQ reference: Ibrahim et al (2011)
-<doi:https://doi.org/10.1111/j.1541-0420.2010.01463.x>). 
+\item{BICq_posterior}{an optional character string expressing the path and file 
+basename of a file combination that 
+will file-back or currently file-backs a \code{big.matrix} of the posterior samples from the 
+minimal penalty model used for the BIC-ICQ calculation used for model selection. T
+(BIC-ICQ reference: Ibrahim et al (2011)
+<doi:10.1111/j.1541-0420.2010.01463.x>). 
 If this argument is
-specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
+specified as \code{NULL} (default) and BIC-ICQ calculations are requested (see \code{\link{selectControl}})
+for details), the posterior samples
 will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
 in the working directory.
 See 'Details' section for additional details about the required format of \code{BICq_posterior}
@@ -142,9 +152,11 @@ and the file-backed big matrix.}
 \item{checks_complete}{logical value indicating if several data checks have been completed.}
 
 \item{pre_screen}{logical value indicating whether pre-screening should be performed before
-model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+model selection (default \code{TRUE}). If the number of random effects covariates
+considered is 4 or less, then
 no pre-screening will be performed. Pre-screening removes random effects from consideration
-during the model selection process, which can significantly speed up the algorithm.}
+during the model selection process, which can significantly speed up the algorithm.
+See "Details" section for a further discussion.}
 
 \item{ranef_keep}{vector of 0s and 1s indicating which random effects should 
 be considered as non-zero at the start of the algorithm. For each random effect,
@@ -152,7 +164,7 @@ be considered as non-zero at the start of the algorithm. For each random effect,
 0 indicates otherwise. The first element for the random intercept should always be 1.}
 
 \item{lambda.min.full}{a vector of two numeric values that gives the fixed and random effect penalty 
-values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
+values to use in pre-screening and/or the minimal penalty model fit for the BIC-ICQ calculation 
 (if applicable)}
 
 \item{stage1}{logical value indicating if the first stage of the abbreviated two-stage grid
@@ -163,10 +175,10 @@ full grid search over all possible penalty parameter combinations.}
 \item{progress}{a logical value indicating if additional output should be given showing the
 progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
 for the fit procedure (iteration number EM_iter,
-number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+number of MCMC samples nMC, average Euclidean distance between current coefficients and coefficients
 from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
-and number of non-zero fixed and random effects
-including the intercept). Additionally, \code{progress = TRUE}
+and number of non-zero fixed and random effects covariates
+not including the intercept). Additionally, \code{progress = TRUE}
 gives some other information regarding the progress of the variable selection 
 procedure, including the model selection criteria and log-likelihood estimates
 for each model fit.
