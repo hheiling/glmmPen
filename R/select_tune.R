@@ -84,7 +84,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   # Pre-screening step
   ## If number of random effects in model (including intercept) is 6 or more
   ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
-  if((ncol(dat$Z)/nlevels(dat$group) >= 6) & (pre_screen == T)){
+  if((ncol(dat$Z)/nlevels(dat$group) >= 6) & (pre_screen == TRUE)){
     message("Running prescreening procedure")
     out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 

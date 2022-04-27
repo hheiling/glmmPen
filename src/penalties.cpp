@@ -15,9 +15,9 @@ double soft_thresh(double zeta, double lambda){
   double abs_z = fabs(zeta);
   double val = 0;
   
-  if((zeta > 0) & (lambda < abs_z)){
+  if((zeta > 0) && (lambda < abs_z)){
     val = zeta - lambda;
-  }else if((zeta < 0) & (lambda < abs_z)){
+  }else if((zeta < 0) && (lambda < abs_z)){
     val = zeta + lambda;
   } else if(lambda >= abs_z ){
     val = 0;

@@ -16,7 +16,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
   const char* mcp = "MCP";
   const char* scad = "SCAD";
   
-  const char* pois = "poisson";
+  // const char* pois = "poisson";
   
   int p = dims(0); // number covariates (ncol(X))
   int N = dims(1); // total number observations (length(y))
@@ -43,7 +43,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
   
   v0 = sum(resid % resid) / N;
   
-  while((iter<maxit_CD) & (converged==0)){
+  while((iter<maxit_CD) && (converged==0)){
     
     // Add to iter
     iter = iter + 1;
@@ -55,7 +55,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     // Element-wise update of beta
     for(j=0; j<p; j++){
       
-      if((iter>=5) & (beta(j) == 0)){
+      if((iter>=5) && (beta(j) == 0)){
         // If beta penalized to zero in past round, will stay zero in further rounds
         // Therefore, skip to next covariate
         continue; 
@@ -66,7 +66,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
       zetaj = sum(X.col(j) % weights % resid) / N + nuj * beta(j);
       
       // Update beta
-      if((j==0) | (penalty_factor(j)==0)){
+      if((j==0) || (penalty_factor(j)==0)){
         // No penalization for the intercept or variables specifically requested not to have penalization
         beta(j) = zetaj / nuj;
       }else{
@@ -105,7 +105,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     // }
     
     for(i=0; i<N; i++){
-      if((weights(i) <= 1e-8) | (mu_check(i) == 0)){
+      if((weights(i) <= 1e-8) || (mu_check(i) == 0)){
         resid(i) = 0.0;
         weights(i) = 0.0;
       }
@@ -127,7 +127,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     
   } // End while loop
   
-  if((converged == 0) & (trace >= 1)){
+  if((converged == 0) && (trace >= 1)){
     Rcout << "initial coordinate descent algorithm did not converge" << std::endl;
   }
   

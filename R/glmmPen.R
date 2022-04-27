@@ -600,12 +600,12 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       # Check to see if files already exist in working directory
       # If they exist, remove files. 
       # Since this name is generic for all cases where the input of BICq_posterior was NULL,
-      #   save to assume user forgot that these files were saved previously.
+      #   safe to assume user forgot that these files were saved previously.
       # Delete to avoid potential issues of using wrong posterior draws for the model
       if(file.exists("BICq_Posterior_Draws.bin") | file.exists("BICq_Posterior_Draws.desc")){
         message("Removing existing BICq_Posterior_Draws files with saved posterior samples")
-        file.remove("BICq_Posterior_Draws.bin")
-        file.remove("BICq_Posterior_Draws.desc")
+        if(file.exists("BICq_Posterior_Draws.bin")) file.remove("BICq_Posterior_Draws.bin")
+        if(file.exists("BICq_Posterior_Draws.desc")) file.remove("BICq_Posterior_Draws.desc")
       }
     }else{
       BICq_post_file = BICq_posterior

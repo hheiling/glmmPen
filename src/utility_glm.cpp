@@ -32,7 +32,7 @@ arma::vec initial_mu(const char* family, arma::vec y, int N) {
       }
       mu(i) = (y(i) + 0.5)/(1.0+1.0);
     }
-  }else if((std::strcmp(family, pois) == 0) | (std::strcmp(family, negbin) == 0)){
+  }else if((std::strcmp(family, pois) == 0) || (std::strcmp(family, negbin) == 0)){
     for (i=0; i<N; i++) {
       if (y(i) < 0) {
         stop("negative values not allowed for the Poisson family");
@@ -77,7 +77,7 @@ arma::vec muvalid(const char* family, arma::vec mu) {
     for(i=0; i<N; i++){
       valid(i) = (mu(i) > minb && mu(i) < maxb);
     }
-  }else if((std::strcmp(family, pois) == 0) | (std::strcmp(family, negbin) == 0)){
+  }else if((std::strcmp(family, pois) == 0) || (std::strcmp(family, negbin) == 0)){
     for(i=0; i<N; i++){
       valid(i) = (mu(i) > minp);
     }
@@ -123,7 +123,7 @@ arma::vec mu_adjust(const char* family, arma::vec mu) {
         mu_new(i) = maxb;
       }
     }
-  }else if((std::strcmp(family, pois) == 0) | (std::strcmp(family, negbin) == 0)){
+  }else if((std::strcmp(family, pois) == 0) || (std::strcmp(family, negbin) == 0)){
     for(i=0; i<N; i++){
       if(mu(i) < minp){
         mu_new(i) = minp;
@@ -616,7 +616,7 @@ double phi_ml(arma::vec y, arma::mat eta, int link, int limit, double eps, doubl
   
   double phi_new;
   
-  if((phi > minTheta) & (phi < maxTheta)){
+  if((phi > minTheta) && (phi < maxTheta)){
     theta0 = 1.0/(phi);
   }else if(phi < minTheta){
     theta0 = maxTheta;
@@ -627,7 +627,7 @@ double phi_ml(arma::vec y, arma::mat eta, int link, int limit, double eps, doubl
   it  = 0;
   del = 1.0;
   
-  while((it < limit) & (fabs(del) > eps)) {
+  while((it < limit) && (fabs(del) > eps)) {
     score_info(theta0, eta, y, link, &score, &info);
     Rcout << "score: " << score << std::endl;
     Rcout << "info: " << info << std::endl;

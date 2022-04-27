@@ -14,8 +14,6 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
   
   arma::vec mu(M);
   arma::vec mu_check(M);
-  // arma::vec deriv(M);
-  // arma::vec Vmu(M);
   arma::vec resid(M);
   arma::vec weights(M);
   arma::vec const_ones(M); const_ones.ones();
@@ -34,7 +32,7 @@ arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, dou
   
   // If not binomial or gaussian family with canonical link, calculate nu = max(weights)
   // non-canonical link options not yet available
-  if((std::strcmp(family,pois) == 0) & (link == 20)){
+  if((std::strcmp(family,pois) == 0) && (link == 20)){
     
     weights = varfun(family, mu, phi);
     
