@@ -60,9 +60,9 @@ arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat
   arma::uvec n(1); // other observation counter
   int i=0;
   int j=0; // covariate group counter
-  int m=0; // MCMC draw counter
+  // int m=0; // MCMC draw counter
   int f=0;
-  int r=0;
+  // int r=0;
   int k=0; // index of observation group (from 0 to d-1)
   int iter=0; // while loop iteration
   int converged = 0; // 1 if algorithm converged, 0 otherwise
@@ -127,10 +127,10 @@ arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat
   // Initialize nu = max possible weight
   //-------------------------------------------------------------------------------//
   
-  if((std::strcmp(family, bin) == 0) & (link == 10)){
+  if((std::strcmp(family, bin) == 0) && (link == 10)){
     // nu always 0.25 for binomial family with logit link
     nu = 0.25;
-  }else if((std::strcmp(family, gaus) == 0) & (link == 30)){
+  }else if((std::strcmp(family, gaus) == 0) && (link == 30)){
     // nu always 1 for gaussian family with identity link
     nu = 1.0;
   }else{
@@ -199,13 +199,13 @@ arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat
       arma::uvec idxj = find(XZ_group == j);
       Kj = idxj.n_elem;
       
-      if((init == 1) & (iter>=3) & (sum(beta.elem(idxj)) == 0.0)){
+      if((init == 1) && (iter>=3) && (sum(beta.elem(idxj)) == 0.0)){
         // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
         // update all beta a few times regardless of whether betaj == 0.
         // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
         // Therefore, skip to next covariate grouping
         continue;
-      }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
+      }else if((init == 0) && (sum(beta.elem(idxj)) == 0.0)){
         // If beta penalized to zero in past round of EM iteration for same lambda, 
         // will stay zero in further rounds of EM algorithm
         // Therefore, skip to next covariate grouping
@@ -324,13 +324,13 @@ arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat
       arma::uvec idxj = find(XZ_group == j);
       Kj = idxj.n_elem;
       
-      if((init == 1) & (iter>=3) & (sum(beta.elem(idxj)) == 0.0)){
+      if((init == 1) && (iter>=3) && (sum(beta.elem(idxj)) == 0.0)){
         // If initializing beta using beta calculated from previous lambda in sequence of lambdas,
         // update all beta a few times regardless of whether betaj == 0.
         // If beta penalized to zero in past round for same lambda, will stay zero in further rounds
         // Therefore, skip to next covariate grouping
         continue;
-      }else if((init == 0) & (sum(beta.elem(idxj)) == 0.0)){
+      }else if((init == 0) && (sum(beta.elem(idxj)) == 0.0)){
         // If beta penalized to zero in past round of EM iteration for same lambda,
         // will stay zero in further rounds of EM algorithm
         // Therefore, skip to next covariate grouping
@@ -395,10 +395,10 @@ arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat
     } // End k for loop
     
     // Re-set nu if necessary
-    if((std::strcmp(family, bin) == 0) & (link == 10)){
+    if((std::strcmp(family, bin) == 0) && (link == 10)){
       // nu always 0.25 for binomial family with logit link
       nu = 0.25;
-    }else if((std::strcmp(family, gaus) == 0) & (link == 30)){
+    }else if((std::strcmp(family, gaus) == 0) && (link == 30)){
       // nu always 1 for gaussian family with identity link
       nu = 1.0;
     }else{
@@ -442,7 +442,7 @@ arma::vec grp_CD_XZ_fast(const arma::vec& y, const arma::mat& X, const arma::mat
     Rcout << "phi: " << phi << std::endl;
   }
   
-  if((converged == 0) & (trace >= 1)){
+  if((converged == 0) && (trace >= 1)){
     // warning("grouped coordinate descent algorithm did not converge \n");
     Rcout << "grouped coordinate descent algorithm did not converge" << std::endl;
   }

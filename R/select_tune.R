@@ -15,7 +15,7 @@
 #' best model.
 #' @param checks_complete logical value indicating if several data checks have been completed.
 #' @param lambda.min.full a vector of two numeric values that gives the fixed and random effect penalty 
-#' values to use in pre-screening and/or the full model fit for the BIC-ICQ calculation 
+#' values to use in pre-screening and/or the minimal penalty model fit for the BIC-ICQ calculation 
 #' (if applicable)
 #' @param stage1 logical value indicating if the first stage of the abbreviated two-stage grid
 #' search in the model selection procedure is being performed. \code{FALSE} if either 
@@ -84,9 +84,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   # Pre-screening step
   ## If number of random effects in model (including intercept) is 6 or more
   ## Note: since random effects are subset of fixed effects, fixed effects necessarily 6 or more
-  if((ncol(dat$Z)/nlevels(dat$group) >= 6) & (pre_screen == T)){
+  if((ncol(dat$Z)/nlevels(dat$group) >= 6) & (pre_screen == TRUE)){
     message("Running prescreening procedure")
-    # cat("begin prescreening procedure \n")
     out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 
                         lambda0_min = lambda.min.full[1], lambda1_min = lambda.min.full[2], 
@@ -94,7 +93,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
                         adapt_RW_options = adapt_RW_options, covar = covar,
                         var_start = var_start, 
                         checks_complete = checks_complete, progress = progress)
-    # cat("end prescreening procedure \n")
     ranef_keep = out_pre$ranef_keep
     coef_pre = out_pre$coef_pre
     u_pre = out_pre$u_pre
@@ -129,36 +127,36 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   sampler = optim_options$sampler
   
   ###########################################################################################
-  # BIC-ICQ calculation (optional)
+  # Minimal penalty model fit for BIC-ICQ calculation (optional)
   ###########################################################################################
   
   # ufull_describe: the output from describe(big_matrix)
   ufull_describe = NULL
   
   # Either read in already saved posterior samples for BIC-ICQ calculation, or
-  # specify that the full model needs to be fit in order to calculate these posterior samples
+  # specify that the minimal penalty model needs to be fit in order to calculate these posterior samples
   if(BICq_calc == T){
-    # If posterior draws from full model not yet created, fit full model and save posterior draws
-    # Otherwise, read in the prevoiusly fit full model posterior draw results
+    # If posterior draws from minimal penalty model not yet created, fit minimal penalty model and save posterior draws
+    # Otherwise, read in the prevoiusly fit minimal penalty model posterior draw results
     if(!is.null(BICq_posterior)){
       if(file.exists(sprintf("%s.desc",BICq_posterior)) & file.exists(sprintf("%s.bin",BICq_posterior))){
-        message("Using saved posterior draws from full model for BIC-ICQ calculation: ")
+        message("Using saved posterior draws from minimal penalty model for BIC-ICQ calculation: ")
         message(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior))
         fitfull_needed = FALSE
       }else{
         message(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior))
-        message(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc",
+        message(sprintf("Fitting minimal penalty model and saving posterior draws to %s.bin and %s.desc",
                       BICq_posterior, BICq_posterior))
         fitfull_needed = TRUE
       }
     }else{ # if is.null(BICq_posterior)
       BICq_posterior = "BICq_Posterior_Draws"
-      message(sprintf("Fitting full model and saving posterior draws to %s.bin and %s.desc within working directory",
+      message(sprintf("Fitting minimal penalty model and saving posterior draws to %s.bin and %s.desc within working directory",
                     BICq_posterior, BICq_posterior))
       fitfull_needed = TRUE
     } # End if-else !is.null(BICq_posterior)
     
-    # If in previous code chunk specified that full model needed to be fit, run full model
+    # If in previous code chunk specified that minimal penalty model needed to be fit, run minimal penalty model
     # and save posterior samples for BIC-ICQ calculation
     if(fitfull_needed){
       # fixed effects penalty
@@ -168,40 +166,40 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       ## assume a higher penalty on the random effects for a 'full' model
       if(ncol(dat$Z)/nlevels(dat$group) >= 6) lam1 = lambda.min.full[2] else lam1 = 0
       if((trace >= 1)){
-        cat("Penalty parameters used to calculate full model for BIC-ICQ calculation: \n")
+        cat("Penalty parameters used to calculate minimal penalty model for BIC-ICQ calculation: \n")
         cat(sprintf("fixed effects %f, random effects %f", lam0, lam1), "\n")
       }
       # Fit 'full' model
-      ## Note: M default set to 10^4 in optimControl(). Will report M posterior draws from full model
+      ## Note: M default set to 10^4 in optimControl(). Will report M posterior draws from minimal penalty model
       out = try(fit_dat(dat, lambda0 = lam0, lambda1 = lam1, 
                           nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
                           family = fam_fun, offset_fit = offset, group_X = group_X,
                           penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
                           trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
                           coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
-                          maxitEM = maxitEM + 15, maxit_CD = maxit_CD, t = t, mcc = mcc,
+                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
                           M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
                           covar = covar, var_start = var_start, logLik_calc = FALSE,
                           checks_complete = checks_complete,
                           ranef_keep = ranef_keep, progress = progress))
       
       if(is.character(out)){
-        warning("Issue with full model fit, no BICq calculation will be completed \n",
+        warning("Issue with minimal penalty model fit, no BICq calculation will be completed \n",
                 immediate. = TRUE)
         message("Setting model selection criteria to BICh")
         BIC_option = "BICh"
         ufull_describe = NULL
       }else{
         
-        # Using full model fit parameters, sample from the posterior (posterior samples used for
+        # Using minimal penalty model fit parameters, sample from the posterior (posterior samples used for
         # BIC-ICQ calculation)
         Estep_out = E_step_final(dat = dat, offset_fit = offset, fit = out, optim_options = optim_options, 
                                  fam_fun = fam_fun, extra_calc = FALSE, 
                                  adapt_RW_options = adapt_RW_options, trace = trace,
                                  progress = progress)
-        # ufull_big: big.matrix of posterior samples from full model
+        # ufull_big: big.matrix of posterior samples from minimal penalty model
         ufull_big = attach.big.matrix(Estep_out$u0)
-        # File-back the posterior samples of the full model
+        # File-back the posterior samples of the minimal penalty model
         ufull_big_tmp = as.big.matrix(ufull_big[,],
                                       backingpath = dirname(BICq_posterior),
                                       backingfile = sprintf("%s.bin",basename(BICq_posterior)),
@@ -210,26 +208,26 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         # ufull_describe: describe() output for the big.matrix of posterior samples
         ufull_describe = Estep_out$u0
         # If pre_screen = T, restrict the next model in the search to only consider random 
-        # effects that were not penalized out in this full model
+        # effects that were not penalized out in this minimal penalty model
         if(pre_screen){
           ranef_keep = as.numeric(diag(out$sigma) > 0)
         }
         # Restrict lambda1_seq to not include any points smaller than the minimum lambda used
-        # in the full model fit (restriction also applied if pre-screening performed)
+        # in the minimal penalty model fit (restriction also applied if pre-screening performed)
         lambda1_seq = lambda1_seq[which(lambda1_seq >= lam1)]
       }
       
     }else{ # if fitfull_needed = F
       if(progress == TRUE){
-        cat("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
+        message("Reading in ",BICq_posterior," for posterior draws for BICq calculation \n")
       }
-      # ufull_big: big.matrix of posterior samples from full model
+      # ufull_big: big.matrix of posterior samples from minimal penalty model
       ufull_big = attach.big.matrix(sprintf("%s.desc",BICq_posterior))
       # ufull_describe: describe() output for the big.matrix of posterior samples
       ufull_describe = describe(ufull_big)
       # Checks
       if(ncol(ufull_big) != ncol(dat$Z)){
-        stop("The number of columns in the saved full model posterior draws do not match \n",
+        stop("The number of columns in the saved minimal penalty model posterior draws do not match \n",
              "  the number of columns in the random effects matrix Z: ",ncol(dat$Z))
       }
       if(nrow(ufull_big) < 10^4){
@@ -242,7 +240,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   
   # Restrict lambda1_seq to not include any points smaller than the minimum lambda used
   # in the 'full' model fit used in pre-screening or BIC-ICQ calculation
-  ## Note: this restriction is also done when the full model is fit for the BIC-ICQ calculation
+  ## Note: this restriction is also done when the minimal penalty model is fit for the BIC-ICQ calculation
   ## (see code above)
   if(pre_screen){
     lambda1_seq = lambda1_seq[which(lambda1_seq >= lambda.min.full[2])]
@@ -290,7 +288,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   # If stage 1 of abbreviated grid search, will adjust ranef_keep for subsequent models:
   ## if random effect penalized out in model j, that random effect will be assumed 0 in
   ## subseqent model
-  # Therefore, store ranef_keep after pre-screening/full model (if performed)
+  # Therefore, store ranef_keep after pre-screening/minimal penalty model (if performed)
   ranef_keep_presc = ranef_keep
   
   for(j in 1:n2){ # random effects

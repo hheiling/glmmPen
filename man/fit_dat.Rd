@@ -50,10 +50,10 @@ fit_dat(
 Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
 the study, batch, or other group identity to which on observation belongs)}
 
-\item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
+\item{lambda0}{a non-negative numeric penalty parameter for the fixed effects coefficients}
 
 \item{lambda1}{a non-negative numeric penalty parameter for the (grouped) random effects
-covariance parameters}
+covariance coefficients}
 
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
 EM algorithm. Default is 0.0015. 
@@ -66,7 +66,7 @@ See \code{t} and \code{mcc} for more details.}
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0005.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
 with canonical links only.}
 
 \item{offset_fit}{This can be used to specify an a priori known component to be included in the 
@@ -78,21 +78,23 @@ See Details for more information about output provided when trace = 0, 1, or 2.}
 
 \item{penalty}{character describing the type of penalty to use in the variable selection procedure.
 Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
-matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
-random effects coefficients.}
+matrix is "unstructured", then a group MCP, group SCAD, or group LASSO penalty is used on the 
+random effects coefficients. See Breheny and Huang (2011) <doi:10.1214/10-AOAS388> 
+and Breheny and Huang (2015) <doi:10.1007/s11222-013-9424-2> for details of these penalties.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
-from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
-the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+from the MCP/SCAD/LASSO penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+the MCP/SCAD/LASSO penalty, while \code{alpha=0} is equivalent to ridge regression. However,
 \code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero}
 
-\item{gamma_penalty}{The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
-Default is 4.0 for SCAD and 3.0 for MCP.}
+\item{gamma_penalty}{The scaling factor of the MCP and SCAD penalties. Not used by LASSO penalty.
+Default is 4.0 for SCAD and 3.0 for MCP. See Breheny and Huang (2011) <doi:10.1214/10-AOAS388> 
+and Breheny and Huang (2015) <doi:10.1007/s11222-013-9424-2> for further details.}
 
 \item{group_X}{vector describing the grouping of the covariates in the model matrix.}
 
 \item{nMC_burnin}{positive integer specifying the number of posterior samples to use as
-burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
+burn-in for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
 the following defaults: Default 250 when the number of random effects 
 predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 to be less than 100.}
@@ -102,16 +104,16 @@ argument in \code{\link{optimControl}} for more details.}
 
 \item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws used
 in each step of the EM algorithm. If set to \code{NULL}, the algorithm inputs the following 
-defaults: When the number of random effect predictors is 10 or less, 
-Default is set to 5000 when no selection is performed and 2500 when selection is performed.
-Default is set to 1000 when the number of random effect predictors is greater than 10.}
+defaults: When the number of random effect covariates is greater than 10,
+the default is set to 1000; when the number of random effect covariates is
+10 or less, the default is set to 2500.}
 
 \item{t}{the convergence criteria is based on the average Euclidean distance between 
-the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
+the most recent coefficient estimates and the coefficient estimates from \code{t} EM iterations back.
 Positive integer, default equals 2.}
 
-\item{mcc}{the number of times the convergence critera must be met before the algorithm is
-seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+\item{mcc}{the number of times the convergence criteria must be met before the algorithm is
+seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value restricted 
 to be no less than 2.}
 
 \item{u_init}{matrix giving values to initialize samples from the posterior. If 
@@ -130,9 +132,9 @@ described by the object is used to calculate the BIC-ICQ value for the model.}
 
 \item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
 If set to \code{NULL}, then the algorithm inputs the following defaults:
-Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
+Default equals 50 for the Binomial and Poisson families, 65 for the Gaussian family.}
 
-\item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
+\item{maxit_CD}{a positive integer for the maximum number of allowed iterations for the
 coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.}
 
 \item{M}{positive integer specifying the number of posterior samples to use within the 
@@ -159,7 +161,7 @@ algorithm automatically assumes an unstructured covariance structure and \code{c
 
 \item{var_start}{either the character string "recommend" or a positive number specifying the 
 starting values to initialize the variance of the covariance matrix. Default "recommend" first
-fits a simple model with a fixed and random intercept only using a Laplace approximation. The 
+fits a simple model with a fixed and random intercept only using the \link{lme4} package. The 
 random intercept variance estimate from this model is then multiplied by 2 and used as the 
 starting variance.}
 
@@ -191,10 +193,10 @@ future versions of the package.}
 \item{progress}{a logical value indicating if additional output should be given showing the
 progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
 for the fit procedure (iteration number EM_iter,
-number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+number of MCMC samples nMC, average Euclidean distance between current coefficients and coefficients
 from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
-and number of non-zero fixed and random effects
-including the intercept). Additionally, \code{progress = TRUE}
+and number of non-zero fixed and random effects covariates
+not including the intercept). Additionally, \code{progress = TRUE}
 gives some other information regarding the progress of the variable selection 
 procedure, including the model selection criteria and log-likelihood estimates
 for each model fit.

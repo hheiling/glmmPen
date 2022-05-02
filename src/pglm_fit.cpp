@@ -1,3 +1,5 @@
+// Fit a penalized generalized linear mixed model (no random effects)
+
 // [[Rcpp::depends(RcppArmadillo)]]
 
 #include <RcppArmadillo.h>
@@ -50,7 +52,7 @@ arma::vec pglm_fit(arma::vec y, arma::mat X, arma::vec dims,
   resid = deriv % (y - mu);
   weights = constant.ones() / (deriv % deriv % Vmu);
   for(i=0; i<N; i++){
-    if((weights(i) <= 1e-8) | (mu_check(i) == 0)){
+    if((weights(i) <= 1e-8) || (mu_check(i) == 0)){
       resid(i) = 0.0;
       weights(i) = 0.0;
     }

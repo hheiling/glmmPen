@@ -2,9 +2,7 @@
 % Please edit documentation in R/control_options.R
 \name{optimControl}
 \alias{optimControl}
-\title{Control of Penalized Generalized Linear Mixed Model Fitting
-
-Constructs the control structure for the optimization of the penalized mixed model fit algorithm.}
+\title{Control of Penalized Generalized Linear Mixed Model Fitting}
 \usage{
 optimControl(
   conv_EM = 0.0015,
@@ -34,7 +32,7 @@ See \code{t} and \code{mcc} for more details.}
 grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0005.}
 
 \item{nMC_burnin}{positive integer specifying the number of posterior samples to use as
-burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
+burn-in for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
 the following defaults: Default 250 when the number of random effects 
 predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 to be less than 100.}
@@ -45,30 +43,30 @@ the number of random effects predictors is less than or equal to 10; default 100
 
 \item{nMC_max}{a positive integer for the maximum number of allowed Monte Carlo draws used
 in each step of the EM algorithm. If set to \code{NULL}, the algorithm inputs the following 
-defaults: When the number of random effect predictors is 10 or less, 
-Default is set to 5000 when no selection is performed and 2500 when selection is performed.
-Default is set to 1000 when the number of random effect predictors is greater than 10.}
+defaults: When the number of random effect covariates is greater than 10,
+the default is set to 1000; when the number of random effect covariates is
+10 or less, the default is set to 2500.}
 
 \item{nMC_report}{a positive integer for the number of posterior samples to save from the final
 model. These posterior samples can be used for diagnostic purposes, see \code{\link{plot_mcmc}}.
-Default set tp 5000.}
+Default set to 5000.}
 
 \item{maxitEM}{a positive integer for the maximum number of allowed EM iterations. 
 If set to \code{NULL}, then the algorithm inputs the following defaults:
-Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.}
+Default equals 50 for the Binomial and Poisson families, 65 for the Gaussian family.}
 
-\item{maxit_CD}{a positive integer for the maximum number of allowed interations for the
+\item{maxit_CD}{a positive integer for the maximum number of allowed iterations for the
 coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.}
 
 \item{M}{positive integer specifying the number of posterior samples to use within the 
 Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.}
 
 \item{t}{the convergence criteria is based on the average Euclidean distance between 
-the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
+the most recent coefficient estimates and the coefficient estimates from \code{t} EM iterations back.
 Positive integer, default equals 2.}
 
-\item{mcc}{the number of times the convergence critera must be met before the algorithm is
-seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+\item{mcc}{the number of times the convergence criteria must be met before the algorithm is
+seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value restricted 
 to be no less than 2.}
 
 \item{sampler}{character string specifying whether the posterior samples of the random effects
@@ -79,7 +77,7 @@ for some additional control structure parameters.}
 
 \item{var_start}{either the character string "recommend" or a positive number specifying the 
 starting values to initialize the variance of the covariance matrix. Default "recommend" first
-fits a simple model with a fixed and random intercept only using a Laplace approximation. The 
+fits a simple model with a fixed and random intercept only using the \link{lme4} package. The 
 random intercept variance estimate from this model is then multiplied by 2 and used as the 
 starting variance.}
 }
@@ -88,15 +86,13 @@ Function returns a list inheriting from class \code{optimControl}
 containing fit and optimization criteria values used in optimization routine.
 }
 \description{
-Control of Penalized Generalized Linear Mixed Model Fitting
-
 Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
 }
 \details{
 Several arguments are set to a default value of \code{NULL}. If these arguments 
 are left as \code{NULL} by the user, then these values will be filled in with appropriate
-default values as specified above, which may depend on the number of random effects,
-the family of the data, and/or whether selection is being performed. If the user
+default values as specified above, which may depend on the number of random effects or
+the family of the data. If the user
 specifies particular values for these arguments, no additional modifications to these 
 arguments will be done within the algorithm.
 }

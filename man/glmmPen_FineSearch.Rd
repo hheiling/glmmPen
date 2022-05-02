@@ -12,6 +12,7 @@ values, and performs model selection on this finer grid search.}
 glmmPen_FineSearch(
   object,
   tuning_options = selectControl(),
+  BIC_option = NULL,
   idx_range = 2,
   optim_options = NULL,
   adapt_RW_options = NULL,
@@ -30,6 +31,11 @@ documentation for details. The user can specify their own fine grid search, or i
 lambda0_seq and lambda1_seq arguments are left as \code{NULL}, the algorithm will automatically
 select a fine grid search based on the best model from the previous selection. See Details for 
 more information. Default value set to 1.}
+
+\item{BIC_option}{character string specifying the selection criteria used to select the 'best' model.
+If left as the default \code{NULL}, then will use the same selection criteria used
+during the grid search used to produce the input \code{pglmmObj} object. 
+See further details in the \code{BIC_option} description of \code{\link{selectControl}}.}
 
 \item{idx_range}{a positive integer that determines what positions within the sequence of the 
 fixed and random effect lambda penalty parameters used in the previous coarse grid search

@@ -5,44 +5,26 @@
 #' 
 #' @description Constructs control structures for penalized mixed model fitting.
 #' 
-#' @details If unspecified, the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
-#' automatically calculated. The sequence will be calculated in the same manner as 
-#' \code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
-#' small portion of max (\code{lambda.min}*(lambda max)), sequence is composed of 
-#' \code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
-#' values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
-#' running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
-#' By default, these sequences are calculated using \code{\link{LambdaSeq}}.
-#' 
-#' The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
-#' non-zero penalty parameter combination. However, this is generally not recommended. 
-#' 
-#' Abbreviated grid search: The abbreviated grid search proceeds in two stages. In stage 1, the
-#' algorithm fits the following series of models: the fixed effects penalty parameter remains a
-#' fixed value evaluated at the minimum of the fixed effects penalty parameters, and a all
-#' random effects penalty parameters are examined. The 'best' model from this first stage of models
-#' determines the optimum random effect penalty parameter. In stage 2, the algorithm fits the 
-#' following series of models: the random effects penalty parameter remains fixed at the value of
-#' the optimum random effect penalty parameter (from stage 1) and all fixed effects penalty
-#' parameters are considered. The best overall model is the best model from stage 2. This reduces the 
-#' number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). The authors found
-#' that this abbreviated grid search worked well in simulations.
-#' 
-#' @param lambda0 a non-negative numeric penalty parameter for the fixed effects parameters
+#' @param lambda0 a non-negative numeric penalty parameter for the fixed effects coefficients
 #' @param lambda1 a non-negative numeric penalty parameter for the (grouped) random effects
-#' covariance parameters
-#' @param lambda0_seq,lambda1_seq a sequence of non-negative numeric penalty parameters for the fixed 
-#' and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
+#' covariance coefficients
+#' @param lambda0_seq,lambda1_seq a sequence of non-negative numeric penalty parameters for 
+#' the fixed 
+#' and random effect coefficients (\code{lambda0_seq} and \code{lambda1_seq}, respectively). 
+#' If \code{NULL}, then a sequence will be automatically 
 #' calculated. See 'Details' section for more details on these default calculations. 
-#' @param nlambda positive integer specifying number of penalty parameters (lambda) 
-#' to use for the fixed and random effects penalty parameters. Default set to 10.
-#' Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.
+#' @param nlambda positive integer specifying number of penalty parameters  
+#' to use for the fixed and random effects penalty parameters. Default set to 10. Only used
+#' if either \code{lambda0_seq} or \code{lambda1_seq} remain unspecified by the user
+#' (one or both of these arguments set to \code{NULL}) and, consequently, one or more default sequences need
+#' to be calculated.
 #' @param BIC_option character string specifying the selection criteria used to select the 'best' model.
 #' Default "BICq" option specifies the BIC-ICQ criterion (Ibrahim et al (2011)
 #' <doi:10.1111/j.1541-0420.2010.01463.x>),
 #' which requires a fit of 
-#' a full model; a small penalty (the minimum of the penalty sequence) 
-#' is used for the fixed and random effects. 
+#' a 'minimum penalty' model; a small penalty (the minimum of the penalty sequence) 
+#' is used for the fixed and random effects. See "Details" section for what these 
+#' small penalties will be.
 #' The "BICh" option utilizes the hybrid BIC value described in 
 #' Delattre, Lavielle, and Poursat (2014) <doi:10.1214/14-EJS890>.
 #' The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
@@ -63,16 +45,95 @@
 #' ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
 #' a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
 #' \code{lambda.min} specifies this fraction. Default value is set to \code{NULL}, which
-#' automatically selects \code{lambda.min} to equal 0.01 when p <= 10 and 0.05 when p > 10.
+#' automatically selects \code{lambda.min} to equal 0.01 when the number of observations is
+#' greater than the number of fixed effects predictors and 0.05 otherwise.
+#' Only used
+#' if either \code{lambda0_seq} or \code{lambda1_seq} remain unspecified by the user
+#' (one or both of these sequence arguments set to \code{NULL}) and, consequently, 
+#' one or more default sequences need
+#' to be calculated.
 #' @param pre_screen logical value indicating whether pre-screening should be performed before
-#' model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+#' model selection (default \code{TRUE}). If the number of random effects covariates
+#' considered is 4 or less, then
 #' no pre-screening will be performed. Pre-screening removes random effects from consideration
 #' during the model selection process, which can significantly speed up the algorithm.
-#' @param lambda.min.presc numeric fraction between 0 and 1. During pre-screening and the full
+#' See "Details" section for a further discussion.
+#' @param lambda.min.presc numeric fraction between 0 and 1. During pre-screening and the 
+#' minimal penalty
 #' model fit for the BIC-ICQ calculation, the small penalty used on the random effect is
-#' the fraction \code{lambda.min.presc} mulitplied by the maximum penalty parameter that penalizes
+#' the fraction \code{lambda.min.presc} multiplied by the maximum penalty parameter that penalizes
 #' all fixed and random effects to 0. If left as \code{NULL}, the default value is 0.01 when the number
-#' of random effects is 10 or less and 0.05 otherwise.
+#' of random effect covariates is 10 or less and 0.05 otherwise.
+#' Only used if \code{lambda1_seq} remains unspecified by the user
+#' (this argument set to \code{NULL} so the random effects penalty parameter sequence
+#' needs to be automatically calculated) AND either the pre-screening procedure is selected by the argument
+#' \code{pre_screen} or the BIC-ICQ is selected as the model selection criteria,
+#' i.e., \code{BIC_option} = "BICq". See the "Details" section for a further discussion.
+#' 
+#' 
+#' @details If left as the default \code{NULL} values, 
+#' the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
+#' automatically calculated. The sequence will be calculated in the same manner as 
+#' \code{ncvreg} calculates the range: the max value (let's denote this as \code{lambda_max}) 
+#' penalizes all fixed and random effects to 0, the min value is a 
+#' small portion of max (\code{lambda.min}*\code{lambda_max}), and the sequence is composed of 
+#' \code{nlambda} values ranging from these min and max values spread evenly on the log scale. 
+#' Unlike \code{ncvreg}, the order of penalty
+#' values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
+#' running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
+#' By default, these sequences are calculated using \code{\link{LambdaSeq}}.
+#' 
+#' The \code{lambda0} and \code{lambda1} arguments used within the \code{\link{glmm}} function 
+#' allow for a user to fit a model with a single 
+#' non-zero penalty parameter combination. However, this is generally not recommended. 
+#' 
+#' Abbreviated grid search: The abbreviated grid search proceeds in two stages. In stage 1, the
+#' algorithm fits the following series of models: the fixed effects penalty parameter remains a
+#' fixed value evaluated at the minimum of the fixed effects penalty parameters, and all
+#' random effects penalty parameters are examined. The 'best' model from this first stage of models
+#' determines the optimum random effect penalty parameter. In stage 2, the algorithm fits the 
+#' following series of models: the random effects penalty parameter remains fixed at the value of
+#' the optimum random effect penalty parameter (from stage 1) and all fixed effects penalty
+#' parameters are considered. The best overall model is the best model from stage 2. This reduces the 
+#' number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). The authors found
+#' that this abbreviated grid search worked well in simulations, and performed considerably
+#' faster than the full grid search that examined all possible fixed and random effect penalty
+#' parameter combinations.
+#' 
+#' The arguments \code{nlambda} and \code{lambda.min} are only used
+#' if one or both of the \code{lambda0_seq} and \code{lambda1_seq} penalty sequences
+#' (corresponding to the fixed and random effects penalty sequences, respectively) 
+#' remain unspecified by the user (one or both of these arguments left as \code{NULL}),
+#' indicating that the algorithm needs to calculate default penalty sequences.
+#' 
+#' The argument \code{lambda.min.presc} is only used under the following condition:
+#' \code{lambda1_seq} remains unspecified by the user
+#' (this argument set to \code{NULL} so the random effects penalty parameter sequence
+#' needs to be calculated) AND either the pre-screening procedure is selected by the argument
+#' \code{pre_screen} or the BIC-ICQ is selected as the model selection criteria,
+#' i.e., \code{BIC_option} = "BICq". 
+#' If \code{lambda1_seq} is specified by the user, the minimum
+#' value in that sequence will be used as the random effect penalty in the
+#' pre-screening procedure and/or the minimal penalty model for the BIC-ICQ calculation.
+#' 
+#' BIC-ICQ calculation: This model selection criteria requires the fitting of a 'minimal penalty'
+#' model, which fits a model with a small penalty on the fixed and random effects.
+#' For the fixed effects penalty, the minimal penalty is: (a) 0 if the number of fixed 
+#' effects covariates is 4 or less or (b) the minimum fixed effect penalty from the fixed
+#' effects penalty sequence (either from the default sequence or from the sequence
+#' specified by the user). For the random effects penalty, the minimal penalty
+#' is (a) 0 if the number of random 
+#' effects covariates is 4 or less; (b) the minimum random effect penalty 
+#' from the random effects penalty sequence specified by the user, or 
+#' (c) \code{lambda.min.presc} multiplied to the \code{lambda_max} maximum penalty
+#' specified above when a default random effects penalty sequence is calculated.
+#' 
+#' Pre-screening: The minimum fixed effects penalty used in the pre-screening stage 
+#' will be the minimum penalty of the fixed effects penalty sequence, \code{lambda0_seq}.
+#' The minimum random effects penalty used in the pre-screening stage will be either 
+#' (a) the minimum random effects penalty in the sequence \code{lambda1_seq} 
+#' if this sequence specified by the user, or (b) \code{lambda.min.pres} x \code{lambda_max},
+#' where \code{lambda_max} was described above.
 #' 
 #' @return The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
 #' containing parameter values that determine settings for variable selection.
@@ -223,7 +284,7 @@ adaptControl = function(batch_length = 100, offset = 0){
 
 #' @title Control of Penalized Generalized Linear Mixed Model Fitting
 #' 
-#' Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
+#' @description Constructs the control structure for the optimization of the penalized mixed model fit algorithm.
 #' 
 #' @param conv_EM a non-negative numeric convergence criteria for the convergence of the 
 #' EM algorithm. Default is 0.0015. 
@@ -234,7 +295,7 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' @param conv_CD a non-negative numeric convergence criteria for the convergence of the 
 #' grouped coordinate descent loop within the M step of the EM algorithm. Default 0.0005.
 #' @param nMC_burnin positive integer specifying the number of posterior samples to use as
-#' burnin for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
+#' burn-in for each E step in the EM algorithm. If set to \code{NULL}, the algorithm inputs
 #' the following defaults: Default 250 when the number of random effects 
 #' predictors is less than or equal to 10; default 100 otherwise. Function will not allow \code{nMC_burnin}
 #' to be less than 100. 
@@ -243,24 +304,24 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' the number of random effects predictors is less than or equal to 10; default 100 otherwise.
 #' @param nMC_max a positive integer for the maximum number of allowed Monte Carlo draws used
 #' in each step of the EM algorithm. If set to \code{NULL}, the algorithm inputs the following 
-#' defaults: When the number of random effect predictors is 10 or less, 
-#' Default is set to 5000 when no selection is performed and 2500 when selection is performed.
-#' Default is set to 1000 when the number of random effect predictors is greater than 10.
+#' defaults: When the number of random effect covariates is greater than 10,
+#' the default is set to 1000; when the number of random effect covariates is
+#' 10 or less, the default is set to 2500.
 #' @param nMC_report a positive integer for the number of posterior samples to save from the final
 #' model. These posterior samples can be used for diagnostic purposes, see \code{\link{plot_mcmc}}.
-#' Default set tp 5000.
+#' Default set to 5000.
 #' @param maxitEM a positive integer for the maximum number of allowed EM iterations. 
 #' If set to \code{NULL}, then the algorithm inputs the following defaults:
-#' Default equals 50 for the Binomial and Poisson families, 100 for the Gaussian family.
-#' @param maxit_CD a positive integer for the maximum number of allowed interations for the
+#' Default equals 50 for the Binomial and Poisson families, 65 for the Gaussian family.
+#' @param maxit_CD a positive integer for the maximum number of allowed iterations for the
 #' coordinate descent algorithms used within the M-step of each EM iteration. Default equals 50.
 #' @param M positive integer specifying the number of posterior samples to use within the 
 #' Pajor log-likelihood calculation. Default is 10^4; minimum allowed value is 5000.
 #' @param t the convergence criteria is based on the average Euclidean distance between 
-#' the most recent coefficient estimates and the coefficient estimates from t EM iterations back.
+#' the most recent coefficient estimates and the coefficient estimates from \code{t} EM iterations back.
 #' Positive integer, default equals 2.
-#' @param mcc the number of times the convergence critera must be met before the algorithm is
-#' seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value retricted 
+#' @param mcc the number of times the convergence criteria must be met before the algorithm is
+#' seen as having converged (mcc for 'meet condition counter'). Default set to 2. Value restricted 
 #' to be no less than 2.
 #' @param sampler character string specifying whether the posterior samples of the random effects
 #' should be drawn using Stan (default, from package rstan) or the Metropolis-within-Gibbs procedure 
@@ -269,14 +330,14 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' for some additional control structure parameters.
 #' @param var_start either the character string "recommend" or a positive number specifying the 
 #' starting values to initialize the variance of the covariance matrix. Default "recommend" first
-#' fits a simple model with a fixed and random intercept only using a Laplace approximation. The 
+#' fits a simple model with a fixed and random intercept only using the \link{lme4} package. The 
 #' random intercept variance estimate from this model is then multiplied by 2 and used as the 
 #' starting variance. 
 #' 
 #' @details Several arguments are set to a default value of \code{NULL}. If these arguments 
 #' are left as \code{NULL} by the user, then these values will be filled in with appropriate
-#' default values as specified above, which may depend on the number of random effects,
-#' the family of the data, and/or whether selection is being performed. If the user
+#' default values as specified above, which may depend on the number of random effects or
+#' the family of the data. If the user
 #' specifies particular values for these arguments, no additional modifications to these 
 #' arguments will be done within the algorithm.
 #' 
@@ -352,53 +413,42 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
 # optim_recommend: For input arguments of optimControl() that are set to NULL by default,
 #   recommend appropriate inputs that depend on the family, number of random effects,
 #   and whether or not variable selection is being performed.
-# q = number of random effects (including random intercept)
+# q = number of random effects (including random intercept) 
+#     Alternatively, q = number latent factors for glmm_FA and glmmPen_FA functions
 # select: TRUE if running the selection algorithm
 optim_recommend = function(optim_options, family, q, select){
   
-  # If selection and moderate/small q, or if large q (with or without selection):
-  
-  if (q <= 11) { # q includes random intercept
-    # For selection, decrease nMC_max to improve time
-    ## Note: During selection, will initialize with good starting points, so
-    ## larger nMC_max not needed for convergence
-    ## In order to speed up algorithm, will decrease nMC_max while increasing maxitEM
-    # Otherwise, keep everything else the same
-    if (select == TRUE) {
-      if(is.null(optim_options$nMC_max)){
-        optim_options$nMC_max = 2500
-      }
+  # Default nMC in case with large number of random effects covariates
+  if(q <= 11){ # q includes random intercept, "if number random effect covariates <= 10"
+    # If not special case of large q, give default values of nMC args
+    if(is.null(optim_options$nMC_burnin)){
+      optim_options$nMC_burnin = 250
     }
-  }else{
-    # Decrease nMC
+    if(is.null(optim_options$nMC)){
+      optim_options$nMC = 250
+    }
+    if(is.null(optim_options$nMC_max)){
+      optim_options$nMC_max = 2500
+    }
+  }else{ # q includes random intercept, "if number random effect covariates >= 11"
+    # Decrease burn-in and starting nMC
     if(is.null(optim_options$nMC_burnin)){
       optim_options$nMC_burnin = 100
     }
     if(is.null(optim_options$nMC)){
       optim_options$nMC = 100
     }
-    if(is.null(optim_options$nMC_burnin)){
+    if(is.null(optim_options$nMC_max)){
       optim_options$nMC_max = 1000
     }
-    
   } # End if-else q <= 11
   
-  # If not special case of large q and/or selection, give default values of nMC args and maxitEM
-  
-  if(is.null(optim_options$nMC_burnin)){
-    optim_options$nMC_burnin = 250
-  }
-  if(is.null(optim_options$nMC)){
-    optim_options$nMC = 250
-  }
-  if(is.null(optim_options$nMC_max)){
-    optim_options$nMC_max = 5000
-  }
+  # Default maxitEM
   if(is.null(optim_options$maxitEM)){
     if(family %in% c("binomial","poisson")){
       optim_options$maxitEM = 50
     }else if(family == "gaussian"){
-      optim_options$maxitEM = 50
+      optim_options$maxitEM = 65
     }
   }
   
@@ -407,6 +457,73 @@ optim_recommend = function(optim_options, family, q, select){
   }
   
   return(optim_options)
+  
+}
+
+#' @title Control of Latent Factor Model Number Estimation
+#' 
+#' Constructs the control structure for the estimation of the 
+#' number of latent factors (r) for use within the \code{glmmPen_FA} and
+#' \code{glmm_FA} estimation procedures.
+#' 
+#' @param r positive integer specifying number of latent common factors to assume 
+#' in the model. If \code{NULL} (default), this value estimated from the data. See 
+#' \code{r_est_method} for available estimation procedures, and the Details
+#' section for further details on the general estimation procedure.
+#' @param r_max positive integer specifying maximum number of latent factors to consider.
+#' If \code{NULL} (default), this value is automatically calculated.
+#' @param r_est_method character string indicating method used to estimate number
+#' of latent factors \code{r}. Default "GR" uses the Growth Ratio method of
+#' Ahn and Horenstein (2013). Other available options include "ER" for
+#' the Eigenvalue Ratio method of Ahn and Horenstein (2013) and "BN1" or "BN2",
+#' the Bai and Ng (2002) method using one of two penalties: 
+#' (1) \code{(d + p) / (d p) log(d p/(d+p))},
+#' (2) \code{(d + p) / (d p) log(min(d,p))} where d is the number of groups in
+#' the data and p is the number of total random effect covariates (including the intercept)
+#' @param size positive integer specifying the total number of pseudo random
+#' effect estimates to use in the estimation procedure for the number of latent factors
+#' r, which is restricted to be no less than 25. If this \code{size} is greater
+#' than the number of groups in the data (i.e.~the number of levels of the grouping
+#' variable), then a sampling procedure is used to increase the number of pseudo estimates
+#' to the value of \code{size}.
+#' 
+#' @details TODO: additional details on estimation procedure.
+#' 
+#' @export
+rControl = function(r = NULL, r_max = NULL, r_est_method = "GR",
+                    size = 25){
+  
+  # r, r_max, and sample_size must all be positive integers
+  int_check = list(r = r, r_max = r_max, size = size)
+  var_int_names = names(int_check)
+  for(i in 1:length(int_check)){
+    x = int_check[[i]]
+    if(!is.null(x)){
+      if(!(floor(x) == x) | (x <= 0)){
+        stop(x, " must be a postive integer")
+      }
+    }
+  }
+  
+  # Additional size checks: r, r_max, and sample_size must be of sufficient size
+  if(!is.null(r)){
+    if(r < 2){
+      message("number of latent factors r restricted to be no less than 2")
+    }
+  }
+  
+  if(size < 25){
+    stop("size restricted to be no less than 25")
+  }
+  
+  # Check of r estimation method
+  if(!(r_est_method %in% c("GR","ER","BN1","BN2"))){ 
+    stop("r_est_method must be one of GR, ER, BN1, or BN2, see rControl() documentation")
+  } 
+  
+  structure(list(r = r, r_max = r_max, r_est_method = r_est_method,
+                 size = size),
+            class = "rControl")
   
 }
 

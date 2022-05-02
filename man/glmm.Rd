@@ -21,7 +21,7 @@ glmm(
 \arguments{
 \item{formula}{a two-sided linear formula object describing both the fixed effects and 
 random effects part of the model, with the response on the left of a ~ operator and the terms, 
-sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
+separated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
 ("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
 of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
 will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
@@ -31,7 +31,7 @@ The offset must be specified outside of the formula in the 'offset' argument.}
 omitted, variables will be taken from the environment of \code{formula}.}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
 with canonical links only.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
@@ -45,12 +45,13 @@ algorithm automatically assumes an unstructured covariance structure and \code{c
 
 \item{offset}{This can be used to specify an \emph{a priori} known component to be included in the 
 linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
-argument is \code{NULL}, this should be a numeric vector of length equal to the 
-number of cases (the response). If the data argument specifies a data.frame, the offset
+argument is not \code{NULL}, this should be a numeric vector of length equal to the 
+number of cases (the length of the response vector). 
+If the data argument specifies a data.frame, the offset
 argument should specify the name of a column in the data.frame.}
 
 \item{optim_options}{a structure of class "optimControl" created 
-from function \code{\link{optimControl}} that specifies optimization parameters. See the 
+from function \code{\link{optimControl}} that specifies several optimization parameters. See the 
 documentation for \code{\link{optimControl}} for more details on defaults.}
 
 \item{adapt_RW_options}{a list of class "adaptControl" from function \code{\link{adaptControl}} 
@@ -60,21 +61,21 @@ Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" 
 \item{trace}{an integer specifying print output to include as function runs. Default value is 0. 
 See Details for more information about output provided when trace = 0, 1, or 2.}
 
-\item{tuning_options}{a list of class selectControl or lambdaControl resulting from 
+\item{tuning_options}{a list of class "selectControl" or "lambdaControl" resulting from 
 \code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
 When function \code{glmm} is used,the algorithm may be run using one specific set of
 penalty parameters \code{lambda0} and \code{lambda1} by specifying such values in \code{lambdaControl()}. 
 The default for \code{glmm} is to run the model fit with no penalization (\code{lambda0} = \code{lambda1} = 0).
-When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
+When function \code{glmmPen} is run, \code{tuning_options} is specified using \code{selectControl()}. 
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
 \item{progress}{a logical value indicating if additional output should be given showing the
 progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
 for the fit procedure (iteration number EM_iter,
-number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+number of MCMC samples nMC, average Euclidean distance between current coefficients and coefficients
 from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
-and number of non-zero fixed and random effects
-including the intercept). Additionally, \code{progress = TRUE}
+and number of non-zero fixed and random effects covariates
+not including the intercept). Additionally, \code{progress = TRUE}
 gives some other information regarding the progress of the variable selection 
 procedure, including the model selection criteria and log-likelihood estimates
 for each model fit.
@@ -96,12 +97,12 @@ is performed.
 The \code{glmm} function can be used to fit a single generalized mixed model.
 While this approach is meant to be used in the case where the user knows which
 covariates belong in the fixed and random effects and no penalization is required, one is
-allowed to specify non-zero fixed and random effects penalites using \code{\link{lambdaControl}}
+allowed to specify non-zero fixed and random effects penalties using \code{\link{lambdaControl}}
 and the (...) arguments. The (...) allow for specification of penalty-related arguments; see
 \code{\link{glmmPen}} for details. For a high dimensional situation, the user may want to fit a 
-full model using a small penalty for the fixed and random effects and save the posterior
-draws from this full model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
-Specifying a file name in the 'BICq_posterior' argument will save the posterior draws from the 
+minimal penalty model using a small penalty for the fixed and random effects and save the posterior
+samples from this minimal penalty model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
+Specifying a file name in the 'BICq_posterior' argument will save the posterior samples from the 
 \code{glmm} model into a big.matrix with this file name, see the Details section of 
 \code{\link{glmmPen}} for additional details.
 }

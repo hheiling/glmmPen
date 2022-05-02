@@ -56,7 +56,7 @@ E_step_final= function(dat, offset_fit, fit, optim_options,
     Znew2[group == k,seq(k, ncol(Z), by = d)] = Z[group == k,seq(k, ncol(Z), by = d)]%*%Gamma_mat
   }
   
-  if(progress == TRUE) cat("Start of sampling from posterior \n")
+  if(progress == TRUE) message("Start of sampling from posterior")
   Estep_out = E_step(coef = coef, ranef_idx = which(diag(sigma > 0)), y = y,
                      X = X, Znew2 = Znew2, group = group, offset_fit = offset_fit,
                      nMC = M, nMC_burnin = nMC_burnin,
@@ -65,7 +65,7 @@ E_step_final= function(dat, offset_fit, fit, optim_options,
                      proposal_SD = fit$proposal_SD, batch = fit$updated_batch, 
                      batch_length = adapt_RW_options$batch_length, 
                      offset_increment = adapt_RW_options$offset, trace = trace)
-  if(progress == TRUE) cat("Finished sampling from posterior \n")
+  if(progress == TRUE) message("Finished sampling from posterior")
   
   if(extra_calc){
     

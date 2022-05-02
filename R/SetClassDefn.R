@@ -58,6 +58,10 @@
 #' sample chains, including the Gibbs acceptance rates (included for both the independence
 #' and adaptive random walk samplers) and the final proposal standard deviations 
 #' (included for the adaptive random walk sampler only))}
+#' \item{r_estimation}{list of output related to estimation of number of latent common 
+#' factors, r. Only relevant for the output of functions \code{glmm_FA} and 
+#' \code{glmmPen_FA}, which are currently in development and are not yet ready for
+#' general use.}
 #' 
 #' showClass("pglmmObj")
 #' methods(class = "pglmmObj")
@@ -70,6 +74,7 @@ pglmmObj = setRefClass("pglmmObj",
               fixef = "numeric", # fixed effects coefficients
               ranef = "list", # random effects coefficients
               sigma = "matrix", 
+              covar = "character",
               scale = "list",
               posterior_samples = "matrix",
               sampling = "character",
@@ -84,7 +89,8 @@ pglmmObj = setRefClass("pglmmObj",
               optinfo = "list",
               control_info = "list",
               Estep_init = "list",
-              Gibbs_info = "list"
+              Gibbs_info = "list",
+              r_estimation = "list"
             ),
             methods = list(
               initialize = function(x){ # x = input list object
@@ -130,6 +136,8 @@ pglmmObj = setRefClass("pglmmObj",
                 sigma <<- x$sigma
                 colnames(sigma) <<- x$coef_names$random
                 rownames(sigma) <<- x$coef_names$random
+                
+                covar <<- x$covar
                 
                 # coef <<- x$coef
                 # names(coef) = c(x$coef_names$fixed, str_c("Gamma",0:length(coef[-c(1:p)])))
@@ -181,6 +189,12 @@ pglmmObj = setRefClass("pglmmObj",
                 Estep_init <<- list(u_init = x$Estep_out$u_init, coef = x$coef,
                                         updated_batch = x$updated_batch)
                 Gibbs_info <<- list(gibbs_accept_rate = x$gibbs_accept_rate, proposal_SD = x$proposal_SD)
+                if(is.null(x$r_estimation)){
+                  r_estimation <<- list(r = NULL, r_est_method = NULL, r_max = NULL)
+                }else{
+                  r_estimation <<- x$r_estimation
+                }
+                
                 
               },
               show = function(){

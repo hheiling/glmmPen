@@ -13,7 +13,7 @@ fixef.pglmmObj = function(object){
   object$fixef
 }
 
-#' @describeIn pglmmObj Provides the random effects coefficients for each explanatory variable
+#' @describeIn pglmmObj Provides the random effects posterior modes for each explanatory variable
 #' for each level of the grouping factor
 #'
 #' @importFrom lme4 ranef
@@ -47,8 +47,9 @@ sigma.pglmmObj = function(object, ...){
   return(out)
 }
 
-#' @describeIn pglmmObj Computes the sum of the random and fixed effects 
-#' coefficients for each explanatory variable for each level of each grouping factor.
+#' @describeIn pglmmObj Computes the sum of the fixed effects 
+#' coefficients and the random effect posterior modes 
+#' for each explanatory variable for each level of each grouping factor.
 #' 
 #' @importFrom stats coef setNames
 #' @export
@@ -216,7 +217,7 @@ invLink = function(family, eta){
   return(mu)
 }
 
-#' @describeIn pglmmObj Fitted values
+#' @describeIn pglmmObj Fitted values, i.e., the linear predictor of the model.
 #' 
 #' @inheritParams predict.pglmmObj
 #' 
@@ -248,16 +249,21 @@ fitted.pglmmObj = function(object, fixed.only = TRUE, ...){
 }
 
 
-#' @describeIn pglmmObj Predictions for the pglmmObj output object from the glmmPen package functions.
-#' Argument \code{type}: character string for type of predictors: "link", which generates the linear predictor,
+#' @describeIn pglmmObj Predictions for the model corresponding to 
+#' the pglmmObj output object from the glmmPen package functions. The function
+#' \code{predict} can predict either the linear predictor of the model or the
+#' expected mean of the response, as specified by the \code{type} argument.
+#' Argument \code{type}: character string for type of predictors: "link" (default), 
+#' which generates the linear predictor,
 #' and "response", which generates the expected mean values of the response.
 #' 
 #' @param object pglmmObj object output from \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}
 #' @param newdata optional new data.frame containing the same variables used in the model fit procedure
 #' @param type See details of \code{type} options for each function under "Functions" section.
-#' @param fixed.only logical value; default \code{TRUE} indicates that only the fixed effects 
+#' @param fixed.only logical value; default \code{TRUE} indicates that only the 
+#' fixed effects 
 #' should be used in the fitted value/prediction, while \code{FALSE} indicates that both the fixed and 
-#' random effects should be used in the fitted value/prediction
+#' random effects posterior modes should be used in the fitted value/prediction
 #' @param ... potentially further arguments passed from other methods
 #' 
 #' @importFrom stats predict drop.terms reformulate

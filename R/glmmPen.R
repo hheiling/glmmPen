@@ -12,12 +12,12 @@
 #' @details The \code{glmm} function can be used to fit a single generalized mixed model.
 #' While this approach is meant to be used in the case where the user knows which
 #' covariates belong in the fixed and random effects and no penalization is required, one is
-#' allowed to specify non-zero fixed and random effects penalites using \code{\link{lambdaControl}}
+#' allowed to specify non-zero fixed and random effects penalties using \code{\link{lambdaControl}}
 #' and the (...) arguments. The (...) allow for specification of penalty-related arguments; see
 #' \code{\link{glmmPen}} for details. For a high dimensional situation, the user may want to fit a 
-#' full model using a small penalty for the fixed and random effects and save the posterior
-#' draws from this full model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
-#' Specifying a file name in the 'BICq_posterior' argument will save the posterior draws from the 
+#' minimal penalty model using a small penalty for the fixed and random effects and save the posterior
+#' samples from this minimal penalty model for use in any BIC-ICQ calculations during selection within \code{glmmPen}. 
+#' Specifying a file name in the 'BICq_posterior' argument will save the posterior samples from the 
 #' \code{glmm} model into a big.matrix with this file name, see the Details section of 
 #' \code{\link{glmmPen}} for additional details.
 #' 
@@ -159,7 +159,7 @@ fD_adj = function(out){
   # Convert alpha-numeric group to numeric group (e.g. "A","B","C" to 1,2,3) for ease of 
   # computation within fit_dat() algorithm.
   ## Even if already numeric, convert to levels 1,2,3,... (consecutive integers)
-  group_num = factor(as.numeric(group))
+  group_num = factor(group, labels = 1:nlevels(group))
   
   d = nlevels(group)
   numvars = nrow(Zt)/d
@@ -199,7 +199,7 @@ fD_adj = function(out){
 #' 
 #' @param formula a two-sided linear formula object describing both the fixed effects and 
 #' random effects part of the model, with the response on the left of a ~ operator and the terms, 
-#' sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
+#' separated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
 #' ("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
 #' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
 #' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
@@ -207,7 +207,7 @@ fD_adj = function(out){
 #' @param data an optional data frame containing the variables named in \code{formula}. If \code{data} is 
 #' omitted, variables will be taken from the environment of \code{formula}.
 #' @param family a description of the error distribution and link function to be used in the model. 
-#' Currently, the \code{glmmPen} algorithm allows the binomial, gaussian, and poisson families
+#' Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
 #' with canonical links only.
 #' @param covar character string specifying whether the covariance matrix should be unstructured
 #' ("unstructured") or diagonal with no covariances between variables ("independent").
@@ -219,8 +219,9 @@ fD_adj = function(out){
 #' algorithm automatically assumes an unstructured covariance structure and \code{covar} is set to "unstructured".
 #' @param offset This can be used to specify an \emph{a priori} known component to be included in the 
 #' linear predictor during fitting. Default set to \code{NULL} (no offset). If the data 
-#' argument is \code{NULL}, this should be a numeric vector of length equal to the 
-#' number of cases (the response). If the data argument specifies a data.frame, the offset
+#' argument is not \code{NULL}, this should be a numeric vector of length equal to the 
+#' number of cases (the length of the response vector). 
+#' If the data argument specifies a data.frame, the offset
 #' argument should specify the name of a column in the data.frame.
 #' @param fixef_noPen Optional vector of 0's and 1's of the same length as the number of fixed effects covariates
 #' used in the model. Value 0 indicates the variable should not have its fixed effect coefficient
@@ -228,34 +229,38 @@ fD_adj = function(out){
 #' fixed effects given in the formula.
 #' @param penalty character describing the type of penalty to use in the variable selection procedure.
 #' Options include 'MCP', 'SCAD', and 'lasso'. Default is MCP penalty. If the random effect covariance
-#' matrix is "unstructured", then a group MCP, group SCAD, or group Lasso penalty is used on the 
-#' random effects coefficients. 
+#' matrix is "unstructured", then a group MCP, group SCAD, or group LASSO penalty is used on the 
+#' random effects coefficients. See Breheny and Huang (2011) <doi:10.1214/10-AOAS388> 
+#' and Breheny and Huang (2015) <doi:10.1007/s11222-013-9424-2> for details of these penalties.
 #' @param alpha Tuning parameter for the Mnet estimator which controls the relative contributions 
-#' from the MCP/SCAD/lasso penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
-#' the MCP/SCAD/lasso penalty, while \code{alpha=0} is equivalent to ridge regression. However,
+#' from the MCP/SCAD/LASSO penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
+#' the MCP/SCAD/LASSO penalty, while \code{alpha=0} is equivalent to ridge regression. However,
 #' \code{alpha=0} is not supported; \code{alpha} may be arbitrarily small, but not exactly zero
-#' @param gamma_penalty The tuning parameter of the MCP and SCAD penalties. Not used by Lasso penalty.
-#' Default is 4.0 for SCAD and 3.0 for MCP.
+#' @param gamma_penalty The scaling factor of the MCP and SCAD penalties. Not used by LASSO penalty.
+#' Default is 4.0 for SCAD and 3.0 for MCP. See Breheny and Huang (2011) <doi:10.1214/10-AOAS388> 
+#' and Breheny and Huang (2015) <doi:10.1007/s11222-013-9424-2> for further details.
 #' @param optim_options a structure of class "optimControl" created 
-#' from function \code{\link{optimControl}} that specifies optimization parameters. See the 
+#' from function \code{\link{optimControl}} that specifies several optimization parameters. See the 
 #' documentation for \code{\link{optimControl}} for more details on defaults.
 #' @param adapt_RW_options a list of class "adaptControl" from function \code{\link{adaptControl}} 
 #' containing the control parameters for the adaptive random walk Metropolis-within-Gibbs procedure. 
 #' Ignored if \code{\link{optimControl}} parameter \code{sampler} is set to "stan" (default) or "independence".
-#' @param tuning_options a list of class selectControl or lambdaControl resulting from 
+#' @param tuning_options a list of class "selectControl" or "lambdaControl" resulting from 
 #' \code{\link{selectControl}} or \code{\link{lambdaControl}} containing additional control parameters.
 #' When function \code{glmm} is used,the algorithm may be run using one specific set of
 #' penalty parameters \code{lambda0} and \code{lambda1} by specifying such values in \code{lambdaControl()}. 
 #' The default for \code{glmm} is to run the model fit with no penalization (\code{lambda0} = \code{lambda1} = 0).
-#' When function \code{glmmPen} is run, \code{tuning_options} is specified usig \code{selectControl{}}. 
+#' When function \code{glmmPen} is run, \code{tuning_options} is specified using \code{selectControl()}. 
 #' See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.
-#' @param BICq_posterior an optional character string expressing the path and file basename of a file combination that 
-#' will file-back or currently file-backs a \code{big.matrix} of the posterior draws from the full model.
-#' These full model posterior draws will be used in BIC-ICQ calculations if these calculations
-#' are requested (BIC-ICQ reference: Ibrahim et al (2011)
-#' <doi:https://doi.org/10.1111/j.1541-0420.2010.01463.x>). 
+#' @param BICq_posterior an optional character string expressing the path and file 
+#' basename of a file combination that 
+#' will file-back or currently file-backs a \code{big.matrix} of the posterior samples from the 
+#' minimal penalty model used for the BIC-ICQ calculation used for model selection. T
+#' (BIC-ICQ reference: Ibrahim et al (2011)
+#' <doi:10.1111/j.1541-0420.2010.01463.x>). 
 #' If this argument is
-#' specified as \code{NULL} (default) and BIC-ICQ calculations are requested, the posterior draws
+#' specified as \code{NULL} (default) and BIC-ICQ calculations are requested (see \code{\link{selectControl}})
+#' for details), the posterior samples
 #' will be saved in the file combination 'BICq_Posterior_Draws.bin' and 'BICq_Posterior_Draws.desc'
 #' in the working directory.
 #' See 'Details' section for additional details about the required format of \code{BICq_posterior}
@@ -265,10 +270,10 @@ fD_adj = function(out){
 #' @param progress a logical value indicating if additional output should be given showing the
 #' progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
 #' for the fit procedure (iteration number EM_iter,
-#' number of MCMC draws nMC, average Euclidean distance between current coefficients and coefficients
+#' number of MCMC samples nMC, average Euclidean distance between current coefficients and coefficients
 #' from t--defined in \code{\link{optimControl}}--iterations back EM_conv, 
-#' and number of non-zero fixed and random effects
-#' including the intercept). Additionally, \code{progress = TRUE}
+#' and number of non-zero fixed and random effects covariates
+#' not including the intercept). Additionally, \code{progress = TRUE}
 #' gives some other information regarding the progress of the variable selection 
 #' procedure, including the model selection criteria and log-likelihood estimates
 #' for each model fit.
@@ -277,34 +282,34 @@ fD_adj = function(out){
 #' @details Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
 #' (\code{tuning_options}) is specified 
 #' to be 'BICq', this requests the calculation of the BIC-ICQ criterion during the selection
-#' process. For the BIC-ICQ criterion to be calculated, a full model assuming a small valued 
-#' lambda penalty needs to be fit, and the posterior draws from this full model need to be used. 
+#' process. For the BIC-ICQ criterion to be calculated, a minimal penalty model assuming a small valued 
+#' lambda penalty needs to be fit, and the posterior samples from this minimal penalty model need to be used. 
 #' In order to avoid repetitive calculations of
-#' this full model (i.e. if secondary rounds of selection are desired in 
+#' this minimal penalty model (i.e. if secondary rounds of selection are desired in 
 #' \code{\link{glmmPen_FineSearch}} or if the user wants to re-run \code{glmmPen} with a different
 #' set of penalty parameters), a \code{big.matrix} of these 
-#' posterior draws will be file-backed as two files: a backing file with extention '.bin' and a 
+#' posterior samples will be file-backed as two files: a backing file with extension '.bin' and a 
 #' descriptor file with extension '.desc'. The \code{BICq_posterior} argument should contain a 
-#' path and a filename with no extension of the form "./path/filename" such that the backingfile and
+#' path and a filename of the form "./path/filename" such that the backingfile and
 #' the descriptor file would then be saved as "./path/filename.bin" and "./path/filename.desc", respectively.
 #' If \code{BICq_posterior} is set to \code{NULL}, then by default, the backingfile and descriptor
 #' file are saved in the working directory as "BICq_Posterior_Draws.bin" and "BICq_Posterior_Draws.desc".
-#' If the big matrix of posterior draws is already file-backed, \code{BICq_posterior} should
+#' If the big matrix of posterior samples is already file-backed, \code{BICq_posterior} should
 #' specify the path and basename of the appropriate files (again of form "./path/filename"); 
-#' the full model 
+#' the minimal penalty model 
 #' will not be fit again and the big.matrix of 
-#' posterior draws will be read using the \code{attach.big.matrix} function of the
+#' posterior samples will be read using the \code{attach.big.matrix} function of the
 #'  \code{bigmemory} package and used in the BIC-ICQ 
-#' calcuations. If the appropriate files do not exist or \code{BICq_posterior} 
-#' is specified as \code{NULL}, the full model will be fit and the full model posterior
-#' draws will be saved as specified above. The algorithm will save 10^4 posterior draws automatically.
+#' calculations. If the appropriate files do not exist or \code{BICq_posterior} 
+#' is specified as \code{NULL}, the minimal penalty model will be fit and the minimal penalty model posterior
+#' samples will be saved as specified above. The algorithm will save 10^4 posterior samples automatically.
 #'  
 #' Trace details: The value of 0 (default) does not output any extra information. The value of 1
 #' additionally outputs the updated coefficients, updated covariance matrix values, and the
 #' number of coordinate descent iterations used for the M step for each
 #' EM iteration. When pre-screening procedure is used and/or if the BIC-ICQ criterion is
 #' requested, trace = 1 gives additional information about the penalties used
-#' for the 'full model' fit procedure. If Stan is not used as the E-step sampling mechanism, 
+#' for the 'minimal penalty model' fit procedure. If Stan is not used as the E-step sampling mechanism, 
 #' the value of 2 outputs all of the above plus gibbs acceptance rate information
 #' for the adaptive random walk and independence samplers and the updated proposal standard deviation
 #' for the adaptive random walk. 
@@ -356,7 +361,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   }
   
   if(!inherits(optim_options, "optimControl")){ 
-    stop("optim_options must be of class 'optimControl' (see optimControl documentation) or character string 'recommend'")
+    stop("optim_options must be of class 'optimControl' (see optimControl documentation)")
   }
   
   out = NULL
@@ -497,7 +502,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     
     ranef_keep = NULL
     
-    # If relevant, save posterior draws for later BIC-ICQ calculations
+    # If relevant, save posterior samples for later BIC-ICQ calculations
     if(!is.null(BICq_posterior)){
       
       y = data_input$y
@@ -523,9 +528,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                          batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
                          offset_increment=adapt_RW_options$offset_increment, 
                          trace=trace)
-      # cat("End E-step \n")
       u0 = attach.big.matrix(Estep_out$u0)
-      # File-back the posterior samples of the full model
+      # File-back the posterior samples of the minimal penalty model
       ufull_big_tmp = as.big.matrix(u0[,],
                                     backingpath = dirname(BICq_posterior),
                                     backingfile = sprintf("%s.bin",basename(BICq_posterior)),
@@ -554,34 +558,58 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       lambda1_seq = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
                                 alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
                                 lambda.min = tuning_options$lambda.min)
+      # Extract or calculate penalty parameters for pre-screening step
+      lambda.min.presc = tuning_options$lambda.min.presc
+      if(is.null(lambda.min.presc)){ 
+        if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
+          lambda.min.presc = 0.01
+        }else{
+          lambda.min.presc = 0.05
+        }
+      }
+      
+      # Minimum lambda values to use for pre-screening and BIC-ICQ minimal penalty model fit
+      # Fixed effects: use minimum fixed effects penalty parameters
+      # Random effects: calculate penalty to use using lambda.min.presc 
+      ##    (penalty = lambda.min.presc * max random effect penalty parameter)
+      full_ranef = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+                             alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
+                             lambda.min = lambda.min.presc)
+      lambda.min.full = c(min(lambda0_seq), min(full_ranef))
     }else{
       lambda1_seq = tuning_options$lambda1_seq
+      # Minimum lambda values to use for pre-screening and BIC-ICQ minimal penalty model fit
+      # Fixed and random effects: choose minimum penalty for respective sequence
+      lambda.min.full = c(min(lambda0_seq), min(lambda1_seq))
     }
     
-    # Extract or calculate penalty parameters for pre-screening step
-    lambda.min.presc = tuning_options$lambda.min.presc
-    if(is.null(lambda.min.presc)){ 
-      if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
-        lambda.min.presc = 0.01
-      }else{
-        lambda.min.presc = 0.05
-      }
-    }
-    
-    # Minimum lambda values to use for pre-screening and BIC-ICQ full model fit
-    # Fixed effects: use minimum fixed effects penalty parameters
-    # Random effects: calculate penalty to use using lambda.min.presc 
-    ##    (penalty = lambda.min.presc * max random effect penalty parameter)
-    full_ranef = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
-                           alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
-                           lambda.min = lambda.min.presc)
-    lambda.min.full = c(lambda0_seq[1], full_ranef[1])
     names(lambda.min.full) = c("fixef","ranef")
     
     # Extract additional arguments needed for selection
     BIC_option = tuning_options$BIC_option
-    pre_screen = tuning_options$pre_screen # TRUE vs FALSE
+    if(lambda.min.full["ranef"] == 0){
+      message("minimum random effect penalty set to 0, will consequently skip pre-screening procedure")
+      pre_screen = FALSE
+    }else{
+      pre_screen = tuning_options$pre_screen # TRUE vs FALSE
+    }
     logLik_calc = tuning_options$logLik_calc # TRUE vs FALSE
+    
+    if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
+      BICq_post_file = "BICq_Posterior_Draws"
+      # Check to see if files already exist in working directory
+      # If they exist, remove files. 
+      # Since this name is generic for all cases where the input of BICq_posterior was NULL,
+      #   safe to assume user forgot that these files were saved previously.
+      # Delete to avoid potential issues of using wrong posterior draws for the model
+      if(file.exists("BICq_Posterior_Draws.bin") | file.exists("BICq_Posterior_Draws.desc")){
+        message("Removing existing BICq_Posterior_Draws files with saved posterior samples")
+        if(file.exists("BICq_Posterior_Draws.bin")) file.remove("BICq_Posterior_Draws.bin")
+        if(file.exists("BICq_Posterior_Draws.desc")) file.remove("BICq_Posterior_Draws.desc")
+      }
+    }else{
+      BICq_post_file = BICq_posterior
+    }
     
     
     if(tuning_options$search == "abbrev"){
@@ -597,7 +625,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       lam_min = min(lambda0_seq)
       
       # Fit first stage of abbreviated grid search
-      if(progress == TRUE) cat("Start of stage 1 of abbreviated grid search \n")
+      if(progress == TRUE) message("Start of stage 1 of abbreviated grid search")
       fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
                                 lambda0_seq = lam_min, lambda1_seq = lambda1_seq,
                                 penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -605,11 +633,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                                 adapt_RW_options = adapt_RW_options, 
                                 optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                                 BICq_calc = (BIC_option == "BICq"),
-                                BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
+                                BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
                                 checks_complete = TRUE, pre_screen = pre_screen, 
                                 lambda.min.full = lambda.min.full, stage1 = TRUE,
                                 progress = progress)
-      if(progress == TRUE) cat("End of stage 1 of abbreviated grid search \n")
+      if(progress == TRUE) message("End of stage 1 of abbreviated grid search")
       
       # Extract stage 1 results needed for stage 2
       
@@ -628,15 +656,9 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       ## only consider random effects that are non-zero or above 10^-2 in the optimal random effect model
       # ranef_keep = fit_fixfull$ranef_keep
       vars = diag(fit_fixfull$out$sigma)
-      ## BIC-ICQ full model results to avoid repeat calculation of full model
-      if((is.null(BICq_posterior)) & (BIC_option == "BICq")){
-        BICq_post_file = "BICq_Posterior_Draws"
-      }else{
-        BICq_post_file = BICq_posterior
-      }
       
       # Fit second stage of 'abbreviated' model fit
-      if(progress == TRUE) cat("Start of stage 2 of abbreviated grid search \n")
+      if(progress == TRUE) message("Start of stage 2 of abbreviated grid search")
       fit_select = select_tune(dat = data_input, offset = offset, family = family,
                                lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
                                penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
@@ -650,7 +672,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                                ranef_keep = as.numeric((vars > 0)), 
                                lambda.min.full = lambda.min.full, stage1 = FALSE,
                                progress = progress)
-      if(progress == TRUE) cat("End of stage 2 of abbreviated grid search \n")
+      if(progress == TRUE) message("End of stage 2 of abbreviated grid search")
       
       resultsA = rbind(fit_fixfull$results, fit_select$results)
       coef_results = rbind(fit_fixfull$coef, fit_select$coef)
@@ -668,7 +690,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                                adapt_RW_options = adapt_RW_options, 
                                optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
                                BICq_calc = (tuning_options$BIC_option == "BICq"),
-                               BIC_option = BIC_option, BICq_posterior = BICq_posterior, 
+                               BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
                                checks_complete = TRUE, pre_screen = pre_screen, 
                                lambda.min.full = lambda.min.full, stage1 = FALSE,
                                progress = progress)
@@ -730,10 +752,10 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   }
   
   # Perform a final E-step
-  ## Use results to calculate logLik and posterior draws, and save draws for MCMC diagnostics
+  ## Use results to calculate logLik and posterior samples, and save samples for MCMC diagnostics
   Estep_final_complete = FALSE
   # if problematic model fit, do not perform final calculations for 
-  #   logLik and posterior draws and give NA values for appropriate output
+  #   logLik and posterior samples and give NA values for appropriate output
   if(!is.null(fit$warnings)){
     if(str_detect(fit$warnings, "coefficient values diverged") | str_detect(fit$warnings, "coefficient estimates contained NA values")){
      
@@ -782,15 +804,15 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   ## output = list object plugged into function used to create pglmmObj object
   output = c(fit, 
              list(Estep_out = Estep_out, formula = formula, y = fD_out$y, fixed_vars = fD_out$fixed_vars,
-                   X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
-                   coef_names = coef_names, family = fam_fun,
-                   offset = offset, frame = fD_out$frame, 
-                   sampling = sampling, std_out = std_out, 
-                   selection_results = selection_results, optim_results = optim_results,
-                   penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
-                   fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
-                   control_options = list(optim_options = optim_options, tuning_options = tuning_options,
-                                          adapt_RW_options = adapt_RW_options)))
+                  X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
+                  coef_names = coef_names, family = fam_fun, covar = covar,
+                  offset = offset, frame = fD_out$frame, 
+                  sampling = sampling, std_out = std_out, 
+                  selection_results = selection_results, optim_results = optim_results,
+                  penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
+                  fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
+                  control_options = list(optim_options = optim_options, tuning_options = tuning_options,
+                                         adapt_RW_options = adapt_RW_options)))
 
   # If glmm() function, output the output list to the outer glmm() function
   # If glmmPen() function, create pglmmObj object and output this pglmmObj object directly
@@ -922,7 +944,6 @@ LambdaSeq = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
   }
   
   if(is.null(lambda.min)){
-    # lambda.min = ifelse(n>p, 0.001, 0.05)
     lambda.min = ifelse(n>p, 0.01, 0.05)
   }
   
@@ -948,9 +969,9 @@ LambdaSeq = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
 
 ## Possible code to only perform final E-step if number of random effects in final model is low
 # If final model has relatively low random effect dimensions, perform another E step
-## Use results to calculate logLik and posterior draws, and save draws for MCMC diagnostics
+## Use results to calculate logLik and posterior samples, and save samples for MCMC diagnostics
 ## If final model has too many random effects, the calculation of this last E step
-## with the necessarily large number of draws may be too computationally burdensome, so
+## with the necessarily large number of samples may be too computationally burdensome, so
 ## we will output NA values and allow the user to calculate these values after the model fit.
 
 # Estep_out = list(u0 = NULL, u_init = fit$u_init, 

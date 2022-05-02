@@ -20,18 +20,22 @@ selectControl(
 )
 }
 \arguments{
-\item{lambda0}{a non-negative numeric penalty parameter for the fixed effects parameters}
+\item{lambda0}{a non-negative numeric penalty parameter for the fixed effects coefficients}
 
 \item{lambda1}{a non-negative numeric penalty parameter for the (grouped) random effects
-covariance parameters}
+covariance coefficients}
 
-\item{lambda0_seq, lambda1_seq}{a sequence of non-negative numeric penalty parameters for the fixed 
-and random effect parameters, respectively. If \code{NULL}, then a sequence will be automatically 
+\item{lambda0_seq, lambda1_seq}{a sequence of non-negative numeric penalty parameters for 
+the fixed 
+and random effect coefficients (\code{lambda0_seq} and \code{lambda1_seq}, respectively). 
+If \code{NULL}, then a sequence will be automatically 
 calculated. See 'Details' section for more details on these default calculations.}
 
-\item{nlambda}{positive integer specifying number of penalty parameters (lambda) 
-to use for the fixed and random effects penalty parameters. Default set to 10.
-Ignored if \code{lambda0_seq} and \code{lambda1_seq} are specified by the user.}
+\item{nlambda}{positive integer specifying number of penalty parameters
+to use for the fixed and random effects penalty parameters. Default set to 10. Only used
+if either \code{lambda0_seq} or \code{lambda1_seq} remain unspecified by the user
+(one or both of these arguments set to \code{NULL}) and, consequently, one or more default sequences need
+to be calculated.}
 
 \item{search}{character string of "abbrev" (default) or "full_grid" indicating if the search of models over 
 the penalty parameter space should be the full grid search (total number of models equals
@@ -43,8 +47,9 @@ highly recommend the abbreviated grid search.}
 Default "BICq" option specifies the BIC-ICQ criterion (Ibrahim et al (2011)
 <doi:10.1111/j.1541-0420.2010.01463.x>),
 which requires a fit of 
-a full model; a small penalty (the minimum of the penalty sequence) 
-is used for the fixed and random effects. 
+a 'minimum penalty' model; a small penalty (the minimum of the penalty sequence) 
+is used for the fixed and random effects. See "Details" section for what these 
+small penalties will be.
 The "BICh" option utilizes the hybrid BIC value described in 
 Delattre, Lavielle, and Poursat (2014) <doi:10.1214/14-EJS890>.
 The regular "BIC" option penalty term uses (total non-zero coefficients)*(length(y) = total number
@@ -62,18 +67,32 @@ in comparing the best models from BIC-ICQ and other BIC-type selection criteria,
 ranges from the maximum lambda where all fixed and random effects are penalized to 0 and 
 a minimum lambda value, which equals a small fraction of the maximum lambda. The parameter 
 \code{lambda.min} specifies this fraction. Default value is set to \code{NULL}, which
-automatically selects \code{lambda.min} to equal 0.01 when p <= 10 and 0.05 when p > 10.}
+automatically selects \code{lambda.min} to equal 0.01 when the number of observations is
+greater than the number of fixed effects predictors and 0.05 otherwise.
+Only used
+if either \code{lambda0_seq} or \code{lambda1_seq} remain unspecified by the user
+(one or both of these sequence arguments set to \code{NULL}) and, consequently, 
+one or more default sequences need
+to be calculated.}
 
 \item{pre_screen}{logical value indicating whether pre-screening should be performed before
-model selection (default \code{TRUE}). If the number of random effects considered less than 5,
+model selection (default \code{TRUE}). If the number of random effects covariates
+considered is 4 or less, then
 no pre-screening will be performed. Pre-screening removes random effects from consideration
-during the model selection process, which can significantly speed up the algorithm.}
+during the model selection process, which can significantly speed up the algorithm.
+See "Details" section for a further discussion.}
 
-\item{lambda.min.presc}{numeric fraction between 0 and 1. During pre-screening and the full
+\item{lambda.min.presc}{numeric fraction between 0 and 1. During pre-screening and the 
+minimal penalty
 model fit for the BIC-ICQ calculation, the small penalty used on the random effect is
-the fraction \code{lambda.min.presc} mulitplied by the maximum penalty parameter that penalizes
+the fraction \code{lambda.min.presc} multiplied by the maximum penalty parameter that penalizes
 all fixed and random effects to 0. If left as \code{NULL}, the default value is 0.01 when the number
-of random effects is 10 or less and 0.05 otherwise.}
+of random effect covariates is 10 or less and 0.05 otherwise.
+Only used if \code{lambda1_seq} remains unspecified by the user
+(this argument set to \code{NULL} so the random effects penalty parameter sequence
+needs to be automatically calculated) AND either the pre-screening procedure is selected by the argument
+\code{pre_screen} or the BIC-ICQ is selected as the model selection criteria,
+i.e., \code{BIC_option} = "BICq". See the "Details" section for a further discussion.}
 }
 \value{
 The *Control functions return a list (inheriting from class "\code{pglmmControl}") 
@@ -83,26 +102,67 @@ containing parameter values that determine settings for variable selection.
 Constructs control structures for penalized mixed model fitting.
 }
 \details{
-If unspecified, the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
+If left as the default \code{NULL} values, 
+the \code{lambda0_seq} and \code{lambda1_seq} numeric sequences are 
 automatically calculated. The sequence will be calculated in the same manner as 
-\code{ncvreg} calculates the range: max penalizes all fixed and random effects to 0, min is a 
-small portion of max (\code{lambda.min}*(lambda max)), sequence is composed of 
-\code{nlambda} values spread evenly on the log scale. Unlike \code{ncvreg}, the order of penalty
+\code{ncvreg} calculates the range: the max value (let's denote this as \code{lambda_max}) 
+penalizes all fixed and random effects to 0, the min value is a 
+small portion of max (\code{lambda.min}*\code{lambda_max}), and the sequence is composed of 
+\code{nlambda} values ranging from these min and max values spread evenly on the log scale. 
+Unlike \code{ncvreg}, the order of penalty
 values used in the algorithm must run from the min lambda to the max lambda (as opposed to 
 running from max lambda to min lambda). The length of the sequence is specified by \code{nlambda}. 
 By default, these sequences are calculated using \code{\link{LambdaSeq}}.
 
-The \code{lambda0} and \code{lambda1} arguments allow for a user to fit a model with a single 
+The \code{lambda0} and \code{lambda1} arguments used within the \code{\link{glmm}} function 
+allow for a user to fit a model with a single 
 non-zero penalty parameter combination. However, this is generally not recommended. 
 
 Abbreviated grid search: The abbreviated grid search proceeds in two stages. In stage 1, the
 algorithm fits the following series of models: the fixed effects penalty parameter remains a
-fixed value evaluated at the minimum of the fixed effects penalty parameters, and a all
+fixed value evaluated at the minimum of the fixed effects penalty parameters, and all
 random effects penalty parameters are examined. The 'best' model from this first stage of models
 determines the optimum random effect penalty parameter. In stage 2, the algorithm fits the 
 following series of models: the random effects penalty parameter remains fixed at the value of
 the optimum random effect penalty parameter (from stage 1) and all fixed effects penalty
 parameters are considered. The best overall model is the best model from stage 2. This reduces the 
 number of models considered to length(`lambda0_seq`) + length(`lambda1_seq`). The authors found
-that this abbreviated grid search worked well in simulations.
+that this abbreviated grid search worked well in simulations, and performed considerably
+faster than the full grid search that examined all possible fixed and random effect penalty
+parameter combinations.
+
+The arguments \code{nlambda} and \code{lambda.min} are only used
+if one or both of the \code{lambda0_seq} and \code{lambda1_seq} penalty sequences
+(corresponding to the fixed and random effects penalty sequences, respectively) 
+remain unspecified by the user (one or both of these arguments left as \code{NULL}),
+indicating that the algorithm needs to calculate default penalty sequences.
+
+The argument \code{lambda.min.presc} is only used under the following condition:
+\code{lambda1_seq} remains unspecified by the user
+(this argument set to \code{NULL} so the random effects penalty parameter sequence
+needs to be calculated) AND either the pre-screening procedure is selected by the argument
+\code{pre_screen} or the BIC-ICQ is selected as the model selection criteria,
+i.e., \code{BIC_option} = "BICq". 
+If \code{lambda1_seq} is specified by the user, the minimum
+value in that sequence will be used as the random effect penalty in the
+pre-screening procedure and/or the minimal penalty model for the BIC-ICQ calculation.
+
+BIC-ICQ calculation: This model selection criteria requires the fitting of a 'minimal penalty'
+model, which fits a model with a small penalty on the fixed and random effects.
+For the fixed effects penalty, the minimal penalty is: (a) 0 if the number of fixed 
+effects covariates is 4 or less or (b) the minimum fixed effect penalty from the fixed
+effects penalty sequence (either from the default sequence or from the sequence
+specified by the user). For the random effects penalty, the minimal penalty
+is (a) 0 if the number of random 
+effects covariates is 4 or less; (b) the minimum random effect penalty 
+from the random effects penalty sequence specified by the user, or 
+(c) \code{lambda.min.presc} multiplied to the \code{lambda_max} maximum penalty
+specified above when a default random effects penalty sequence is calculated.
+
+Pre-screening: The minimum fixed effects penalty used in the pre-screening stage 
+will be the minimum penalty of the fixed effects penalty sequence, \code{lambda0_seq}.
+The minimum random effects penalty used in the pre-screening stage will be either 
+(a) the minimum random effects penalty in the sequence \code{lambda1_seq} 
+if this sequence specified by the user, or (b) \code{lambda.min.pres} x \code{lambda_max},
+where \code{lambda_max} was described above.
 }
