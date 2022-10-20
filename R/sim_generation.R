@@ -164,8 +164,8 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
   #Z = model.matrix(~drep-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   if(slopes == TRUE) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   ##
-  
-  colnames(Z) = str_c(rep(colnames(X), each = d), ":", 1:d)
+ 
+  colnames(Z) = str_c(rep(colnames(X), each = d), ":", rep(1:d, ncol(X)))
   
   if(!is.null(ok)){
     dat = list(y = y[-ok], X = X[-ok,], Z = Z[-ok,],  pnonzero =  pnonzero, z1 = matrix(z1, nrow = d), group = drep[-ok], X0 = X0)
