@@ -169,7 +169,7 @@ fD_adj = function(out){
   for(lev in 1:numvars){
     Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = numvars, length.out = d),])
   }
-  colnames(Z) = str_c(rep(cnms, each = d), ":", levels(group))
+  colnames(Z) = str_c(rep(cnms, each = d), ":", rep(levels(group), length(cnms)))
   
   ## Make sure colnames random effects subset of colnames of fixed effects model matrix X
   if(sum(!(cnms %in% colnames(X))) > 0){
