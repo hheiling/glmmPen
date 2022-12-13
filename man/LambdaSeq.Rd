@@ -21,7 +21,8 @@ documenation). X should not include intercept.}
 \item{y}{numeric vector of response values}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
-Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
+Currently, the \code{glmmPen} algorithm allows the Binomial ("binomial" or binomial()), 
+Gaussian ("gaussian" or gaussian()), and Poisson ("poisson" or poisson()) families
 with canonical links only.}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 

@@ -6,8 +6,8 @@
 prescreen = function(dat, family, offset_fit, trace = 0, 
                      penalty, alpha, gamma_penalty, 
                      lambda0_min, lambda1_min, group_X,
-                     sampler, adapt_RW_options, covar,
-                     var_start, checks_complete, progress){
+                     optim_options, adapt_RW_options, covar,
+                     checks_complete, progress){
   
   
   # fixed effects penalty
@@ -17,31 +17,25 @@ prescreen = function(dat, family, offset_fit, trace = 0,
   
   if((trace >= 1)) cat(sprintf("Pre-screening penalty parameters: fixed effects %f, random effects %f", lam0, lam1), "\n")
   
-  # Determine nMC ranges
+  # Overwrite optim control options with small nMC values
   q = ncol(dat$Z) / nlevels(dat$group)
-  nMC_burnin = 100
-  nMC = 100
-  nMC_max = 500
+  optim_options$nMC_burnin = 100
+  optim_options$nMC = 100
+  optim_options$nMC_max = 500
   
-  # Other convergence criteria
-  conv_EM = 0.0015
-  conv_CD = 0.0005
-  maxitEM = 30
-  maxit_CD = 50
-  t = 2
-  mcc = 2
+  # Overwrite optim control options with smaller maxitEM
+  optim_options$maxitEM = 30
   
   # Fit 'full' model (small penalty for fixed and random effects)
   out = try(fit_dat(dat, lambda0 = lam0, lambda1 = lam1, 
-                      nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
-                      family = family, offset_fit = offset_fit, group_X = group_X,
-                      penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                      trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
-                      coef_old = NULL, u_init = NULL, ufull_describe = NULL,
-                      maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
-                      sampler = sampler, adapt_RW_options = adapt_RW_options,
-                      covar = covar, var_start = var_start, logLik_calc = FALSE,
-                      checks_complete = checks_complete, progress = progress))
+                    family = family, offset_fit = offset_fit, group_X = group_X,
+                    optim_options = optim_options,
+                    penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                    trace = trace,  
+                    coef_old = NULL, u_init = NULL, ufull_describe = NULL,
+                    adapt_RW_options = adapt_RW_options,
+                    covar = covar, logLik_calc = FALSE,
+                    checks_complete = checks_complete, progress = progress))
   
   if(is.character(out)){
     stop("Issue with pre-screening step in model selection procedure")

@@ -181,9 +181,15 @@ model.frame.pglmmObj = function(formula, fixed.only = FALSE, ...){
 #' @export
 model.matrix.pglmmObj = function(object, type = c("fixed", "random"), ...) {
   
+  # select correct Z to use
+  if(is.null(object$data$Z_std)){
+    Z = object$data$Z
+  }else{
+    Z = object$data$Z_std
+  }
   switch(type[1],
          "fixed" = object$data$X,
-         "random" = Matrix(object$data$Z_std, sparse = TRUE))
+         "random" = Matrix(Z, sparse = TRUE))
 }
 
 etaCalc = function(X, Z, beta, U){
@@ -230,7 +236,12 @@ fitted.pglmmObj = function(object, fixed.only = TRUE, ...){
   if(fixed.only){
     eta = object$data$X %*% matrix(object$fixef, ncol = 1) + offset
   }else{
-    eta = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, U = object$posterior_samples) + offset
+    if(is.null(object$data$Z_std)){
+      eta = etaCalc(X = object$data$X, Z = object$data$Z, beta = object$fixef, U = object$posterior_samples) + offset
+    }else{
+      eta = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, U = object$posterior_samples) + offset
+    }
+    
   }
   
   mu = invLink(family = object$family, eta)
@@ -278,10 +289,16 @@ predict.pglmmObj = function(object, newdata = NULL, type = c("link","response"),
   }
   
   if(is.null(newdata)){
+    # Select correct Z to use
+    if(is.null(object$data$Z_std)){
+      Z = object$data$Z
+    }else{
+      Z = object$data$Z_std
+    }
     # Calculate prediction result for original data
     if(!fixed.only){ # fixed.only = FALSE
       pred = switch(type[1], # if unspecified, default = link output (linear predictor)
-                    link = etaCalc(X = object$data$X, Z = object$data$Z_std, beta = object$fixef, 
+                    link = etaCalc(X = object$data$X, Z = Z, beta = object$fixef, 
                                    U = object$posterior_samples),
                     response = fitted(object, fixed.only = fixed.only))
     }else{ # fixed.only = TRUE
@@ -616,8 +633,7 @@ BIC.pglmmObj = function(object, ...){
 #' @description Provides graphical diagnostics of the random effect posterior draws from the (best) model.
 #' Availabile diagnostics include the sample path, histograms, cummulative sums, and autocorrelation.
 #' 
-#' @param object an object of class \code{pglmmObj} output from either \code{\link{glmmPen}} 
-#' or \code{\link{glmmPen_FineSearch}}.
+#' @param object an object of class \code{pglmmObj} 
 #' @param plots a character string or a vector of character strings specifying which graphical
 #' diagnostics to provide. Options include a sample path plot (default, "sample.path"), 
 #' autocorrelation plots ("autocorr"), histograms ("histogram"), cumulative sum plots ("cumsum"),

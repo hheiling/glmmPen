@@ -12,5 +12,6 @@ parameters {
 
 model {
   alpha ~ normal(0,1); // Prior of random effects (Gamma matrix factored out into Z matrix)
-  y ~ poisson(exp(eta_fef + Z * alpha)); // Distribution of y based on fixed and random effects
+  y ~ poisson_log(eta_fef + Z * alpha); // Distribution of y based on fixed and random effects
+  // y ~ poisson(exp(eta_fef + Z * alpha)); // Distribution of y based on fixed and random effects
 }

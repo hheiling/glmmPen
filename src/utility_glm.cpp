@@ -7,7 +7,8 @@
 
 using namespace Rcpp;
 
-// Helper functions for IRLS
+// Helper functions for IRLS, Q-function calcuation (glmm() and glmmPen() implementation),
+// and Gaussian sigma estimate (for E-step)
 
 
 arma::vec initial_mu(const char* family, arma::vec y, int N) {
@@ -275,7 +276,7 @@ arma::vec varfun(const char* family, arma::vec mu, double phi){
   
 }
 
-// Q function estimate
+// Q function estimate (positive version of estimate)
 // [[Rcpp::export]]
 double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
             const arma::vec& group, const arma::sp_mat& J_q,

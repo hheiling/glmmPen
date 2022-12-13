@@ -137,7 +137,8 @@ model converged (0 for no vs 1 for yes), and the fixed and random effects coeffi
 BICh, BIC, BICNgrp, and LogLik computed for this best model if not previously calculated.}
 \item{family}{Family}
 \item{penalty_info}{list of penalty information}
-\item{call}{arguments plugged into \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}}
+\item{call}{arguments plugged into \code{glmm}, \code{glmmPen}, \code{glmm_FA}, or 
+\code{glmmPen_FA}}
 \item{formula}{formula}
 \item{fixed_vars}{names of fixed effects variables}
 \item{data}{list of data used in model fit, including the response y, the fixed effects 
@@ -147,8 +148,7 @@ the grouping factor, offset, model frame,
 and standarization information used to standardize the fixed effects covariates}
 \item{optinfo}{Information about the optimization of the 'best' model}
 \item{control_info}{optimization parameters used for the model fit}
-\item{Estep_init}{materials that can be used to initialize another E-step (for 
-use in \code{glmmPen_FineSearch})}
+\item{Estep_init}{materials that can be used to initialize another E-step, if desired}
 \item{Gibbs_info}{list of materials to perform diagnositics on the Metropolis-within-Gibbs
 sample chains, including the Gibbs acceptance rates (included for both the independence
 and adaptive random walk samplers) and the final proposal standard deviations 
@@ -162,8 +162,8 @@ showClass("pglmmObj")
 methods(class = "pglmmObj")
 }
 \description{
-The functions \code{\link{glmm}}, \code{\link{glmmPen}}, and 
-\code{\link{glmmPen_FineSearch}} from the package \code{glmmPen} 
+The functions \code{\link{glmm}}, \code{\link{glmmPen}}, 
+\code{\link{glmm_FA}}, and \code{\link{glmmPen_FA}} from the package \code{glmmPen} 
 output the reference class object of type \code{pglmmObj}.
 }
 \section{Functions}{

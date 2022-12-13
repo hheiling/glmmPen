@@ -5,6 +5,7 @@
 \title{Control of Penalized Generalized Linear Mixed Model Fitting}
 \usage{
 optimControl(
+  var_restrictions = c("none", "fixef"),
   conv_EM = 0.0015,
   conv_CD = 5e-04,
   nMC_burnin = NULL,
@@ -17,10 +18,22 @@ optimControl(
   t = 2,
   mcc = 2,
   sampler = c("stan", "random_walk", "independence"),
-  var_start = "recommend"
+  var_start = "recommend",
+  step_size = 1,
+  standardization = TRUE,
+  convEM_type = c("AvgEuclid1", "maxdiff", "AvgEuclid2", "Qfun"),
+  B_init_type = c("deterministic", "data", "random")
 )
 }
 \arguments{
+\item{var_restrictions}{character string indicating how the random effect covariance
+matrix should be initialized at the beginning of the algorithm
+when penalties are applied to the coefficients. 
+If "none" (default), all random effect predictors are initialized to have non-zero variances.
+If "fixef", the code first examines the initialized fixed effects (initialized using a regular
+penalized GLM), and only the random effect predictors that are initialized with non-zero fixed effects
+are initialized with non-zero variances.}
+
 \item{conv_EM}{a non-negative numeric convergence criteria for the convergence of the 
 EM algorithm. Default is 0.0015. 
 EM algorithm is considered to have converge if the average Euclidean 
@@ -76,10 +89,41 @@ independence sampler ("independence"). If using the random walk sampler, see \co
 for some additional control structure parameters.}
 
 \item{var_start}{either the character string "recommend" or a positive number specifying the 
-starting values to initialize the variance of the covariance matrix. Default "recommend" first
+starting values to initialize the variance of the covariance matrix. For \code{\link{glmmPen}},
+the default "recommend" first
 fits a simple model with a fixed and random intercept only using the \link{lme4} package. The 
 random intercept variance estimate from this model is then multiplied by 2 and used as the 
-starting variance.}
+starting variance. For \code{\link{glmmPen_FA}}, the default is set to 0.10 (see \code{B_init_type} 
+for further information).}
+
+\item{step_size}{positive numeric value indicating the starting step size to use in the 
+Majorization-Minimization scheme of the M-step. Only relevant when the distributional assumption
+used is not Binomial or Gaussian with canonical links (e.g. Poisson with log link)}
+
+\item{standardization}{logical value indicating whether covariates should
+standardized (\code{TRUE}, default) or unstandardized (\code{FALSE}) before being
+used within the algorithm. If \code{standardization = TRUE}, then the standardized covariates
+will also be used to create the Z matrix used in the estimation of the random effects.}
+
+\item{convEM_type}{character string indicating the type of convergence criteria to 
+use within the EM algorithm to determine when a model has converged. The default is "AvgEuclid1",
+which calculates the average Euclidean distance between the most recent coefficient vector and
+the coefficient vector \code{t} EM iterations back (Euclidean distance divided by the number
+of non-zero coefficients \code{t} EM iterations back). Alternative convergence options include
+"maxdiff", which determines convergence based on the maximum difference between the coefficient vectors; 
+"AvgEuclid2", which is similar to "AvgEuclid1" except it divides the Euclidean distance by the square-root
+of the number of non-zero coefficients; and "Qfun", which determines convergence based on
+the relative difference in the Q-function estimates calculated with the most recent coefficient vector 
+and the coefficient vector \code{t} EM iterations back.}
+
+\item{B_init_type}{character string indicating how the B matrix within the \code{\link{glmmPen_FA}}
+method should be initialized. (This argument is not used within the \code{\link{glmmPen}} function.)
+The default "deterministic" initializes all non-zero variance and 
+covariance values of the random effect covariance matrix to the value of \code{var_start},
+such that each non-zero element of the B matrix is \code{sqrt(var_start / r)} (where \code{r} is
+the number of latent factors). Option "data" is similar to "deterministic", but the 
+\code{var_start} value is the default data-driven variance estimate used in \code{\link{glmmPen}} 
+(see argument \code{var_start} for more details).}
 }
 \value{
 Function returns a list inheriting from class \code{optimControl}

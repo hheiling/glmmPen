@@ -5,6 +5,7 @@
 #include "utility_CD.h"
 
 using namespace Rcpp;
+using namespace arma;
 
 arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid, 
                      arma::vec eta, arma::vec dims, arma::vec beta, 
@@ -96,6 +97,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     Vmu = varfun(family, mu, 1.0); // Generic place-holder for phi (negbin family not fit in initial coefficient estimate)
     resid = deriv % (y - mu);
     weights = constant.ones() / (deriv % deriv % Vmu);
+    
     // if((std::strcmp(family, pois) == 0) & (link == 20)){
     //   weights = Vmu;
     //   resid = (y - mu) / Vmu;
@@ -122,13 +124,15 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
     //   Rcout << "beta" << beta.t() << std::endl;
     //   Rcout << "weights" << weights.t() << std::endl;
     //   Rcout << "residuals" << resid.t() << std::endl;
-    //   Rcout << "mu" << mu.t() << std::endl;
+    //   // Rcout << "mu" << mu.t() << std::endl;
+    //   // Rcout << "deriv" << deriv.t() << std::endl;
+    //   // Rcout << "Vmu" << Vmu.t() << std::endl;
     // }
     
   } // End while loop
   
   if((converged == 0) && (trace >= 1)){
-    Rcout << "initial coordinate descent algorithm did not converge" << std::endl;
+    Rcpp::Rcout << "initial coordinate descent algorithm did not converge in " << maxit_CD << " iterations" << std::endl;
   }
   
   return beta;
