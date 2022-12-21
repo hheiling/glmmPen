@@ -29,8 +29,7 @@ A list containing the following elements:
   which are given the following descriptions:
   UNC PDAC, TCGA PDAC, TCGA Bladder Cancer, and UNC Breast Cancer}
   \item{Z}{model matrix for random effects; organized first by variable, then
-  by group (groups \{1,2,3,4\} correspond to studies UNC\_PDAC,
-  TCGA\_PDAC, TCGA\_Bladder, and UNC\_Breast )}
+  by group (i.e. by cancer study)}
 }
 }
 \usage{

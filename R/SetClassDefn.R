@@ -4,8 +4,8 @@
 #' @title Class \code{pglmmObj} of Fitted Penalized Generalized Mixed-Effects Models for 
 #' package \code{glmmPen}
 #' 
-#' @description The functions \code{\link{glmm}}, \code{\link{glmmPen}}, and 
-#' \code{\link{glmmPen_FineSearch}} from the package \code{glmmPen} 
+#' @description The functions \code{\link{glmm}}, \code{\link{glmmPen}}, 
+#' \code{\link{glmm_FA}}, and \code{\link{glmmPen_FA}} from the package \code{glmmPen} 
 #' output the reference class object of type \code{pglmmObj}.
 #' 
 #' @name pglmmObj-class 
@@ -42,7 +42,8 @@
 #' BICh, BIC, BICNgrp, and LogLik computed for this best model if not previously calculated.}
 #' \item{family}{Family}
 #' \item{penalty_info}{list of penalty information}
-#' \item{call}{arguments plugged into \code{glmm}, \code{glmmPen}, or \code{glmmPen_FineSearch}}
+#' \item{call}{arguments plugged into \code{glmm}, \code{glmmPen}, \code{glmm_FA}, or 
+#' \code{glmmPen_FA}}
 #' \item{formula}{formula}
 #' \item{fixed_vars}{names of fixed effects variables}
 #' \item{data}{list of data used in model fit, including the response y, the fixed effects 
@@ -52,8 +53,7 @@
 #' and standarization information used to standardize the fixed effects covariates}
 #' \item{optinfo}{Information about the optimization of the 'best' model}
 #' \item{control_info}{optimization parameters used for the model fit}
-#' \item{Estep_init}{materials that can be used to initialize another E-step (for 
-#' use in \code{glmmPen_FineSearch})}
+#' \item{Estep_init}{materials that can be used to initialize another E-step, if desired}
 #' \item{Gibbs_info}{list of materials to perform diagnositics on the Metropolis-within-Gibbs
 #' sample chains, including the Gibbs acceptance rates (included for both the independence
 #' and adaptive random walk samplers) and the final proposal standard deviations 
@@ -109,16 +109,22 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 y = x$y
                 X = x$X
+                Z = x$Z
                 Z_std = x$Z_std
                   rand_vars = rep(x$coef_names$random, each = d)
                   grp_levs = rep(levs, times = length(x$coef_names$random))
-                  colnames(Z_std) = noquote(paste(rand_vars, grp_levs, sep = ":"))
-                  rownames(Z_std) = rownames(X)
+                  if(!is.null(Z_std)){
+                    colnames(Z_std) = noquote(paste(rand_vars, grp_levs, sep = ":"))
+                    rownames(Z_std) = rownames(X)
+                  }
+                  colnames(Z) = noquote(paste(rand_vars, grp_levs, sep = ":"))
+                  rownames(Z) = rownames(X)
+                  
                 frame = x$frame
                 offset = x$offset
                 std_info = list(X_center = x$std_out$X_center,
                                   X_scale = x$std_out$X_scale)
-                data <<- list(y = y, X = X, Z_std = Z_std, group = group, 
+                data <<- list(y = y, X = X, Z = Z, Z_std = Z_std, group = group, 
                               offset = offset, frame = frame, std_info = std_info)
                 
                 # Fixed effects coefficients - need to unstandardize
@@ -144,11 +150,11 @@ pglmmObj = setRefClass("pglmmObj",
                 
                 # Return MCMC results - potentially for MCMC diagnostics if desired
                 posterior_samples <<- x$Estep_out$post_out
-                colnames(posterior_samples) <<- colnames(Z_std)
+                colnames(posterior_samples) <<- colnames(Z)
                 
                 # Random effects coefficients
                 rand = x$Estep_out$post_modes
-                q = ncol(Z_std) / d
+                q = ncol(Z) / d
                 
                 ## Organization of rand: Var1 group levels 1, 2, ... Var2 group levels 1, 2, ...
                 ref = as.data.frame(matrix(rand, nrow = d, ncol = q, byrow = FALSE) )

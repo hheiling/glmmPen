@@ -1,34 +1,33 @@
 
-#' @title Fit a Sequence of Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
-#' Minimization (MCECM) 
-#' 
-#' \code{select_tune} is used to fit a sequence of penalized generalized mixed models 
-#' via Monte Carlo Expectation Conditional Minimization (MCECM) for 
-#' multiple tuning parameter combinations and is called within
-#' \code{glmmPen} (cannot be called directly by user)
-#' 
-#' @inheritParams glmmPen
-#' @inheritParams fit_dat
-#' @inheritParams selectControl
-#' @inheritParams optimControl
-#' @param BICq_calc logical value indicating if the BIC-ICQ criterion should be used to select the
-#' best model.
-#' @param checks_complete logical value indicating if several data checks have been completed.
-#' @param lambda.min.full a vector of two numeric values that gives the fixed and random effect penalty 
-#' values to use in pre-screening and/or the minimal penalty model fit for the BIC-ICQ calculation 
-#' (if applicable)
-#' @param stage1 logical value indicating if the first stage of the abbreviated two-stage grid
-#' search in the model selection procedure is being performed. \code{FALSE} if either 
-#' performing the second stage of the abbreviated two-stage grid search or if performing the
-#' full grid search over all possible penalty parameter combinations.
-#' 
-#' @return A list with the following elements:
-#' \item{results}{matrix of summary results for each lambda tuning parameter combination, used
-#' to select the 'best' model}
-#' \item{out}{list of \code{\link{fit_dat}} results for the best model}
-#' \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
-#' Rows correspond with the rows of the results matrix.}
-#'  
+# @title Fit a Sequence of Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+# Minimization (MCECM) 
+# 
+# \code{select_tune} is used to fit a sequence of penalized generalized mixed models 
+# via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+# multiple tuning parameter combinations and is called within
+# \code{glmmPen} (cannot be called directly by user)
+# 
+# @inheritParams glmmPen
+# @inheritParams fit_dat
+# @inheritParams selectControl
+# @param BICq_calc logical value indicating if the BIC-ICQ criterion should be used to select the
+# best model.
+# @param checks_complete logical value indicating if several data checks have been completed.
+# @param lambda.min.full a vector of two numeric values that gives the fixed and random effect penalty 
+# values to use in pre-screening and/or the minimal penalty model fit for the BIC-ICQ calculation 
+# (if applicable)
+# @param stage1 logical value indicating if the first stage of the abbreviated two-stage grid
+# search in the model selection procedure is being performed. \code{FALSE} if either 
+# performing the second stage of the abbreviated two-stage grid search or if performing the
+# full grid search over all possible penalty parameter combinations.
+# 
+# @return A list with the following elements:
+# \item{results}{matrix of summary results for each lambda tuning parameter combination, used
+# to select the 'best' model}
+# \item{out}{list of \code{\link{fit_dat}} results for the best model}
+# \item{coef}{matrix of coefficient results for each lambda tuning parameter combination. 
+# Rows correspond with the rows of the results matrix.}
+#  
 #' @importFrom stringr str_c
 #' @importFrom bigmemory attach.big.matrix describe write.big.matrix read.big.matrix
 select_tune = function(dat, offset = NULL, family, covar = c("unstructured","independent"), 
@@ -66,17 +65,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     offset = rep(0, length(dat$y))
   }
   
-  # Initialize starting variance for random effect covariance matrix
-  if(optim_options$var_start == "recommend"){
-    var_start = var_init(dat, fam_fun)
-    # record starting variance 
-    optim_options$var_start = var_start
-  }else{
-    var_start = optim_options$var_start
-  }
-  
-  sampler = optim_options$sampler
-  
   ###########################################################################################
   # Pre-screening of random effects (optional)
   ###########################################################################################
@@ -89,9 +77,8 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
     out_pre = prescreen(dat = dat, family = fam_fun$family, offset_fit = offset, trace = trace, 
                         penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty, 
                         lambda0_min = lambda.min.full[1], lambda1_min = lambda.min.full[2], 
-                        group_X = group_X, sampler = sampler, 
+                        group_X = group_X, optim_options = optim_options,
                         adapt_RW_options = adapt_RW_options, covar = covar,
-                        var_start = var_start, 
                         checks_complete = checks_complete, progress = progress)
     ranef_keep = out_pre$ranef_keep
     coef_pre = out_pre$coef_pre
@@ -111,20 +98,6 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
   # If any optimization arguments set to NULL, fill in defaults
   optim_options = optim_recommend(optim_options = optim_options, family = family, 
                                   q = sum(ranef_keep), select = TRUE)
-  
-  # Extract variables from optimControl
-  conv_EM = optim_options$conv_EM
-  conv_CD = optim_options$conv_CD
-  nMC_burnin = optim_options$nMC_burnin
-  nMC = optim_options$nMC
-  nMC_max = optim_options$nMC_max
-  # nMC_report = optim_options$nMC_report
-  maxitEM = optim_options$maxitEM
-  maxit_CD = optim_options$maxit_CD
-  M = optim_options$M
-  t = optim_options$t
-  mcc = optim_options$mcc
-  sampler = optim_options$sampler
   
   ###########################################################################################
   # Minimal penalty model fit for BIC-ICQ calculation (optional)
@@ -172,16 +145,15 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       # Fit 'full' model
       ## Note: M default set to 10^4 in optimControl(). Will report M posterior draws from minimal penalty model
       out = try(fit_dat(dat, lambda0 = lam0, lambda1 = lam1, 
-                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
-                          family = fam_fun, offset_fit = offset, group_X = group_X,
-                          penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                          trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
-                          coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
-                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
-                          M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start, logLik_calc = FALSE,
-                          checks_complete = checks_complete,
-                          ranef_keep = ranef_keep, progress = progress))
+                        family = fam_fun, offset_fit = offset, 
+                        optim_options = optim_options, group_X = group_X,
+                        penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                        trace = trace, 
+                        coef_old = coef_pre, u_init = u_pre, ufull_describe = NULL,
+                        adapt_RW_options = adapt_RW_options,
+                        covar = covar, logLik_calc = FALSE,
+                        checks_complete = checks_complete,
+                        ranef_keep = ranef_keep, progress = progress))
       
       if(is.character(out)){
         warning("Issue with minimal penalty model fit, no BICq calculation will be completed \n",
@@ -323,6 +295,7 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
         }
       }
       
+      
       # Model fit
       gc()
       cat("------------------------------------------------------------------ \n")
@@ -330,16 +303,15 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       cat(sprintf("lambda0 i %i lambda1 j %i", i, j), "\n")
       cat("------------------------------------------------------------------ \n")
       out = try(fit_dat(dat, lambda0 = lambda0_seq[i], lambda1 = lambda1_seq[j], 
-                          nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
-                          family = fam_fun, offset_fit = offset, group_X = group_X,
-                          penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                          trace = trace, conv_EM = conv_EM, conv_CD = conv_CD,  
-                          coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
-                          maxitEM = maxitEM, maxit_CD = maxit_CD, t = t, mcc = mcc,
-                          M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                          covar = covar, var_start = var_start, logLik_calc = logLik_calc,
-                          checks_complete = checks_complete,
-                          ranef_keep = ranef_keep, progress = progress))
+                        family = fam_fun, offset_fit = offset, 
+                        optim_options = optim_options, group_X = group_X,
+                        penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                        trace = trace,   
+                        coef_old = coef_old0, u_init = uold, ufull_describe = ufull_describe,
+                        adapt_RW_options = adapt_RW_options,
+                        covar = covar, logLik_calc = logLik_calc,
+                        checks_complete = checks_complete,
+                        ranef_keep = ranef_keep, progress = progress))
       
 
       if(is.character(out)) next

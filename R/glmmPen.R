@@ -169,7 +169,7 @@ fD_adj = function(out){
   for(lev in 1:numvars){
     Z[,(d*(lev-1)+1):(d*lev)] = Matrix::t(Zt[seq(lev, by = numvars, length.out = d),])
   }
-  colnames(Z) = str_c(rep(cnms, each = d), ":", levels(group))
+  colnames(Z) = str_c(rep(cnms, each = d), ":", rep(levels(group), times=length(cnms)))
   
   ## Make sure colnames random effects subset of colnames of fixed effects model matrix X
   if(sum(!(cnms %in% colnames(X))) > 0){
@@ -195,7 +195,8 @@ fD_adj = function(out){
 #' variable selection on both the fixed and random effects simultaneously for the
 #' generalized linear mixed model. \code{glmmPen} selects the best model using 
 #' BIC-type selection criteria (see \code{\link{selectControl}} documentation for 
-#' further details)
+#' further details). To improve the speed of the algorithm, consider setting
+#' \code{var_restrictions} = "fixef" within the \code{\link{optimControl}} options.
 #' 
 #' @param formula a two-sided linear formula object describing both the fixed effects and 
 #' random effects part of the model, with the response on the left of a ~ operator and the terms, 
@@ -207,7 +208,8 @@ fD_adj = function(out){
 #' @param data an optional data frame containing the variables named in \code{formula}. If \code{data} is 
 #' omitted, variables will be taken from the environment of \code{formula}.
 #' @param family a description of the error distribution and link function to be used in the model. 
-#' Currently, the \code{glmmPen} algorithm allows the Binomial, Gaussian, and Poisson families
+#' Currently, the \code{glmmPen} algorithm allows the Binomial ("binomial" or binomial()), 
+#' Gaussian ("gaussian" or gaussian()), and Poisson ("poisson" or poisson()) families
 #' with canonical links only.
 #' @param covar character string specifying whether the covariance matrix should be unstructured
 #' ("unstructured") or diagonal with no covariances between variables ("independent").
@@ -278,6 +280,8 @@ fD_adj = function(out){
 #' procedure, including the model selection criteria and log-likelihood estimates
 #' for each model fit.
 #' Default is \code{TRUE}.
+#' @param ... additional arguments that could be passed into \code{glmmPen}. See \code{\link{glmmPen_FA}}
+#' for further details.
 #' 
 #' @details Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
 #' (\code{tuning_options}) is specified 
@@ -285,8 +289,7 @@ fD_adj = function(out){
 #' process. For the BIC-ICQ criterion to be calculated, a minimal penalty model assuming a small valued 
 #' lambda penalty needs to be fit, and the posterior samples from this minimal penalty model need to be used. 
 #' In order to avoid repetitive calculations of
-#' this minimal penalty model (i.e. if secondary rounds of selection are desired in 
-#' \code{\link{glmmPen_FineSearch}} or if the user wants to re-run \code{glmmPen} with a different
+#' this minimal penalty model (i.e. if the user wants to re-run \code{glmmPen} with a different
 #' set of penalty parameters), a \code{big.matrix} of these 
 #' posterior samples will be file-backed as two files: a backing file with extension '.bin' and a 
 #' descriptor file with extension '.desc'. The \code{BICq_posterior} argument should contain a 
@@ -329,11 +332,37 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
                    trace = 0, tuning_options = selectControl(), BICq_posterior = NULL,
-                   progress = TRUE){
+                   progress = TRUE, ...){
   
   ###########################################################################################
   # Input argument checks and modifications
   ###########################################################################################
+  
+  # Check that (...) arguments are subsets of glmmPen_FA arguments (factor assumption version)
+  args_extra = list(...)
+  args_avail = c("r_estimation")
+  if(length(args_extra) >= 1){
+    if(!(names(args_extra) %in% args_avail)){
+      stop("additional arguments provided in '...' input must match the following glmmPen_FA arguments: \n",
+           "'r_estimation', see glmmPen_FA documentation for details")
+    }
+    if(names(args_extra) %in% "r_estimation"){
+      r_estimation = args_extra$r_estimation
+    }
+  }else{
+    r_estimation = NULL
+  }
+  
+  if(is.null(r_estimation)){
+    fit_type = "glmmPen"
+  }else if(!is.null(r_estimation)){
+    fit_type = "glmmPen_FA"
+    if(!inherits(r_estimation, "rControl")){
+      stop("r_estimation must be of class 'rControl' (see rControl() documentation)")
+    }
+    # For the record, fix 'covar' to 'unstructured'
+    covar = "unstructured"
+  }
   
   # Input modification and restriction for family
   family_info = family_export(family)
@@ -364,6 +393,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     stop("optim_options must be of class 'optimControl' (see optimControl documentation)")
   }
   
+  
   out = NULL
   
   # Convert formula and data to useful forms
@@ -391,14 +421,29 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     }
   }
   
-  # Standardize X and Z - see XZ_std() function later in this document
-  std_out = XZ_std(fD_out)
-  
-  # data_input: list of main data for fit algorithm
-  data_input = list(y = fD_out$y, X = std_out$X_std, Z = std_out$Z_std, group = fD_out$group_num)
-  
   # Names of covariates for fixed effects, random effects, and group factor
   coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
+  
+  # data_input: list of main data for fit algorithm
+  standardization = optim_options$standardization
+  if(standardization == TRUE){
+    # Standardize X and Z - see XZ_std() function later in this document
+    std_out = XZ_std(fD_out)
+    # Specify data to use in fit procedure
+    data_input = list(y = fD_out$y, X = std_out$X_std, Z = std_out$Z_std, 
+                      group = fD_out$group_num, coef_names = coef_names)
+  }else if(standardization == FALSE){
+    # Put dummy values into std_out list
+    std_out = list(X_std = NULL, Z_std = NULL, 
+                   X_center = rep(0,ncol(fD_out$X[,-1,drop=FALSE])), 
+                   X_scale = rep(1,ncol(fD_out$X[,-1,drop=FALSE])),
+                   Z_center = NULL, Z_scale = NULL)
+    # Specify data to use in the fit procedure
+    data_input = list(y = fD_out$y, X = fD_out$X, Z = fD_out$Z, 
+                      group = fD_out$group_num, coef_names = coef_names)
+  }
+  
+ 
   
   # Identify fixed effects that should not be penalized in select_tune or fit_dat (if any)
   ## For now, do not allow grouping of fixed effects (i.e. cannot penalize fixed effects as groups of covariates)
@@ -436,20 +481,94 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     covar = "unstructured"
   }
   
-  if((covar == "unstructured") & (ncol(data_input$Z)/nlevels(data_input$group) >= 11)){
+  if((covar == "unstructured") & (ncol(data_input$Z)/nlevels(data_input$group) >= 11) & (fit_type == "glmmPen")){
     warning("The random effect covariance matrix is currently specified as 'unstructured'. 
             Due to dimension of sigma covariance matrix, we suggest using covar = 'independent' to simplify computation",
             immediate. = TRUE)
   }
   
+  if(fit_type == "glmmPen_FA"){
+    
+    ###########################################################################################
+    # Estimate number of latent factors, r
+    ###########################################################################################
+    
+    # If input r = NULL, use input data to estimate this value
+    if(is.null(r_estimation$r)){
+      
+      # penalty to use for fixed effects:
+      if(inherits(tuning_options, "lambdaControl")){
+        lambda0 = tuning_options$lambda0
+      }else if(inherits(tuning_options, "selectControl")){
+        lambda0_seq = tuning_options$lambda0_seq
+        if(is.null(lambda0_seq)){
+          lambda.min = tuning_options$lambda.min
+          if(is.null(lambda.min)){
+            if(ncol(data_input$X) <= 51){ # 50 predictors plus intercept
+              lambda.min = 0.01
+            }else if(ncol(data_input$X) <= 201){
+              lambda.min = 0.05
+            }else if(ncol(data_input$X) > 201){
+              lambda.min = 0.10
+            }
+          }
+          lambda0 = min(LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
+                                  alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
+                                  lambda.min = lambda.min))
+        }else{
+          lambda0 = min(lambda0_seq)
+        }
+      }
+      
+      # Estimate number of common factors r
+      r_out = estimate_r(dat = data_input, optim_options = optim_options,
+                         coef_names = coef_names, 
+                         r_est_method = r_estimation$r_est_method,
+                         r_max = r_estimation$r_max, 
+                         family_info = family_info, offset_fit = offset, 
+                         penalty = penalty, lambda0 = lambda0, 
+                         gamma_penalty = gamma_penalty, alpha = alpha, 
+                         group_X = group_X, 
+                         sample = (r_estimation$size < nlevels(data_input$group)), 
+                         size = r_estimation$size,
+                         trace = trace)
+      # Extract estimate of r
+      r = r_out$r_est
+      # Record maximum considered value of r
+      r_max = r_out$r_max
+      
+    }else{ # Checks on input r
+      r = r_estimation$r
+      if(r <= 1){
+        message("glmmPen_FA restricts the number of latent factors r to be at least 2, ",
+                "setting r to 2")
+        r = 2
+      }
+      if(!(floor(r)==r)){
+        stop("number of latent factors r must be an integer")
+      }
+      r_max = NULL
+    }
+    
+  }
+  
+  
   ###########################################################################################
   # Fitting of model
   ###########################################################################################
   
+  # Recommend starting variance  for random effects covariance matrix (if necessary)
+  if(optim_options$var_start == "recommend"){
+    if((fit_type == "glmmPen") | ((fit_type == "glmmPen_FA") & (optim_options$B_init_type == "data"))){
+      var_start = var_init(data_input, fam_fun)
+      optim_options$var_start = var_start
+    }
+  }
+  
   if(inherits(tuning_options, "lambdaControl")){
     
     ###########################################################################################
-    # Fit single model specified by glmm()
+    # Fit single model specified by glmm() or glmm_FA()
     ###########################################################################################
     
     # Default: penalty parameters lambda0 and lambda1 both = 0.
@@ -462,41 +581,38 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     
     # If any optim_option arguments initialized as NULL, give defaults
     ## See bottom of "control_options.R" for function optim_recommend()
-    optim_options = optim_recommend(optim_options = optim_options, family = family,
-                                    q = ncol(fD_out$Z)/nlevels(data_input$group), select = F)
-    
-    # Recommend starting variance  for random effects covariance matrix (if necessary)
-    if(optim_options$var_start == "recommend"){
-      var_start = var_init(data_input, fam_fun)
-      optim_options$var_start = var_start
+    if(fit_type == "glmmPen"){
+      optim_options = optim_recommend(optim_options = optim_options, family = fam_fun$family,
+                                      q = ncol(fD_out$Z)/nlevels(data_input$group), select = FALSE)
+    }else if(fit_type == "glmmPen_FA"){
+      optim_options = optim_recommend(optim_options = optim_options, family = fam_fun$family,
+                                      q = r, select = FALSE)
     }
     
-    # Extract variables from optimControl
-    conv_EM = optim_options$conv_EM
-    conv_CD = optim_options$conv_CD
-    nMC_burnin = optim_options$nMC_burnin
-    nMC = optim_options$nMC
-    nMC_max = optim_options$nMC_max
-    maxitEM = optim_options$maxitEM
-    maxit_CD = optim_options$maxit_CD
-    M = optim_options$M
-    t = optim_options$t
-    mcc = optim_options$mcc
-    sampler = optim_options$sampler
-    var_start = optim_options$var_start
     
-    # Call fit_dat function to fit the model
-    # fit_dat function found in "/R/fit_dat.R" file
-    
-    fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
-                    conv_EM = conv_EM, conv_CD = conv_CD,
+    # Fit model (single model)
+    if(fit_type == "glmmPen"){
+      # Call fit_dat function to fit the model
+      # fit_dat function found in "/R/fit_dat.R" file
+      fit = fit_dat(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
                     family = fam_fun, offset_fit = offset, trace = trace, 
+                    optim_options = optim_options,
                     group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                    nMC_burnin = nMC_burnin, nMC = nMC, nMC_max = nMC_max,
-                    t = t, mcc = mcc, maxitEM = maxitEM, maxit_CD = maxit_CD,
-                    M = M, sampler = sampler, adapt_RW_options = adapt_RW_options,
-                    covar = covar, var_start = var_start, logLik_calc = FALSE,
+                    adapt_RW_options = adapt_RW_options,
+                    covar = covar, logLik_calc = FALSE,
                     checks_complete = TRUE, progress = progress)
+    }else if(fit_type == "glmmPen_FA"){
+      # Call fit_dat_FA function to fit the model
+      # fit_dat_Fa function found in "/R/fit_dat_FA.R" file
+      fit = fit_dat_FA(dat = data_input, lambda0 = lambda0, lambda1 = lambda1, 
+                       family = fam_fun, offset_fit = offset, trace = trace,
+                       optim_options = optim_options,
+                       group_X = group_X, penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                       adapt_RW_options = adapt_RW_options,
+                       r = r, logLik_calc = FALSE,
+                       checks_complete = TRUE, progress = progress)
+    }
+    
     
     selection_results = matrix(NA, nrow = 1, ncol = 1)
     
@@ -507,27 +623,50 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       
       y = data_input$y
       X = data_input$X
-      Z = data_input$Z
+      Z = Matrix::as.matrix(data_input$Z)
       group = data_input$group
       d = nlevels(data_input$group)
       
       coef = fit$coef
       J = fit$J
-      gamma = fit$Gamma_mat
-      # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% gamma (calculate for each group individually)
-      # Used within E-step
-      Znew2 = Z
-      for(j in 1:d){
-        Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
+      if(fit_type == "glmmPen"){
+        gamma = fit$Gamma_mat
+        # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% gamma (calculate for each group individually)
+        # Used within E-step
+        Znew2 = Z
+        for(j in 1:d){
+          Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
+        }
+        Estep_out = E_step(coef = coef, ranef_idx = sum(diag(fit$sigma) > 0), 
+                           y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
+                           nMC=optim_options$nMC, nMC_burnin=optim_options$nMC_burnin, 
+                           family=fam_fun$family, link=fam_fun$link, 
+                           phi=1.0, sig_g=out$sigma_gaus,
+                           sampler=optim_options$sampler, d=d, uold=fit$u_init, 
+                           proposal_SD=fit$proposal_SD, 
+                           batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
+                           offset_increment=adapt_RW_options$offset_increment, 
+                           trace=trace)
+      }else if(fit_type == "glmmPen_FA"){
+        B = fit$B
+        # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% B (calculate for each group individually)
+        # Used within E-step
+        Znew2 = matrix(0, nrow = nrow(Z), ncol = d*r)
+        for(j in 1:d){
+          Znew2[group == j,seq(j, ncol(Znew2), by = d)] = Z[group == j, seq(j, ncol(Z), by = d)] %*% B
+        }
+        Estep_out = E_step(coef = coef, ranef_idx = 1:r, 
+                           y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
+                           nMC=optim_options$nMC, nMC_burnin=optim_options$nMC_burnin, 
+                           family=fam_fun$family, link=fam_fun$link, 
+                           phi=1.0, sig_g=out$sigma_gaus,
+                           sampler=optim_options$sampler, d=d, 
+                           uold=fit$u_init, proposal_SD=fit$proposal_SD, 
+                           batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
+                           offset_increment=adapt_RW_options$offset_increment, 
+                           trace=trace)
       }
-      Estep_out = E_step(coef = coef, ranef_idx = sum(diag(fit$sigma) > 0), 
-                         y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
-                         nMC=nMC, nMC_burnin=nMC_burnin, family=fam_fun$family, link=fam_fun$link, 
-                         phi=1.0, sig_g=out$sigma_gaus,
-                         sampler=sampler, d=d, uold=fit$u_init, proposal_SD=fit$proposal_SD, 
-                         batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
-                         offset_increment=adapt_RW_options$offset_increment, 
-                         trace=trace)
+      
       u0 = attach.big.matrix(Estep_out$u0)
       # File-back the posterior samples of the minimal penalty model
       ufull_big_tmp = as.big.matrix(u0[,],
@@ -543,36 +682,52 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     # Perform variable and model selection based on specifications from glmmPen()
     ###########################################################################################
     
+    lambda.min = tuning_options$lambda.min
+    if(is.null(lambda.min)){
+      if(ncol(data_input$X) <= 51){ # 50 predictors plus intercept
+        lambda.min = 0.01
+      }else if(ncol(data_input$X) <= 201){
+        lambda.min = 0.05
+      }else if(ncol(data_input$X) > 201){
+        lambda.min = 0.10
+      }
+    }
+    
     # Extract or calculate penalty parameter values for grid search
     # See LambdaSeq() function later in this document
     ## Fixed effects penalty parameters
     if(is.null(tuning_options$lambda0_seq)){
-      lambda0_seq = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+      lambda0_seq = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
                                 alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
-                                lambda.min = tuning_options$lambda.min)
+                                lambda.min = lambda.min)
     }else{
       lambda0_seq = tuning_options$lambda0_seq
     }
     ## Random effects penalty parameters
     if(is.null(tuning_options$lambda1_seq)){
-      lambda1_seq = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
-                                alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
-                                lambda.min = tuning_options$lambda.min)
+      lambda1_seq = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
+                              alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
+                              lambda.min = lambda.min)
       # Extract or calculate penalty parameters for pre-screening step
       lambda.min.presc = tuning_options$lambda.min.presc
       if(is.null(lambda.min.presc)){ 
-        if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
-          lambda.min.presc = 0.01
-        }else{
-          lambda.min.presc = 0.05
+        if(fit_type == "glmmPen"){
+          if((ncol(data_input$Z)/nlevels(data_input$group) <= 11)){ # number random effects (including intercept)
+            lambda.min.presc = 0.01
+          }else{
+            lambda.min.presc = max(0.05, lambda.min)
+          }
+        }else if(fit_type == "glmmPen_FA"){
+          lambda.min.presc = lambda.min
         }
+        
       }
       
       # Minimum lambda values to use for pre-screening and BIC-ICQ minimal penalty model fit
       # Fixed effects: use minimum fixed effects penalty parameters
       # Random effects: calculate penalty to use using lambda.min.presc 
       ##    (penalty = lambda.min.presc * max random effect penalty parameter)
-      full_ranef = LambdaSeq(X = data_input$X[,-1,drop=F], y = data_input$y, family = fam_fun$family, 
+      full_ranef = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
                              alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
                              lambda.min = lambda.min.presc)
       lambda.min.full = c(min(lambda0_seq), min(full_ranef))
@@ -626,17 +781,34 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       
       # Fit first stage of abbreviated grid search
       if(progress == TRUE) message("Start of stage 1 of abbreviated grid search")
-      fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
-                                lambda0_seq = lam_min, lambda1_seq = lambda1_seq,
-                                penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                                group_X = group_X, trace = trace,
-                                adapt_RW_options = adapt_RW_options, 
-                                optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
-                                BICq_calc = (BIC_option == "BICq"),
-                                BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
-                                checks_complete = TRUE, pre_screen = pre_screen, 
-                                lambda.min.full = lambda.min.full, stage1 = TRUE,
-                                progress = progress)
+      
+      if(fit_type == "glmmPen"){
+        fit_fixfull = select_tune(dat = data_input, offset = offset, family = family,
+                                  lambda0_seq = lam_min, lambda1_seq = lambda1_seq,
+                                  penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                  group_X = group_X, trace = trace,
+                                  adapt_RW_options = adapt_RW_options, 
+                                  optim_options = optim_options, 
+                                  covar = covar, logLik_calc = logLik_calc,
+                                  BICq_calc = (BIC_option == "BICq"),
+                                  BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                                  checks_complete = TRUE, pre_screen = pre_screen, 
+                                  lambda.min.full = lambda.min.full, stage1 = TRUE,
+                                  progress = progress)
+      }else if(fit_type == "glmmPen_FA"){
+        fit_fixfull = select_tune_FA(dat = data_input, offset = offset, family = family,
+                                     lambda0_seq = lam_min, lambda1_seq = lambda1_seq,
+                                     penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                     group_X = group_X, trace = trace,
+                                     adapt_RW_options = adapt_RW_options, 
+                                     optim_options = optim_options, logLik_calc = logLik_calc,
+                                     BICq_calc = (BIC_option == "BICq"),
+                                     BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                                     checks_complete = TRUE, pre_screen = pre_screen, 
+                                     lambda.min.full = lambda.min.full, stage1 = TRUE,
+                                     progress = progress, r = r)
+      }
+      
       if(progress == TRUE) message("End of stage 1 of abbreviated grid search")
       
       # Extract stage 1 results needed for stage 2
@@ -659,19 +831,41 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       
       # Fit second stage of 'abbreviated' model fit
       if(progress == TRUE) message("Start of stage 2 of abbreviated grid search")
-      fit_select = select_tune(dat = data_input, offset = offset, family = family,
-                               lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
-                               penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                               group_X = group_X, trace = trace,
-                               coef_old = coef_old, u_init = u_init,
-                               adapt_RW_options = adapt_RW_options, 
-                               optim_options = optim_options, covar = covar, 
-                               logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
-                               BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
-                               checks_complete = TRUE, pre_screen = FALSE,
-                               ranef_keep = as.numeric((vars > 0)), 
-                               lambda.min.full = lambda.min.full, stage1 = FALSE,
-                               progress = progress)
+      
+      if(fit_type == "glmmPen"){
+        fit_select = select_tune(dat = data_input, offset = offset, family = family,
+                                 lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
+                                 penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                 group_X = group_X, trace = trace,
+                                 coef_old = coef_old, u_init = u_init,
+                                 adapt_RW_options = adapt_RW_options, 
+                                 optim_options = optim_options, covar = covar, 
+                                 logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
+                                 BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                                 checks_complete = TRUE, pre_screen = FALSE,
+                                 ranef_keep = as.numeric((vars > 0)), 
+                                 lambda.min.full = lambda.min.full, stage1 = FALSE,
+                                 progress = progress)
+      }else if(fit_type == "glmmPen_FA"){
+        fit_select = select_tune_FA(dat = data_input, offset = offset, family = family,
+                                    lambda0_seq = lambda0_seq, lambda1_seq = lam_ref,
+                                    penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                    group_X = group_X, trace = trace,
+                                    beta_init = coef_old[1:ncol(data_input$X)], 
+                                    B_init = t(matrix(coef_old[-c(1:ncol(data_input$X))],
+                                                      ncol = ncol(data_input$Z)/nlevels(data_input$group),
+                                                      nrow = r)), 
+                                    u_init = u_init,
+                                    adapt_RW_options = adapt_RW_options, 
+                                    optim_options = optim_options,
+                                    logLik_calc = logLik_calc, BICq_calc = (BIC_option == "BICq"),
+                                    BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                                    checks_complete = TRUE, pre_screen = FALSE,
+                                    ranef_keep = as.numeric((vars > 0)), 
+                                    lambda.min.full = lambda.min.full, stage1 = FALSE,
+                                    progress = progress, r = r)
+      }
+      
       if(progress == TRUE) message("End of stage 2 of abbreviated grid search")
       
       resultsA = rbind(fit_fixfull$results, fit_select$results)
@@ -683,17 +877,32 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       # Full grid search
       ###########################################################################################
       
-      fit_select = select_tune(dat = data_input, offset = offset, family = family,
-                               lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
-                               penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
-                               group_X = group_X, trace = trace,
-                               adapt_RW_options = adapt_RW_options, 
-                               optim_options = optim_options, covar = covar, logLik_calc = logLik_calc,
-                               BICq_calc = (tuning_options$BIC_option == "BICq"),
-                               BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
-                               checks_complete = TRUE, pre_screen = pre_screen, 
-                               lambda.min.full = lambda.min.full, stage1 = FALSE,
-                               progress = progress)
+      if(fit_type == "glmmPen"){
+        fit_select = select_tune(dat = data_input, offset = offset, family = family,
+                                 lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
+                                 penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                 group_X = group_X, trace = trace,
+                                 adapt_RW_options = adapt_RW_options, 
+                                 optim_options = optim_options, 
+                                 covar = covar, logLik_calc = logLik_calc,
+                                 BICq_calc = (tuning_options$BIC_option == "BICq"),
+                                 BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                                 checks_complete = TRUE, pre_screen = pre_screen, 
+                                 lambda.min.full = lambda.min.full, stage1 = FALSE,
+                                 progress = progress)
+      }else if(fit_type == "glmmPen_FA"){
+        fit_select = select_tune_FA(dat = data_input, offset = offset, family = family,
+                                    lambda0_seq = lambda0_seq, lambda1_seq = lambda1_seq,
+                                    penalty = penalty, alpha = alpha, gamma_penalty = gamma_penalty,
+                                    group_X = group_X, trace = trace,
+                                    adapt_RW_options = adapt_RW_options, 
+                                    optim_options = optim_options, logLik_calc = logLik_calc,
+                                    BICq_calc = (tuning_options$BIC_option == "BICq"),
+                                    BIC_option = BIC_option, BICq_posterior = BICq_post_file, 
+                                    checks_complete = TRUE, pre_screen = pre_screen, 
+                                    lambda.min.full = lambda.min.full, stage1 = FALSE,
+                                    progress = progress, r = r)
+      }
       
       resultsA = fit_select$results
       coef_results = fit_select$coef
@@ -709,17 +918,28 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     
     # Unstandardize fixed effect coefficient results
     beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
-    beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=F], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
+    beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=FALSE], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
     for(i in 1:nrow(beta_results)){
-      beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=F] / std_out$X_scale
+      beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=FALSE] / std_out$X_scale
     }
     
-    gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results),drop=F]
+    if(fit_type == "glmmPen"){
+      gamma_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results),drop=FALSE]
+      
+      # Combine all relevant selection results
+      selection_results = cbind(resultsA,beta_results,gamma_results)
+      colnames(selection_results) = c(colnames(resultsA), coef_names$fixed, 
+                                      str_c("Gamma",0:(ncol(gamma_results)-1)))
+    }else if(fit_type == "glmmPen_FA"){
+      # B = factor loadings matrix
+      B_results = coef_results[,(ncol(data_input$X)+1):ncol(coef_results),drop=FALSE]
+      
+      # Combine all relevant selection results
+      selection_results = cbind(resultsA,beta_results,B_results)
+      colnames(selection_results) = c(colnames(resultsA), coef_names$fixed, 
+                                      str_c("B",1:(ncol(B_results))))
+    }
     
-    # Combine all relevant selection results
-    selection_results = cbind(resultsA,beta_results,gamma_results)
-    colnames(selection_results) = c(colnames(resultsA), coef_names$fixed, 
-                                    str_c("Gamma",0:(ncol(gamma_results)-1)))
     
     # Find optimum/best model from model selection
     optim_results = matrix(selection_results[which.min(selection_results[,BIC_option]),], nrow = 1)
@@ -757,9 +977,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   # if problematic model fit, do not perform final calculations for 
   #   logLik and posterior samples and give NA values for appropriate output
   if(!is.null(fit$warnings)){
-    if(str_detect(fit$warnings, "coefficient values diverged") | str_detect(fit$warnings, "coefficient estimates contained NA values")){
+    if(str_detect(fit$warnings, "coefficient values diverged") | str_detect(fit$warnings, "coefficient estimates contained NA values") | str_detect(fit$warnings, "Error in model fit")){
      
-      Estep_out = list(u0 = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)), 
+      Estep_out = list(u0 = matrix(NA, nrow = 1, 
+                                   ncol = ifelse(fit_type == "glmmPen",
+                                                 ncol(data_input$Z), r*nlevels(data_input$group))), 
                        post_modes = rep(NA, times = ncol(data_input$Z)), 
                        post_out = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)), 
                        u_init = matrix(NA, nrow = 1, ncol = ncol(data_input$Z)),
@@ -769,10 +991,20 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   }
   # if model fit completed without serious issues, perform final computations
   if(Estep_final_complete == FALSE){
-    Estep_out = E_step_final(dat = data_input, offset_fit = offset, fit = fit, optim_options = optim_options, 
-                             fam_fun = fam_fun, extra_calc = TRUE, 
-                             adapt_RW_options = adapt_RW_options, trace = trace, 
-                             progress = progress)
+    if(fit_type == "glmmPen"){
+      Estep_out = E_step_final(dat = data_input, offset_fit = offset, 
+                               fit = fit, optim_options = optim_options, 
+                               fam_fun = fam_fun, extra_calc = TRUE, 
+                               adapt_RW_options = adapt_RW_options, trace = trace, 
+                               progress = progress)
+    }else if(fit_type == "glmmPen_FA"){
+      Estep_out = E_step_final_FA(dat = data_input, offset_fit = offset, fit = fit, 
+                                  optim_options = optim_options, 
+                                  fam_fun = fam_fun, extra_calc = TRUE, 
+                                  adapt_RW_options = adapt_RW_options, trace = trace, 
+                                  progress = progress, r = r)
+    }
+    
   }
   
   
@@ -783,7 +1015,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     optim_results = c(fit$lambda0, fit$lambda1, Estep_out$BICh, Estep_out$BIC, fit$BICq,
                       Estep_out$BICNgrp, Estep_out$ll,
                       sum(fit$coef[2:ncol(data_input$X)] != 0),
-                      sum(diag(fit$sigma[-1,-1,drop=F]) !=0),
+                      sum(diag(fit$sigma[-1,-1,drop=FALSE]) !=0),
                       sum(fit$coef != 0))
     optim_results = matrix(optim_results, nrow = 1)
     colnames(optim_results) = c("lambda0","lambda1","BICh","BIC","BICq","BICNgrp",
@@ -799,12 +1031,20 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     
   }
   
+  if(fit_type == "glmmPen"){
+    r_estimation_out = NULL
+  }else if(fit_type == "glmmPen_FA"){
+    r_estimation_out = list(r = r, r_max = r_max, 
+                            r_est_method = r_estimation$r_est_method,
+                            sample = (r_estimation$size < nlevels(data_input$group)),
+                            size = r_estimation$size)
+  }
   
   # Create pglmmObj object
   ## output = list object plugged into function used to create pglmmObj object
   output = c(fit, 
              list(Estep_out = Estep_out, formula = formula, y = fD_out$y, fixed_vars = fD_out$fixed_vars,
-                  X = fD_out$X, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
+                  X = fD_out$X, Z = fD_out$Z, Z_std = std_out$Z_std, group = fD_out$reTrms$flist,
                   coef_names = coef_names, family = fam_fun, covar = covar,
                   offset = offset, frame = fD_out$frame, 
                   sampling = sampling, std_out = std_out, 
@@ -812,7 +1052,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                   penalty = penalty, gamma_penalty = gamma_penalty, alpha = alpha, 
                   fixef_noPen = fixef_noPen, ranef_keep = ranef_keep,
                   control_options = list(optim_options = optim_options, tuning_options = tuning_options,
-                                         adapt_RW_options = adapt_RW_options)))
+                                         adapt_RW_options = adapt_RW_options),
+                  r_estimation = r_estimation_out))
 
   # If glmm() function, output the output list to the outer glmm() function
   # If glmmPen() function, create pglmmObj object and output this pglmmObj object directly

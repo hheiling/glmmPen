@@ -14,8 +14,7 @@ plot_mcmc(
 )
 }
 \arguments{
-\item{object}{an object of class \code{pglmmObj} output from either \code{\link{glmmPen}} 
-or \code{\link{glmmPen_FineSearch}}.}
+\item{object}{an object of class \code{pglmmObj}}
 
 \item{plots}{a character string or a vector of character strings specifying which graphical
 diagnostics to provide. Options include a sample path plot (default, "sample.path"), 

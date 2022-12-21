@@ -1,94 +1,106 @@
 
-#' @title Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
-#' Minimization (MCECM)
-#' 
-#' \code{fit_dat} is used to fit a penalized generalized mixed model
-#' via Monte Carlo Expectation Conditional Minimization (MCECM) for 
-#' a single tuning parameter combinations and is called within
-#' \code{glmmPen} or \code{glmm} (cannot be called directly by user)
-#' 
-#' @inheritParams optimControl 
-#' @inheritParams lambdaControl
-#' @inheritParams glmmPen
-#' @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
-#' Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
-#' the study, batch, or other group identity to which on observation belongs)
-#' @param offset_fit This can be used to specify an a priori known component to be included in the 
-#' linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
-#' number of cases. 
-#' @param group_X vector describing the grouping of the covariates in the model matrix.
-#' @param nMC a positive integer for the initial number of Monte Carlo draws. See the \code{nMC_start}
-#' argument in \code{\link{optimControl}} for more details.
-#' @param u_init matrix giving values to initialize samples from the posterior. If 
-#' Binomial or Poisson families, only need a single row to initialize samples from
-#' the posterior; if Gaussian family, multiple rows needed to initialize the estimate
-#' of the residual error (needed for the E-step). Columns correspond to the 
-#' columns of the Z random effect model matrix.
-#' @param coef_old vector giving values to initialized the coefficients (both fixed
-#' and random effects)
-#' @param ufull_describe output from \code{bigmemory::describe} (which returns a list 
-#' of the information needed to attach to a big.matrix object) applied to the
-#' big.matrix of posterior samples from the 'full' model. The big.matrix 
-#' described by the object is used to calculate the BIC-ICQ value for the model.
-#' @param ranef_keep vector of 0s and 1s indicating which random effects should 
-#' be considered as non-zero at the start of the algorithm. For each random effect,
-#' 1 indicates the random effect should be considered non-zero at start of algorithm,
-#' 0 indicates otherwise. The first element for the random intercept should always be 1.
-#' @param checks_complete logical value indicating whether the function has been called within
-#' \code{glmm} or \code{glmmPen} or whether the function has been called by itself. 
-#' Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,
-#' performs additional checks on the input data. If false, assumes data input checks have 
-#' already been performed. 
-#' @param conv_type integer specifying which type of convergence criteria to use. Default 1 specifies
-#' using the average Eucledian distance, and 2 specifies using relative change in the Q-function
-#' estimate. For now, all calls to \code{fit_dat} within the \code{glmmPen} framework
-#' restrict this convergence type to be the average Euclidean distance. However,
-#' we keep this argument in case we decide to allow multiple convergence type options in
-#' future versions of the package.
-#' 
-#' @return a list with the following elements:
-#' \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
-#' non-zero estimates of the lower-triangular cholesky decomposition of the random effects
-#' covariance matrix (in vector form)}
-#' \item{sigma}{random effects covariance matrix}
-#' \item{lambda0, lambda1}{the penalty parameters input into the function}
-#' \item{covgroup}{Organization of how random effects coefficients are grouped.}
-#' \item{J}{a sparse matrix that transforms the non-zero elements of the lower-triangular cholesky 
-#' decomposition of the random effects covariance matrix into a vector. For unstructured
-#' covariance matrices, dimension of dimension q^2 x (q(q+1)/2) (where q = number of random effects).
-#' For independent covariance matrices, q^2 x q.}
-#' \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
-#' \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
-#' \item{BIC}{Regular BIC estimate}
-#' \item{BICNgrps}{BIC estimate with N = number of groups in penalty term instead of N = number
-#' of total observations.}
-#' \item{BICq}{BIC-ICQ estimate}
-#' \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
-#' then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
-#' \item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
-#' and each group (rows) when the sampler is either "random_walk" or "independence"}
-#' \item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
-#' random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
-#' each group (rows)}
-#' 
+# @title Fit a Penalized Generalized Mixed Model via Monte Carlo Expectation Conditional 
+# Minimization (MCECM)
+#
+# \code{fit_dat} is used to fit a penalized generalized mixed model
+# via Monte Carlo Expectation Conditional Minimization (MCECM) for 
+# a single tuning parameter combinations and is called within
+# \code{glmmPen} or \code{glmm} (cannot be called directly by user)
+# 
+# @inheritParams lambdaControl
+# @inheritParams glmmPen
+# @param dat a list object specifying y (response vector), X (model matrix of all covariates), 
+# Z (model matrix for the random effects), and group (numeric factor vector whose value indicates 
+# the study, batch, or other group identity to which on observation belongs)
+# @param offset_fit This can be used to specify an a priori known component to be included in the 
+# linear predictor during fitting. This should be \code{NULL} or a numeric vector of length equal to the 
+# number of cases. 
+# @param group_X vector describing the grouping of the covariates in the model matrix.
+# @param u_init matrix giving values to initialize samples from the posterior. If 
+# Binomial or Poisson families, only need a single row to initialize samples from
+# the posterior; if Gaussian family, multiple rows needed to initialize the estimate
+# of the residual error (needed for the E-step). Columns correspond to the 
+# columns of the Z random effect model matrix.
+# @param coef_old vector giving values to initialized the coefficients (both fixed
+# and random effects)
+# @param ufull_describe output from \code{bigmemory::describe} (which returns a list 
+# of the information needed to attach to a big.matrix object) applied to the
+# big.matrix of posterior samples from the 'full' model. The big.matrix 
+# described by the object is used to calculate the BIC-ICQ value for the model.
+# @param ranef_keep vector of 0s and 1s indicating which random effects should 
+# be considered as non-zero at the start of the algorithm. For each random effect,
+# 1 indicates the random effect should be considered non-zero at start of algorithm,
+# 0 indicates otherwise. The first element for the random intercept should always be 1.
+# @param checks_complete logical value indicating whether the function has been called within
+# \code{glmm} or \code{glmmPen} or whether the function has been called by itself. 
+# Used for package testing purposes (user cannot directly call \code{fit_dat}). If true,
+# performs additional checks on the input data. If false, assumes data input checks have 
+# already been performed. 
+# 
+# @return a list with the following elements:
+# \item{coef}{a numeric vector of coefficients of fixed effects estimates and 
+# non-zero estimates of the lower-triangular cholesky decomposition of the random effects
+# covariance matrix (in vector form)}
+# \item{sigma}{random effects covariance matrix}
+# \item{lambda0, lambda1}{the penalty parameters input into the function}
+# \item{covgroup}{Organization of how random effects coefficients are grouped.}
+# \item{J}{a sparse matrix that transforms the non-zero elements of the lower-triangular cholesky 
+# decomposition of the random effects covariance matrix into a vector. For unstructured
+# covariance matrices, dimension of dimension q^2 x (q(q+1)/2) (where q = number of random effects).
+# For independent covariance matrices, q^2 x q.}
+# \item{ll}{estimate of the log likelihood, calculated using the Pajor method}
+# \item{BICh}{the hybrid BIC estimate described in Delattre, Lavielle, and Poursat (2014)}
+# \item{BIC}{Regular BIC estimate}
+# \item{BICNgrps}{BIC estimate with N = number of groups in penalty term instead of N = number
+# of total observations.}
+# \item{BICq}{BIC-ICQ estimate}
+# \item{u}{a matrix of the Monte Carlo draws. Organization of columns: first by random effect variable,
+# then by group within variable (i.e. Var1:Grp1 Var1:Grp2 ... Var1:GrpK Var2:Grp1 ... Varq:GrpK)}
+# \item{gibbs_accept_rate}{a matrix of the ending gibbs acceptance rates for each variable (columns)
+# and each group (rows) when the sampler is either "random_walk" or "independence"}
+# \item{proposal_SD}{a matrix of the ending proposal standard deviations (used in the adaptive
+# random walk version of the Metropolis-within-Gibbs sampling) for each variable (columns) and
+# each group (rows)}
+# 
 #' @useDynLib glmmPen
 #' @importFrom bigmemory attach.big.matrix describe as.big.matrix
 #' @importFrom mvtnorm dmvnorm
 #' @importFrom stats glm rnorm 
 #' @importFrom Matrix Matrix
-fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0001,
-                     family = "binomial", offset_fit = NULL,
-                     trace = 0, penalty = c("MCP","SCAD","lasso"),
-                     alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
-                     group_X = 0:(ncol(dat$X)-1),
-                     nMC_burnin = 250, nMC = 250, nMC_max = 5000, t = 2, mcc = 2,
-                     u_init = NULL, coef_old = NULL, 
-                     ufull_describe = NULL, maxitEM = 50, maxit_CD = 250,
-                     M = 10^4, sampler = c("stan","random_walk","independence"),
-                     adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
-                     var_start = 1.0, logLik_calc = FALSE, checks_complete = FALSE,
-                     ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group))),
-                     conv_type = 1, progress = TRUE){
+fit_dat = function(dat, lambda0 = 0, lambda1 = 0, 
+                   family = "binomial", offset_fit = NULL,
+                   optim_options = optimControl(nMC_start = 250, nMC_max = 1000, 
+                                                nMC_burnin = 100, var_start = 1.0),
+                   trace = 0, penalty = c("MCP","SCAD","lasso"),
+                   alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0), 
+                   group_X = 0:(ncol(dat$X)-1),
+                   u_init = NULL, coef_old = NULL, 
+                   ufull_describe = NULL,
+                   adapt_RW_options = adaptControl(), covar = c("unstructured","independent"),
+                   logLik_calc = FALSE, checks_complete = FALSE,
+                   ranef_keep = rep(1, times = (ncol(dat$Z)/nlevels(dat$group))),
+                   progress = TRUE){
+  
+  ############################################################################################
+  # Extract optimization parameters
+  ############################################################################################
+  
+  # Extract variables from optimControl
+  conv_EM = optim_options$conv_EM
+  conv_CD = optim_options$conv_CD
+  nMC_burnin = optim_options$nMC_burnin
+  nMC = optim_options$nMC
+  nMC_max = optim_options$nMC_max
+  maxitEM = optim_options$maxitEM
+  maxit_CD = optim_options$maxit_CD
+  M = optim_options$M
+  t = optim_options$t
+  mcc = optim_options$mcc
+  sampler = optim_options$sampler
+  step_size = optim_options$step_size
+  convEM_type = optim_options$convEM_type
+  var_start = optim_options$var_start
+  var_restrictions = optim_options$var_restrictions 
   
   ############################################################################################
   # Data input checks
@@ -100,6 +112,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   X = base::as.matrix(dat$X)
   # Convert sparse Z to dense ZF
   Z = Matrix::as.matrix(dat$Z)
+  coef_names = dat$coef_names # list with items 'fixed', 'random', and 'group'
   group = dat$group
   d = nlevels(factor(group))
   
@@ -178,9 +191,9 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
       zeros = zeros + i
       covgroup = rbind(covgroup, rep(i, (ncol(Z)/d)))
     }
-    covgroup = covgroup[lower.tri(covgroup, diag = T)]
+    covgroup = covgroup[lower.tri(covgroup, diag = TRUE)]
   }else{ # covar == "independent". Originally: ncol(Z)/d > 15
-    J = Matrix(0,(ncol(Z)/d)^2, (ncol(Z)/d), sparse = T) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d))
+    J = Matrix(0,(ncol(Z)/d)^2, (ncol(Z)/d), sparse = TRUE) #matrix(0, (ncol(Z)/d)^2, (ncol(Z)/d))
     index = 0
     indexc = 0
     sumy = 0
@@ -290,6 +303,17 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
       stop("Error in initial coefficient fit: NAs produced")
     }
     
+    # apply variance restrictions if necessary based on initialized fixed effects
+    if(var_restrictions == "fixef"){
+      fixed_keep = coef_names$fixed[c(1,which(coef[-1] != 0)+1)]
+      restrict_idx = which(!(coef_names$random %in% fixed_keep))
+      for(j in 1:(ncol(Z)/d)){
+        if(j %in% restrict_idx){
+          ranef_keep[j] = 0
+        }
+      }
+    }
+    
     # Initialize covariance matrix (cov)
     if(ncol(Z)/d > 1){
       vars = rep(var_start, ncol(Z)/d) * ranef_keep
@@ -302,12 +326,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     }
     
     if(trace >= 1){
-      if(covar == "unstructured"){
-        cat("initialized covariance matrix: \n")
-        print(cov)
-      }else if(covar == "independent"){
-        cat("initialized covariance matrix diagonal: \n", diag(cov), "\n")
-      }
+      cat("initialized covariance matrix diagonal: \n", diag(cov), "\n")
     }
     
     if(covar == "unstructured"){
@@ -343,7 +362,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
       # Find initial estimate of the variance of the error term using initial fixed effects only
       eta = X %*% coef[1:ncol(X)]
       s2_g = sum((y - invlink(link_int, eta))^2)
-      sig_g = sqrt(s2_g / length(y))
+      sig_g = sqrt(s2_g / length(y)) 
     }else{
       # Find initial estimate of variance of the error term using fixed and random effects from 
       # last round of selection
@@ -393,7 +412,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     Znew2[group == i,seq(i, ncol(Z), by = d)] = Z[group == i, seq(i, ncol(Z), by = d)] %*% gamma
   }
 
-  # Initialization of posteiror samples
+  # Initialization of posterior samples
   
   # At start of EM algorithm, acquire posterior draws from all relevant random effect variables
   # Note: restriction of which random effects to use are based on the ranef_keep variable
@@ -443,7 +462,8 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
   EM_converged = 0
   # Determining if issue with EM algorithm results
   problem = FALSE 
-  
+  # Determine if issue where random-intercept only model has too small of variance
+  randInt_issue = 0 
   # Record convergence criteria value (average Euclidean distance) for each EM iteration
   diff = rep(NA, maxitEM)
   
@@ -464,28 +484,38 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     }else{
       maxit_CD_use = maxit_CD
     }
-    coef = M_step(y=y, X=X, Z=Z, u_address=u0@address, M=nrow(u0), J=J, 
+    M_out = M_step(y=y, X=X, Z=Z, u_address=u0@address, M=nrow(u0), J=J, 
                   group=group, family=family, link_int=link_int, coef=coef, offset=offset_fit,
-                  phi=phi, maxit_CD=maxit_CD_use, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
+                  sig_g=sig_g, phi=phi,
+                  maxit_CD=maxit_CD_use, conv_CD=conv_CD, init=(i == 1), group_X=group_X, 
                   covgroup=covgroup, penalty=penalty, lambda0=lambda0, lambda1=lambda1, 
-                  gamma=gamma_penalty, alpha=alpha, trace=trace)
+                  gamma=gamma_penalty, alpha=alpha, step_size=step_size, trace=trace)
     
-    if(trace >= 1){
-      cat("Fixed effects (scaled X): \n")
-      cat(coef[1:ncol(X)], "\n")
+    coef = M_out$coef_new
+    step_size = M_out$step_size
+    phi = M_out$phi # relevant when family = "negbin"
+    
+    if((trace >= 1) & (family == "poisson")){
+      cat("step size: ", step_size,"\n")
     }
     
     # Re-calculate random effects covariance matrix from M step coefficients
     gamma = matrix(J%*%matrix(coef[-c(1:ncol(X))], ncol = 1), ncol = ncol(Z)/d)
     cov = var = gamma %*% t(gamma)
     
+    # If trace >= 1, output most recent coefficients
+    if(trace >= 1){
+      cat("Fixed effects (scaled X): \n")
+      cat(round(coef[1:ncol(X)],3), "\n")
+    }
+    
     if(trace >= 1){
       if(nrow(cov) <= 5){
         cat("random effect covariance matrix: \n")
-        print(cov)
+        print(round(cov,3))
       }else{
         cat("random effect covariance matrix diagonal: \n")
-        cat(diag(cov), "\n")
+        cat(round(diag(cov),3), "\n")
       }
     }
     
@@ -495,15 +525,20 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
       if(trace >= 1){
         cat("sig_g: ", sig_g, "\n")
       }
-     
     }
     
-    # if(family == "negbin"){
-    #   phi = coef[length(coef)]
-    #   coef = coef[-length(coef)]
-    # }
+    # Check of size of random intercept variance in models with only random intercept,
+    #   no random slopes. Cases: pre-specified random effects only includes random
+    #   intercept, OR all random slopes have been penalized out of model
+    if((nrow(cov) == 1) | all(diag(cov[-1,-1,drop=FALSE]) == 0)){
+      if(cov[1,1] < 0.01){
+        randInt_issue = 1
+      }
+    }else{
+      randInt_issue = 0
+    }
     
-    if(any(is.na(coef)) | any(abs(coef) > 10^5)){ # !is.finite(ll0) | 
+    if(any(is.na(coef)) | any(abs(coef) > 10^5) | randInt_issue == 1){ 
       # For now, assume divergent in any abs(coefficient) > 10^5
       problem = TRUE
       if(trace >= 1){
@@ -522,18 +557,21 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
                  BICh = Inf, BIC = Inf, BICq = Inf, BICNgrp = Inf,
                  EM_iter = i, EM_conv = NA, converged = 0, 
                  u_init = NULL)
-      # !is.finite(ll0) | any(is.na(coef)) | any(abs(coef) > 10^5)
       if(any(is.na(coef))){
-        warning(sprintf("coefficient estimates contained NA values at iteration %i",i), immediate. = T)
+        warning(sprintf("coefficient estimates contained NA values at iteration %i",i), immediate. = TRUE)
         out$warnings = sprintf("coefficient estimates contained NA values at iteration %i",i)
       }else if(any(abs(coef) > 10^5)){
         if(family == "gaussian"){
-          warning("Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl", immediate. = T)
+          warning("Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl", immediate. = TRUE)
           out$warnings = "Error in M step: coefficient values diverged. Consider increasing 'var_start' value in optimControl"
         }else{
-          warning("Error in M step: coefficient values diverged", immediate. = T)
+          warning("Error in M step: coefficient values diverged", immediate. = TRUE)
           out$warnings = "Error in M step: coefficient values diverged"
         }
+      }else if(randInt_issue == 1){
+        warning("Error in model fit: Random intercept variance is too small, indicating that this model \n
+                should be fit using traditional generalized linear model techniques.", immediate. = TRUE)
+        out$warnings = "Error in model fit: random intercept variance becomes too small, model should be fit using regular generalized linear model techniques"
       }
       
       if(sampler %in% c("random_walk","independence")){
@@ -544,9 +582,6 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
       if(is.null(coef_old)){
         out$coef_naive = fit_naive
       }
-      
-      u0_out = bigmemory::as.matrix(u0)
-      out$u = u0_out
       
       if(family == "gaussian"){
         out$sigma_gaus = sig_g
@@ -563,15 +598,19 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0, conv_EM = 0.001, conv_CD = 0.0
     # stopping rule: based on average Euclidean distance (comparing coef from minus t iterations)
     if(i <= t){
       diff[i] = 10^2
-      if(conv_type == 2){
+      if(convEM_type == "Qfun"){
         Q_est[i] = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, sig_g, phi)
       }
     }else{
-      if(conv_type == 1){
+      if(convEM_type == "AvgEuclid1"){
         diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / sum(coef_record[1,] != 0)
-      }else if(conv_type == 2){
+      }else if(convEM_type == "AvgEuclid2"){
+        diff[i] = sqrt(sum((coef - coef_record[1,])^2)) / sqrt(sum(coef_record[1,] != 0))
+      }else if(convEM_type == "Qfun"){
         Q_est[i] = Qfun(y, X, Z, u0@address, group, J, matrix(coef, ncol = 1), offset_fit, c(d,ncol(Z)/d), family, link_int, sig_g, phi)
         diff[i] = abs(Q_est[i] - Q_est[i-t]) / abs(Q_est[i])
+      }else if(convEM_type == "maxdiff"){
+        diff[i] = max(abs(coef - coef_record[1,]))
       }
     }
     

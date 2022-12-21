@@ -1,8 +1,12 @@
 
-
+#' @name sim.data
+#' @aliases sim.data.FA
+#' 
 #' @title Simulates data to use for the \code{\link{glmmPen}} package
 #' 
-#' Simulates data to use for testing the \code{\link{glmmPen}} package.
+#' @description Simulates data to use for testing the \code{\link{glmmPen}} package.
+#' \code{sim.data} simulates data for \code{\link{glmmPen}}, and
+#' \code{sim.data.FA} simulates data for \code{\link{glmmPen_FA}}.
 #' Possible parameters to specify includes number of total covariates,
 #' number of non-zero fixed and random effects, and the magnitude
 #' of the random effect covariance values.
@@ -18,13 +22,23 @@
 #' @param family character string specifying which family to generate data from.
 #' Family options include "binomial" (default), "poisson", and "gaussian".
 #' @param corr optional value to specify correlation in the random effects
-#' covariance matrix. Default \code{NULL}
+#' covariance matrix. Default \code{NULL}, only available within \code{sim.data}.
 #' @param seed integer to use for the setting of a random seed
 #' @param imbalance integer of 0 or 1 indicating whether the observations should
 #' be equally distributed among the groups (0) or unequally distributed (1).
 #' @param beta numeric vector of the fixed effects (including intercept)
 #' @param pnonzerovar non-negative integer specifying the number of 
 #' covariates with a zero-valued fixed effect but a non-zero random effect.
+#' @param sd_x non-negative value specifying the standard deviation of the
+#' simulated covariates (drawn from a normal distribution with mean 0,
+#' standard deviation \code{sd_x})
+#' @param B matrix specifying the factor loadings matrix for the random effects,
+#' only used within \code{sim.data.FA}.
+#' Dimensions: number of columns is the number of random effects (including the intercept),
+#' and number of rows is the number of latent common factors (\code{r}).
+#' The random effect covariance matrix is specified as Sigma = B x t(B) + diag(sd_raneff)
+#' @param r positive integer specifying number of latent common factors that describe the random effects,
+#' only used within \code{sim.data.FA}
 #' 
 #' @return list containing the following elements:
 #' \item{y}{vector of the response}
@@ -44,7 +58,7 @@
 #' @export
 sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomial", 
                     corr = NULL, seed, imbalance = 0, 
-                    beta = NULL, pnonzerovar = 0){
+                    beta = NULL, pnonzerovar = 0, sd_x = 1){
   
   set.seed(seed = seed)
   
@@ -65,17 +79,19 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
   if(pnonzero + pnonzerovar > ptot) stop("pnonzero + pnonzerovar > ptot")
   # create fixed effects covariate matrix
   if(is.null(corr)){
-    mat = matrix(rnorm(n*p, mean = 0, sd = 1), nrow = n) # 11/15 switching to var = 1, then scaling below
+    mat = matrix(rnorm(n*p, mean = 0, sd = sd_x), nrow = n) # 11/15 switching to var = 1, then scaling below
     #mat = matrix(rbinom(n*p, p = 0.5, size = 1), nrow = n) # now switching back to normal to have more resolution to show prediction performance
   }else{
     cor = matrix(corr, p, p)
-    diag(cor) = 1
-    sigma = 0.5*cor
+    diag(cor) = sd_x
+    sigma = cor # 0.5*cor
     mat = rmvnorm(n =  n , mean = rep(0,p), sigma = sigma)
   }
   
   # add intercept
-  mat = std(mat)
+  if(sd_x == 1){
+    mat = std(mat)
+  }
   X = cbind(rep(1, n), mat)
   colnames(X) = c("(Intercept)",str_c("X", 1:(ncol(X)-1)))
   
@@ -165,7 +181,7 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
   if(slopes == TRUE) Z = model.matrix(~drep:X-1,  contrasts.arg=list(drep=diag(nlevels(drep))))
   ##
   
-  colnames(Z) = str_c(rep(colnames(X), each = d), ":", 1:d)
+  colnames(Z) = str_c(rep(colnames(X), each = d), ":", rep(1:d, times = length(colnames(X))))
   
   if(!is.null(ok)){
     dat = list(y = y[-ok], X = X[-ok,], Z = Z[-ok,],  pnonzero =  pnonzero, z1 = matrix(z1, nrow = d), group = drep[-ok], X0 = X0)

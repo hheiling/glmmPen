@@ -21,10 +21,12 @@ If \code{NULL} (default), this value is automatically calculated.}
 
 \item{r_est_method}{character string indicating method used to estimate number
 of latent factors \code{r}. Default "GR" uses the Growth Ratio method of
-Ahn and Horenstein (2013). Other available options include "ER" for
-the Eigenvalue Ratio method of Ahn and Horenstein (2013) and "BN1" or "BN2",
-the Bai and Ng (2002) method using one of two penalties: 
-(1) \code{(d + p) / (d p) log(d p/(d+p))},
+Ahn and Horenstein (2013) (<doi:10.3982/ECTA8968>). 
+Other available options include "ER" for
+the Eigenvalue Ratio method of Ahn and Horenstein (2013) (<doi:10.3982/ECTA8968>) 
+and "BN1" or "BN2",
+the Bai and Ng (2002) method (<dio:10.1111/1468-0262.00273>) using one of two penalties: 
+(1) \code{(d + p) / (d p) log(d p/(d+p))} or
 (2) \code{(d + p) / (d p) log(min(d,p))} where d is the number of groups in
 the data and p is the number of total random effect covariates (including the intercept)}
 
@@ -43,5 +45,12 @@ number of latent factors (r) for use within the \code{glmmPen_FA} and
 \code{glmm_FA} estimation procedures.
 }
 \details{
-TODO: additional details on estimation procedure.
+Estimation of \code{r} procedure: For each level of the group variable separately,
+we identify the observations within that group and 
+fit a regular penalized generalized linear model where the penalty value is the
+minimum fixed effect penalty. These group-specific estimates, which we label as 'pseudo random effects',
+are placed into a matrix \code{G}
+(rows = number of levels of the grouping variable, columns = number of random effect covariates),
+and this pseudo random effects matrix is treated as the observed outcome matrix used in
+the "GR", "ER", and "BN" estimatino procedures described above in the description of \code{r_est_method}.
 }

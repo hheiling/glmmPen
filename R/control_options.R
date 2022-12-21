@@ -329,10 +329,44 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' independence sampler ("independence"). If using the random walk sampler, see \code{\link{adaptControl}}
 #' for some additional control structure parameters.
 #' @param var_start either the character string "recommend" or a positive number specifying the 
-#' starting values to initialize the variance of the covariance matrix. Default "recommend" first
+#' starting values to initialize the variance of the covariance matrix. For \code{\link{glmmPen}},
+#' the default "recommend" first
 #' fits a simple model with a fixed and random intercept only using the \link{lme4} package. The 
 #' random intercept variance estimate from this model is then multiplied by 2 and used as the 
-#' starting variance. 
+#' starting variance. For \code{\link{glmmPen_FA}}, the default is set to 0.10 (see \code{B_init_type} 
+#' for further information).
+#' @param step_size positive numeric value indicating the starting step size to use in the 
+#' Majorization-Minimization scheme of the M-step. Only relevant when the distributional assumption
+#' used is not Binomial or Gaussian with canonical links (e.g. Poisson with log link)
+#' @param standardization logical value indicating whether covariates should
+#' standardized (\code{TRUE}, default) or unstandardized (\code{FALSE}) before being
+#' used within the algorithm. If \code{standardization = TRUE}, then the standardized covariates
+#' will also be used to create the Z matrix used in the estimation of the random effects.
+#' @param convEM_type character string indicating the type of convergence criteria to 
+#' use within the EM algorithm to determine when a model has converged. The default is "AvgEuclid1",
+#' which calculates the average Euclidean distance between the most recent coefficient vector and
+#' the coefficient vector \code{t} EM iterations back (Euclidean distance divided by the number
+#' of non-zero coefficients \code{t} EM iterations back). Alternative convergence options include
+#' "maxdiff", which determines convergence based on the maximum difference between the coefficient vectors; 
+#' "AvgEuclid2", which is similar to "AvgEuclid1" except it divides the Euclidean distance by the square-root
+#' of the number of non-zero coefficients; and "Qfun", which determines convergence based on
+#' the relative difference in the Q-function estimates calculated with the most recent coefficient vector 
+#' and the coefficient vector \code{t} EM iterations back.
+#' @param B_init_type character string indicating how the B matrix within the \code{\link{glmmPen_FA}}
+#' method should be initialized. (This argument is not used within the \code{\link{glmmPen}} function.)
+#' The default "deterministic" initializes all non-zero variance and 
+#' covariance values of the random effect covariance matrix to the value of \code{var_start},
+#' such that each non-zero element of the B matrix is \code{sqrt(var_start / r)} (where \code{r} is
+#' the number of latent factors). Option "data" is similar to "deterministic", but the 
+#' \code{var_start} value is the default data-driven variance estimate used in \code{\link{glmmPen}} 
+#' (see argument \code{var_start} for more details).
+#' @param var_restrictions character string indicating how the random effect covariance
+#' matrix should be initialized at the beginning of the algorithm
+#' when penalties are applied to the coefficients. 
+#' If "none" (default), all random effect predictors are initialized to have non-zero variances.
+#' If "fixef", the code first examines the initialized fixed effects (initialized using a regular
+#' penalized GLM), and only the random effect predictors that are initialized with non-zero fixed effects
+#' are initialized with non-zero variances.
 #' 
 #' @details Several arguments are set to a default value of \code{NULL}. If these arguments 
 #' are left as \code{NULL} by the user, then these values will be filled in with appropriate
@@ -345,12 +379,16 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
 #' @export
-optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005, 
+optimControl = function(var_restrictions = c("none","fixef"),
+                        conv_EM = 0.0015, conv_CD = 0.0005, 
                         nMC_burnin = NULL, nMC_start = NULL, nMC_max = NULL, nMC_report = 5000,
                         maxitEM = NULL, maxit_CD = 50, 
                         M = 10000, t = 2, mcc = 2,
                         sampler = c("stan","random_walk","independence"), 
-                        var_start = "recommend"){
+                        var_start = "recommend", step_size = 1.0,
+                        standardization = TRUE,
+                        convEM_type = c("AvgEuclid1","maxdiff","AvgEuclid2","Qfun"),
+                        B_init_type = c("deterministic","data","random")){
   
   # Acceptable input types and input restrictions
   ## Arguments with default as NULL
@@ -403,10 +441,35 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
     stop("mcc must be at least 2")
   }
   
+  if(step_size <= 0){
+    stop("step_size must be positive")
+  }
+  
+  if(!(standardization %in% c(TRUE,FALSE))){
+    stop("standardization must be logical, TRUE or FALSE")
+  }
+  
+  convEM_type = convEM_type[1]
+  if(!(convEM_type %in% c("AvgEuclid1","AvgEuclid2","Qfun","maxdiff"))){
+    stop("convEM_type must be one of 'AvgEuclid1', 'AvgEuclid2', 'Qfun', or 'maxdiff'")
+  }
+  
+  B_init_type = B_init_type[1]
+  if(!(B_init_type %in% c("random","deterministic","data"))){
+    stop("B_init_type must be either 'random' or 'deterministic' or 'data'")
+  }
+  
+  var_restrictions = var_restrictions[1]
+  if(!(var_restrictions %in% c("none","fixef"))){
+    stop("var_restrictions must be either 'none' or 'fixef'")
+  }
+  
   structure(list(conv_EM = conv_EM, conv_CD = conv_CD, 
                  nMC_burnin = nMC_burnin, nMC = nMC_start, nMC_max = nMC_max, nMC_report = nMC_report,
                  maxitEM = maxitEM, maxit_CD = maxit_CD,  M = M, t = t, mcc = mcc,
-                 sampler = sampler, var_start = var_start),
+                 sampler = sampler, var_start = var_start, step_size = step_size,
+                 standardization = standardization, convEM_type = convEM_type,
+                 B_init_type = B_init_type, var_restrictions = var_restrictions),
             class = "optimControl")
 }
 
@@ -417,7 +480,7 @@ optimControl = function(conv_EM = 0.0015, conv_CD = 0.0005,
 #     Alternatively, q = number latent factors for glmm_FA and glmmPen_FA functions
 # select: TRUE if running the selection algorithm
 optim_recommend = function(optim_options, family, q, select){
-  
+
   # Default nMC in case with large number of random effects covariates
   if(q <= 11){ # q includes random intercept, "if number random effect covariates <= 10"
     # If not special case of large q, give default values of nMC args
@@ -442,7 +505,7 @@ optim_recommend = function(optim_options, family, q, select){
       optim_options$nMC_max = 1000
     }
   } # End if-else q <= 11
-  
+
   # Default maxitEM
   if(is.null(optim_options$maxitEM)){
     if(family %in% c("binomial","poisson")){
@@ -451,14 +514,16 @@ optim_recommend = function(optim_options, family, q, select){
       optim_options$maxitEM = 65
     }
   }
-  
+
   if(optim_options$nMC_max < optim_options$nMC){
     stop("in optimControl, nMC_max, ",optim_options$nMC_max," must be less than nMC_start ", optim_options$nMC)
   }
-  
+
   return(optim_options)
-  
+
 }
+
+
 
 #' @title Control of Latent Factor Model Number Estimation
 #' 
@@ -474,10 +539,12 @@ optim_recommend = function(optim_options, family, q, select){
 #' If \code{NULL} (default), this value is automatically calculated.
 #' @param r_est_method character string indicating method used to estimate number
 #' of latent factors \code{r}. Default "GR" uses the Growth Ratio method of
-#' Ahn and Horenstein (2013). Other available options include "ER" for
-#' the Eigenvalue Ratio method of Ahn and Horenstein (2013) and "BN1" or "BN2",
-#' the Bai and Ng (2002) method using one of two penalties: 
-#' (1) \code{(d + p) / (d p) log(d p/(d+p))},
+#' Ahn and Horenstein (2013) (<doi:10.3982/ECTA8968>). 
+#' Other available options include "ER" for
+#' the Eigenvalue Ratio method of Ahn and Horenstein (2013) (<doi:10.3982/ECTA8968>) 
+#' and "BN1" or "BN2",
+#' the Bai and Ng (2002) method (<dio:10.1111/1468-0262.00273>) using one of two penalties: 
+#' (1) \code{(d + p) / (d p) log(d p/(d+p))} or
 #' (2) \code{(d + p) / (d p) log(min(d,p))} where d is the number of groups in
 #' the data and p is the number of total random effect covariates (including the intercept)
 #' @param size positive integer specifying the total number of pseudo random
@@ -487,7 +554,14 @@ optim_recommend = function(optim_options, family, q, select){
 #' variable), then a sampling procedure is used to increase the number of pseudo estimates
 #' to the value of \code{size}.
 #' 
-#' @details TODO: additional details on estimation procedure.
+#' @details Estimation of \code{r} procedure: For each level of the group variable separately,
+#' we identify the observations within that group and 
+#' fit a regular penalized generalized linear model where the penalty value is the
+#' minimum fixed effect penalty. These group-specific estimates, which we label as 'pseudo random effects',
+#' are placed into a matrix \code{G}
+#' (rows = number of levels of the grouping variable, columns = number of random effect covariates),
+#' and this pseudo random effects matrix is treated as the observed outcome matrix used in
+#' the "GR", "ER", and "BN" estimatino procedures described above in the description of \code{r_est_method}.
 #' 
 #' @export
 rControl = function(r = NULL, r_max = NULL, r_est_method = "GR",
@@ -526,4 +600,63 @@ rControl = function(r = NULL, r_max = NULL, r_est_method = "GR",
             class = "rControl")
   
 }
+
+
+
+
+
+
+
+## Alternative?
+# optim_recommend: For input arguments of optimControl() that are set to NULL by default,
+#   recommend appropriate inputs that depend on the family, number of random effects,
+#   and whether or not variable selection is being performed.
+# q = number of random effects (including random intercept) 
+#     Alternatively, q = number latent factors for glmm_FA and glmmPen_FA functions
+# select: TRUE if running the selection algorithm
+# optim_recommend = function(optim_options, family, q, select){
+#   
+#   if(is.null(optim_options$nMC_burnin)){
+#     optim_options$nMC_burnin = 100
+#   }
+#   
+#   if(select == TRUE){
+#     if(is.null(optim_options$nMC)){
+#       optim_options$nMC = 100
+#     }
+#     if(is.null(optim_options$nMC_max)){
+#       optim_options$nMC_max = 500
+#     }
+#     # Default maxitEM
+#     if(is.null(optim_options$maxitEM)){
+#       if(family %in% c("binomial","poisson")){
+#         optim_options$maxitEM = 25
+#       }else if(family == "gaussian"){
+#         optim_options$maxitEM = 35
+#       }
+#     }
+#   }else if(select == FALSE){
+#     if(is.null(optim_options$nMC)){
+#       optim_options$nMC = 250
+#     }
+#     if(is.null(optim_options$nMC_max)){
+#       optim_options$nMC_max = 1000
+#     }
+#     # Default maxitEM
+#     if(is.null(optim_options$maxitEM)){
+#       if(family %in% c("binomial","poisson")){
+#         optim_options$maxitEM = 50
+#       }else if(family == "gaussian"){
+#         optim_options$maxitEM = 65
+#       }
+#     }
+#   }
+#   
+#   if(optim_options$nMC_max < optim_options$nMC){
+#     stop("in optimControl, nMC_max, ",optim_options$nMC_max," must be less than nMC_start ", optim_options$nMC)
+#   }
+#   
+#   return(optim_options)
+#   
+# }
 
