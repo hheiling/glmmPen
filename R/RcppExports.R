@@ -2,66 +2,58 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 grp_CD_XZ_FA_step <- function(y, X, Z, group, pBigMat, J_f, dims, beta, offset, step_size, sig_g, family, link, init, phi, X_group, K, penalty, params, trace) {
-    .Call('_glmmPen_grp_CD_XZ_FA_step', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_f, dims, beta, offset, step_size, sig_g, family, link, init, phi, X_group, K, penalty, params, trace)
+    .Call(`_glmmPen_grp_CD_XZ_FA_step`, y, X, Z, group, pBigMat, J_f, dims, beta, offset, step_size, sig_g, family, link, init, phi, X_group, K, penalty, params, trace)
 }
 
 grp_CD_XZ_step <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, step_size, sig_g, family, link, init, phi, XZ_group, K, penalty, params, trace) {
-    .Call('_glmmPen_grp_CD_XZ_step', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, step_size, sig_g, family, link, init, phi, XZ_group, K, penalty, params, trace)
+    .Call(`_glmmPen_grp_CD_XZ_step`, y, X, Z, group, pBigMat, J_q, dims, beta, offset, step_size, sig_g, family, link, init, phi, XZ_group, K, penalty, params, trace)
 }
 
 soft_thresh <- function(zeta, lambda) {
-    .Call('_glmmPen_soft_thresh', PACKAGE = 'glmmPen', zeta, lambda)
+    .Call(`_glmmPen_soft_thresh`, zeta, lambda)
 }
 
 MCP_soln <- function(zeta, nu, lambda, gamma, alpha) {
-    .Call('_glmmPen_MCP_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma, alpha)
+    .Call(`_glmmPen_MCP_soln`, zeta, nu, lambda, gamma, alpha)
 }
 
 SCAD_soln <- function(zeta, nu, lambda, gamma, alpha) {
-    .Call('_glmmPen_SCAD_soln', PACKAGE = 'glmmPen', zeta, nu, lambda, gamma, alpha)
+    .Call(`_glmmPen_SCAD_soln`, zeta, nu, lambda, gamma, alpha)
 }
 
 pglm_fit <- function(y, X, dims, beta, offset, family, link, penalty, params, penalty_factor, trace) {
-    .Call('_glmmPen_pglm_fit', PACKAGE = 'glmmPen', y, X, dims, beta, offset, family, link, penalty, params, penalty_factor, trace)
+    .Call(`_glmmPen_pglm_fit`, y, X, dims, beta, offset, family, link, penalty, params, penalty_factor, trace)
 }
 
 sample_mc_inner_gibbs <- function(f, z, y, t, NMC, u0, family, link, phi, sig_g) {
-    .Call('_glmmPen_sample_mc_inner_gibbs', PACKAGE = 'glmmPen', f, z, y, t, NMC, u0, family, link, phi, sig_g)
+    .Call(`_glmmPen_sample_mc_inner_gibbs`, f, z, y, t, NMC, u0, family, link, phi, sig_g)
 }
 
 sample_mc_gibbs_adapt_rw <- function(f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, nMC_burnin, family, link, phi, sig_g) {
-    .Call('_glmmPen_sample_mc_gibbs_adapt_rw', PACKAGE = 'glmmPen', f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, nMC_burnin, family, link, phi, sig_g)
-}
-
-Qfun_FA <- function(y, X, Z, pBigMat, group, J_f, beta, offset, dims, family, link, sig_g, phi) {
-    .Call('_glmmPen_Qfun_FA', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_f, beta, offset, dims, family, link, sig_g, phi)
-}
-
-sig_gaus_FA <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, link) {
-    .Call('_glmmPen_sig_gaus_FA', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, link)
+    .Call(`_glmmPen_sample_mc_gibbs_adapt_rw`, f, z, y, NMC, u0, proposal_SD, batch, batch_length, offset, nMC_burnin, family, link, phi, sig_g)
 }
 
 invlink <- function(link, eta) {
-    .Call('_glmmPen_invlink', PACKAGE = 'glmmPen', link, eta)
+    .Call(`_glmmPen_invlink`, link, eta)
 }
 
 Qfun <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, sig_g, phi) {
-    .Call('_glmmPen_Qfun', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, sig_g, phi)
+    .Call(`_glmmPen_Qfun`, y, X, Z, pBigMat, group, J_q, beta, offset, dims, family, link, sig_g, phi)
 }
 
 sig_gaus <- function(y, X, Z, pBigMat, group, J_q, beta, offset, dims, link) {
-    .Call('_glmmPen_sig_gaus', PACKAGE = 'glmmPen', y, X, Z, pBigMat, group, J_q, beta, offset, dims, link)
+    .Call(`_glmmPen_sig_gaus`, y, X, Z, pBigMat, group, J_q, beta, offset, dims, link)
 }
 
 phi_ml <- function(y, eta, link, limit, eps, phi) {
-    .Call('_glmmPen_phi_ml', PACKAGE = 'glmmPen', y, eta, link, limit, eps, phi)
+    .Call(`_glmmPen_phi_ml`, y, eta, link, limit, eps, phi)
 }
 
 phi_ml_init <- function(y, eta, link, limit, eps) {
-    .Call('_glmmPen_phi_ml_init', PACKAGE = 'glmmPen', y, eta, link, limit, eps)
+    .Call(`_glmmPen_phi_ml_init`, y, eta, link, limit, eps)
 }
 
 Qfun_quad_beta <- function(Q0, step_size, diff0, eta, eta0, beta, beta0) {
-    .Call('_glmmPen_Qfun_quad_beta', PACKAGE = 'glmmPen', Q0, step_size, diff0, eta, eta0, beta, beta0)
+    .Call(`_glmmPen_Qfun_quad_beta`, Q0, step_size, diff0, eta, eta0, beta, beta0)
 }
 
