@@ -10,24 +10,24 @@ Authors@R: c(
     person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")),
     person("Joseph", "Ibrahim", email = "ibrahim@bios.unc.edu", role = c("aut")))
 Maintainer: Hillary Heiling <hheiling@live.unc.edu>
-Description: Fits high dimensional penalized generalized linear 
-    mixed models using 
-    the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm. 
-    The purpose of the package is to perform variable selection on both the fixed and 
+Description: Fits high dimensional penalized generalized linear
+    mixed models using
+    the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm.
+    The purpose of the package is to perform variable selection on both the fixed and
     random effects simultaneously for generalized linear mixed models.
     The package supports fitting of Binomial, Gaussian, and Poisson data with canonical links, and
     supports penalization using the MCP, SCAD, or LASSO penalties. The MCECM algorithm
     is described in Rashid et al. (2020) <doi:10.1080/01621459.2019.1671197>.
     The techniques used in the minimization portion of the procedure (the M-step) are
-    derived from the procedures of the 'ncvreg' package (Breheny and Huang (2011) 
+    derived from the procedures of the 'ncvreg' package (Breheny and Huang (2011)
     <doi:10.1214/10-AOAS388>) and 'grpreg' package (Breheny and Huang (2015)
     <doi:10.1007/s11222-013-9424-2>), with
     appropriate modifications to account for the estimation and penalization of
-    the random effects. The 'ncvreg' and 'grpreg' packages also describe the MCP, SCAD, 
+    the random effects. The 'ncvreg' and 'grpreg' packages also describe the MCP, SCAD,
     and LASSO penalties.
 License: GPL (>= 2)
 Encoding: UTF-8
-Imports: 
+Imports:
     ggplot2,
     Matrix,
     methods,
@@ -37,17 +37,19 @@ Imports:
     stringr,
     mvtnorm,
     MASS,
-    coxme
-Depends: 
+    coxme,
+    rstantools
+Depends:
     lme4,
     bigmemory,
     Rcpp (>= 0.12.0),
     R (>= 3.6.0)
-LinkingTo: 
+LinkingTo:
     BH (>= 1.66.0),
     bigmemory,
     Rcpp (>= 0.12.0),
     RcppArmadillo,
+    RcppParallel,
     RcppEigen (>= 0.3.3.3.0),
     rstan (>= 2.18.1),
     StanHeaders (>= 2.18.0)
@@ -58,7 +60,7 @@ Author: Hillary Heiling [aut, cre],
   Naim Rashid [aut],
   Quefeng Li [aut],
   Joseph Ibrahim [aut]
-Suggests: 
+Suggests:
     testthat,
     knitr,
     rmarkdown
