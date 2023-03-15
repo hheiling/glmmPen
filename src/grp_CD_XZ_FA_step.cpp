@@ -28,13 +28,13 @@ using namespace arma;
 
 // [[Rcpp::export]]
 arma::vec grp_CD_XZ_FA_step(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
-                    const arma::vec& group, 
-                    SEXP pBigMat, const arma::sp_mat& J_f, arma::vec dims,
-                    arma::vec beta, const arma::vec& offset,
-                    double step_size, double sig_g,
-                    const char* family, int link, int init, double phi,
-                    const arma::uvec& X_group, arma::uvec K, // covariate group index and size of covariate groups
-                    const char* penalty, arma::vec params, int trace) {
+                            const arma::vec& group, 
+                            SEXP pBigMat, const arma::sp_mat& J_f, arma::vec dims,
+                            arma::vec beta, const arma::vec& offset,
+                            double step_size, double sig_g,
+                            const char* family, int link, int init, double phi,
+                            const arma::uvec& X_group, arma::uvec K, // covariate group index and size of covariate groups
+                            const char* penalty, arma::vec params, int trace) {
   
   
   // y = response vector
@@ -61,11 +61,9 @@ arma::vec grp_CD_XZ_FA_step(const arma::vec& y, const arma::mat& X, const arma::
   int d = dims(2); // number of groups within observations
   int q = dims(3); // number of random effect covariates
   int M = dims(4); // number of MCMC draws (nrow(u))
-  // int J_XZ = dims(5); // number of covariate groups (in fixed and random effects)
   int J_X = dims(5); // number of covariate groups in fixed effects
   double conv = dims(6); // Convergence threshold
   int maxit = dims(7); // maximum number of iterations
-  // int J_X = XZ_group(p); // Covariate group corresponding to random intercept
   
   int Kj = 0; // Size of covariate group j
   
@@ -356,8 +354,7 @@ arma::vec grp_CD_XZ_FA_step(const arma::vec& y, const arma::mat& X, const arma::
     // Then update all other random effects.
     // ----------------------------------------------------------------------------------//
     
-    // Identify covariates belonging to random intercept (group j = J_X)
-    // arma::uvec idxj = find(XZ_group == J_X);
+    // Identify covariates belonging to random intercept 
     for(f=0;f<r;f++){
       idx_bt(f) = f;
     }

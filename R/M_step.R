@@ -61,7 +61,7 @@ M_step = function(y, X, Z, u_address, M, J, group, family, link_int, coef, offse
   K = numeric(J_XZ)
   for(j in unique(XZ_group)){
     idx = which(XZ_group == j)
-    K[j+1] = length(idx)
+    K[j+1] = length(idx) # Add 1 because smallest XZ_group value is 0
   }
   
   # Number of groups wrt observations

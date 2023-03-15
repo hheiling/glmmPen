@@ -322,7 +322,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0,
     }else{
       vars = var_start
       cov = var = matrix(vars, ncol = 1)
-      gamma = matrix(sqrt(var), ncol = 1)
+      gamma = matrix(sqrt(vars), ncol = 1)
     }
     
     if(trace >= 1){
@@ -569,8 +569,10 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0,
           out$warnings = "Error in M step: coefficient values diverged"
         }
       }else if(randInt_issue == 1){
-        warning("Error in model fit: Random intercept variance is too small, indicating that this model \n
-                should be fit using traditional generalized linear model techniques.", immediate. = TRUE)
+        warning("Error in model fit: Random intercept variance is too small, indicating either that 
+                there are high correlations among the covariates (if so, consider reducing these correlations 
+                or changing the Elastic Net alpha value) or that this model should be fit 
+                using traditional generalized linear model techniques.", immediate. = TRUE)
         out$warnings = "Error in model fit: random intercept variance becomes too small, model should be fit using regular generalized linear model techniques"
       }
       
@@ -661,7 +663,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0,
       Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
     }
     
-    # Initial points for Metropolis within Gibbs E step algorithms
+    # Initial points for E step sampling algorithms
     uold = as.numeric(u0[nrow(u0),])
     # if random effect penalized out in past model / in previous M-step, do not
     # collect posterior samples for this random effect

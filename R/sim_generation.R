@@ -21,8 +21,8 @@
 #' random effects covariance matrix (applied to the non-zero random effects)
 #' @param family character string specifying which family to generate data from.
 #' Family options include "binomial" (default), "poisson", and "gaussian".
-#' @param corr optional value to specify correlation in the random effects
-#' covariance matrix. Default \code{NULL}, only available within \code{sim.data}.
+#' @param corr optional value to specify correlation between covariates
+#' in the model matrix. Default \code{NULL}, only available within \code{sim.data}.
 #' @param seed integer to use for the setting of a random seed
 #' @param imbalance integer of 0 or 1 indicating whether the observations should
 #' be equally distributed among the groups (0) or unequally distributed (1).
@@ -83,7 +83,7 @@ sim.data = function(n, ptot, pnonzero, nstudies, sd_raneff = 1, family = "binomi
     #mat = matrix(rbinom(n*p, p = 0.5, size = 1), nrow = n) # now switching back to normal to have more resolution to show prediction performance
   }else{
     cor = matrix(corr, p, p)
-    diag(cor) = sd_x
+    diag(cor) = (sd_x)^2
     sigma = cor # 0.5*cor
     mat = rmvnorm(n =  n , mean = rep(0,p), sigma = sigma)
   }

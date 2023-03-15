@@ -1141,19 +1141,26 @@ XZ_std = function(fD_out){
 #' @inheritParams lambdaControl
 #' @param X matrix of standardized fixed effects (see \code{std} function in \code{ncvreg} 
 #' documenation). X should not include intercept.
-#' @param y numeric vector of response values
+#' @param y numeric vector of response values. If "coxph" family, \code{y} are the event indicator
+#' values (0 if censored, 1 if event)
+#' @param y_times numeric vector of observed times for "coxph" family; \code{NULL} for all 
+#' other families
 #' @param nlambda positive integer specifying number of penalty parameters (lambda) with 
 #' which to fit a model.
 #' @param penalty.factor an optional numeric vector equal to the \code{fixef_noPen} argument
 #' in \code{\link{glmmPen}}
 #' 
+#' @details If the family is "coxph", the \code{y}, \code{y_times}, and \code{X} must be 
+#' sorted such that the subjects' \code{y_times} are sorted from the smallest to the largest times.
+#' The "coxph" family procedure is still in production and not yet ready.
+#' 
 #' @return numeric sequence of penalty parameters of length \code{nlambda} ranging from the
 #' minimum penalty parameter (first element) equal to fraction \code{lambda.min} multiplied by the 
 #' maximum penalty parameter to the maximum penalty parameter (last element)
 #' 
-#' @importFrom ncvreg setupLambda
+#' @importFrom ncvreg setupLambda 
 #' @export
-LambdaSeq = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
+LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL, nlambda = 10,
                        penalty.factor = NULL){
   # Checks
   if(!is.matrix(X)){
@@ -1192,9 +1199,26 @@ LambdaSeq = function(X, y, family, alpha = 1, lambda.min = NULL, nlambda = 10,
     penalty.factor = rep(1, p)
   }
   
-  # setupLambda from ncvreg package
+  # setupLambda and setupLambdaCox from ncvreg package
   ## Order: from max lambda to min lambda
-  lambda = setupLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+  if(family != "coxph"){
+    lambda = setupLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+  }else if(family == "coxph"){
+    stop("LambdaSeq is not yet set up for Cox Proportional Hazards (coxph) family")
+    # if(is.null(y_times)){
+    #   stop("y_times must be given for the 'coxph' family")
+    # }
+    # if(!all(unique(y) %in% c(0,1))){
+    #   stop("y must be the event indicator (0 vs 1) for the 'coxph' family")
+    # }
+    # if(all.equal(y_times, y_times[order(y_times)])){
+    #   lambda = setupLambdaCox(X, y_times, y, alpha, lambda.min, nlambda, penalty.factor)
+    # }else{
+    #   stop("observations for the 'coxph' family must be sorted by y_times (smalles to largest)")
+    # }
+    
+  }
+  
   # reverse the order of the lambda - from min lambda to max lambda
   lambda_rev = lambda[order(lambda)]
   

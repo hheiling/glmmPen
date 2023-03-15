@@ -282,6 +282,72 @@ adaptControl = function(batch_length = 100, offset = 0){
             class = "adaptControl")
 }
 
+#' @title Control of Cox Proportional Hazards Model Fitting
+#' 
+#' @description Constructs the control structure for additional parameters needed for
+#' the sampling and optimization routines involving the Cox Proportional Hazards model fit algorithm
+#' 
+#' @param cut_num positive integer specifying the number of time intervals to include in
+#' the piecewise exponential hazard model assumptions for the sampling step. Default is 8.
+#' General recommendation: use between 5 and 10 intervals. See the Details section for
+#' additional information.
+#' @param lhaz_prior positive numeric value specifying the standard deviation of the 
+#' multivariate normal prior for the log of the baseline hazard values for each time interval.
+#' Default is 3. If encounter convergence issues, the user can consider 
+#' increasing or decreasing this value (e.g. increase to 4 or decrease to 2 ...).
+#' 
+#' @return Function returns a list inheriting from class \code{optimControl}
+#' containing fit and optimization criteria values used in optimization routine.
+#' 
+#' @details In the piecewise exponential hazard model assumption---which is assumed in the 
+#' sampling step (E-step) for the Cox PH family---there is an assumption that the 
+#' time line of the data can be cut into \code{cut_num}
+#' time intervals and the baseline hazard is constant within
+#' each of these time intervals. In the sampling step, we need to estimate
+#' these baseline hazard values (specifically, we estimate the log of the baseline
+#' hazard values). We determine cut points by specifying the total number of cuts
+#' to make (\code{cut_num}) and then specifying time values for cut points such
+#' that each time interval has an equal number (or approximately equal number) 
+#' of events. Each time interval must have at least one event for the model
+#' to be identifiable, but more events per time interval is better. 
+#' Consequently, having too many cut points could result in (i) not having enough
+#' events for each time interval and/or (ii) significantly slowing down the 
+#' sampling step due to requiring the estimation of many log baseline hazard values.
+#' Additionally, data with few events could result too few events per time interval
+#' even for a small number of cut points. We generally recommend having
+#' 8 total time intervals (more broadly, between 5 and 10). Warnings or errors
+#' will occur for cases when there are 1 or 0 events for a time interval. 
+#' If this happens, either adjust the \code{cut_num} value appropriately,
+#' or in the case when the data simply has a very small number of events,
+#' consider not using this software for your estimation purposes. 
+#' 
+#' @export
+coxphControl = function(cut_num = 8, lhaz_prior = 3){
+  
+  #########################################################################################
+  # Input checks and restrictions
+  #########################################################################################
+  
+  # cut_num
+  if((floor(cut_num) != cut_num) | (cut_num < 1)){
+    stop("cut_num must be a positive integer")
+  }
+  
+  if((cut_num < 5) | (cut_num > 10)){
+    warning("the glmmPen team recommends that you keep cut_num between 5 and 10; 8 is typically a good cut_num value", immediate. = TRUE)
+  }
+  
+  # lhaz_prior
+  if(lhaz_prior <= 0){
+    stop("lhaz_prior must be a positive numeric value")
+  }
+  
+  # output object
+  structure(list(cut_num = cut_num, lhaz_prior = lhaz_prior),
+            class = "coxphControl")
+  
+}
+
 #' @title Control of Penalized Generalized Linear Mixed Model Fitting
 #' 
 #' @description Constructs the control structure for the optimization of the penalized mixed model fit algorithm.

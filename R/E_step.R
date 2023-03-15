@@ -4,7 +4,8 @@
 #   only use fixed effects
 # ranef_idx: index of which random effects are non-zero as of latest M-step (will not
 #   sample from random effects that have been penalized out)
-# y: response
+# y: response. If coxph, y = event indicator
+# y_times: If coxph, value of observed times (NULL if not coxph family)
 # X: fixed effects covariates
 # Znew2: For each group k (k = 1,...,d), Znew2 = Z * Gamma (Gamma = t(chol(sigma)))
 # group: group index
@@ -18,14 +19,22 @@
 # d: total number groups
 # uold: posterior sample to use for initialization of E-step
 # proposal_SD, batch, batch_length, offset_increment: arguments for adaptive random walk
+# coxph_options: for Cox Proportional Hazards model, additional parameters of interest
 
 
 #' @importFrom bigmemory attach.big.matrix describe big.matrix
 #' @importFrom rstan sampling extract
-E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit, 
-                  nMC, nMC_burnin, family, link, phi, sig_g,
+E_step = function(coef, ranef_idx, y, y_times = NULL, X, Znew2, group, offset_fit, 
+                  nMC, nMC_burnin, family, link, phi = 0.0, sig_g = 1.0,
                   sampler, d, uold, proposal_SD, batch, batch_length,
-                  offset_increment, trace){
+                  offset_increment, trace, coxph_options = NULL){
+  
+  if((family == "coxph") & !(sampler == "stan")){
+    stop("'coxph' family currently only supports the 'stan' sampler")
+  }
+  if((family == "coxph") & (is.null(coxph_options))){
+    stop("coxph_options must be of class 'coxphControl' (see coxphControl() documentation) for the 'coxph' family")
+  }
   
   gibbs_accept_rate = matrix(NA, nrow = d, ncol = nrow(Znew2)/d)
   
@@ -82,7 +91,7 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
       print(gibbs_accept_rate)
     }
     
-  }else if(sampler == "stan"){
+  }else if((sampler == "stan") & (family != "coxph")){
     
     u0 = big.matrix(nrow = nMC, ncol = ncol(Znew2), init=0) # use ', init = 0' for sampling within EM algorithm
     
@@ -98,10 +107,6 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
     
     # Number draws to extract in each chain (after burn-in)
     nMC_chain = nMC 
-    
-    # Record last elements of each chain for initialization of next E step
-    ## Restriction: single chain for each E-step
-    last_draws = matrix(0, nrow = 1, ncol = ncol(Znew2)) 
     
     # For each group, sample from posterior distribution (sample the alpha values)
     for(k in 1:d){
@@ -121,15 +126,14 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
                         q = length(ranef_idx), # number random effects (or common factors)
                         eta_fef = as.array(as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1)) + offset_fit[idx_k]), # fixed effects componenet of linear predictor
                         y = as.array(y_k), # outcomes for group k
-                        Z = Z_k) # portion of Z matrix corresonding to group k
+                        Z = Z_k) # portion of Z matrix corresponding to group k
       }else{ # length(idx_k) > 1
         dat_list = list(N = length(idx_k), # Number individuals in group k
                         q = length(ranef_idx), # number random effects
                         eta_fef = as.numeric(X_k %*% matrix(coef[1:ncol(X)], ncol = 1) + offset_fit[idx_k]), # fixed effects componenet of linear predictor
                         y = y_k, # outcomes for group k
-                        Z = Z_k) # portion of Z matrix corresonding to group k
+                        Z = Z_k) # portion of Z matrix corresponding to group k
       }
-      
       
       if(family == "gaussian"){
         
@@ -150,7 +154,8 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
         init_lst[[1]] = list(alpha = uold[cols_use])
       }
       
-      # Avoid excessive warnings when nMC_chain is low in early EM iterations
+      # Sampling step
+      # suppressWarnings(): Avoid excessive warnings when nMC_chain is low in early EM iterations
       stan_fit = suppressWarnings(rstan::sampling(stan_file, data = dat_list, init = init_lst, 
                                          iter = nMC_chain + nMC_burnin,
                                          warmup = nMC_burnin, show_messages = FALSE, refresh = 0,
@@ -165,10 +170,6 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
         draws_mat = matrix(stan_out[,1], ncol = 1)
       }
       
-      
-      # Find last elements for each chain for initialization of next E step
-      last_draws[1,cols_use] = draws_mat[nMC_chain,]
-      
       if(nrow(draws_mat) == nMC){
         u0[,cols_use] = draws_mat
       }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
@@ -179,6 +180,129 @@ E_step = function(coef, ranef_idx, y, X, Znew2, group, offset_fit,
       
       
     } # End k for loop
+    
+  }else if((sampler == "stan") & (family == "coxph")){
+    
+    # Alternative approach: https://rpubs.com/kaz_yos/surv_stan_piecewise1
+    
+    # Cox Proportional Hazards family: Calculate cut-points to use for time intervals
+    ## Divide the timeline into J = cut_num intervals such that there are an equal
+    ##  (or approximately equal) number of events in each interval
+    ## Note: must have at least one event in each interval (preferably > 2) to be identifiable
+    cut_num = coxph_options$cut_num
+    event_total = sum(y)
+    event_idx = which(y == 1)
+    # Determine number of events per time interval, event_j
+    if((event_total %% cut_num) == 0){ # event_total is a factor of cut_num
+      event_cuts = rep(event_total / cut_num, times = cut_num) 
+    }else{
+      tmp = event_total %/% cut_num
+      event_cuts = rep(tmp, times = cut_num)
+      for(j in 1:(event_total - tmp*cut_num)){
+        event_cuts[j] = event_cuts[j] + 1
+      }
+    }
+    
+    # warning if only 1 event for an interval, stop if 0 events for an interval
+    if(any(event_cuts == 1)){
+      warning("at least one time interval for the piecewise exponential hazard model has only 1 event, ",
+              "please see the coxphControl() documentation for details and tips on how to fix the issue",
+              immediate. = TRUE)
+    }else if(any(event_cuts == 0)){
+      stop("at least one time interval for the piecewise exponential hazard model has 0 events, ",
+           "please see the coxphControl() documentation for details and tips on how to fix the issue")
+    }
+    
+    cut_pts_idx = numeric(cut_num)
+    for(j in 1:cut_num){
+      cut_pts_idx[j] = event_idx[sum(event_cuts[1:j])]
+    }
+    
+    cut_points = numeric(cut_num)
+    for(j in 1:(cut_num-1)){
+      cut_points[j] = mean(y_times[cut_pts_idx[j]], y_times[cut_pts_idx[j]+1])
+    }
+    cut_points[cut_num] = max(y_times) + 1
+    # cut_points = y_times[cut_pts_idx]
+    
+    u0 = big.matrix(nrow = nMC, ncol = ncol(Znew2) + length(cut_points), init=0) # use ', init = 0' for sampling within EM algorithm
+    
+    stan_file = stanmodels$coxph_piecewise_exp_model
+    
+    # Number draws to extract in each chain (after burn-in)
+    nMC_chain = nMC 
+    
+    # If necessary, restrict columns of Znew2 matrix to columns associated with non-zero
+    #  latent variables (random effects / latent common factors)
+    # Also determine relevant rows of u0 matrix to save alpha samples
+    cols_analyze = NULL
+    for(k in 1:d){
+      cols_k = seq(from = k, to = ncol(Znew2), by = d)
+      cols_analyze = c(cols_analyze,cols_k[ranef_idx])
+    }
+    cols_analyze = cols_analyze[order(cols_analyze)]
+    
+    # Indicator matrix: 
+    ## For subject i, determine which columns of the Znew2 matrix are relevant for analyses
+    ## In other words, if subject i in group k, indicate which rows of Znew2 matrix associated with group k
+    I_mat = matrix(0, nrow = nrow(Znew2), ncol = ncol(Znew2))
+    for(k in 1:d){
+      idx_k = which(group == k)
+      cols_k = seq(from = k, to = ncol(Znew2), by = d)
+      I_mat[idx_k,cols_k] = 1
+    }
+    
+    # Sample the random effects / latent common factors 'alpha': group-specific values needed
+    # Also sample log-hazard values 'lhaz' for each time interval
+    ## As opposed to other families, sample all (d*q) random effects / (d*r) latent common factors 
+    ##    together instead of sampling by group. Reasoning: want log-hazard values to be 
+    ##    consistent regardless of group identity
+    dat_list = list(N = length(y), # Number of observations
+                    NT = length(cut_points), # Number of time intervals
+                    H = length(ranef_idx)*d, # Number groups times number latent variables (latent random effects or latent common factors)
+                    eta_fef =  as.numeric(X %*% matrix(coef[1:ncol(X)], ncol = 1) + offset_fit), # Fixed effects portion of linear predictor
+                    y = y, # event indicator (1 = event, 0 = censor)
+                    obs_t = y_times, # observed times
+                    Z = Znew2[,cols_analyze], # Z * Gamma or Z * B matrix, see calculation in fit_dat_coxph
+                    cutpt = c(0, cut_points), # Time interval boundaries, including 0 as lower bound of first interval
+                    I = I_mat[,cols_analyze], # Indicator matrix, see above calculation
+                    lhaz_prior = coxph_options$lhaz_prior) # Specifies standard deviation of normal prior
+    
+    # initialize posterior random draws
+    alpha_idx = cols_analyze
+    lhaz_idx = (ncol(Znew2)+1):length(uold)
+    # init: See "rstan::stan" documentation
+    ## Set initial values by providing a list equal in length to the number of chains (1).
+    ## The elements of this list should themselves be named lists, where each of these
+    ## named lists has the name of a parameter and is use to specify the initial values for
+    # that parameter for the corresponding chain
+    init_lst = list()
+    init_lst[[1]] = list(alpha = uold[alpha_idx],
+                         lhaz = uold[lhaz_idx])
+      
+    # Sampling step
+    # suppressWarnings(): Avoid excessive warnings when nMC_chain is low in early EM iterations
+    stan_fit = suppressWarnings(rstan::sampling(stan_file, data = dat_list, init = init_lst, 
+                                                iter = nMC_chain + nMC_burnin,
+                                                warmup = nMC_burnin, show_messages = FALSE, refresh = 0,
+                                                chains = 1, cores = 1))
+    
+    stan_out = as.matrix(stan_fit)
+    # Check organization of samples
+    # print(colnames(stan_out)) # first alpha samples, then lhaz samples, then lp__ value
+    # Exclude lp__ column of output (log density up to a constant)
+    samp_idx = 1:(length(cols_analyze) + length(cut_points))
+    draws_mat = stan_out[,samp_idx]
+    # Specify column locations of u0 matrix to save samples from stan_fit object
+    u0_idx = c(cols_analyze, ((1:length(cut_points))+ncol(Znew2)))
+    
+    if(nrow(draws_mat) == nMC){
+      u0[,u0_idx] = draws_mat
+    }else{ # nrow(draws_mat) > nMC due to ceiling function in 'iter' specification
+      start_row = nrow(draws_mat) - nMC + 1
+      rows_seq = start_row:nrow(draws_mat)
+      u0[,u0_idx] = draws_mat[rows_seq,]
+    }
     
   } # End if-else sampler
   

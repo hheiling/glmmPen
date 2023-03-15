@@ -9,7 +9,7 @@
 #' 
 #' @importFrom lme4 fixef
 #' @export
-fixef.pglmmObj = function(object){
+fixef.pglmmObj = function(object, ...){
   object$fixef
 }
 
@@ -18,10 +18,9 @@ fixef.pglmmObj = function(object){
 #'
 #' @importFrom lme4 ranef
 #' @export
-ranef.pglmmObj = function(object){
+ranef.pglmmObj = function(object, ...){
   object$ranef
 }
-
 #' @describeIn pglmmObj Provides the random effect covariance matrix. If family is Gaussian,
 #' also returns the standard deviation of the residual error.
 #'
