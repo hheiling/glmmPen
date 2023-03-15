@@ -119,15 +119,7 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
       converged = 1;
     }
     
-    // if(trace >= 2){
-    //   Rprintf("Results at end of iteration %i \n", iter);
-    //   Rcout << "beta" << beta.t() << std::endl;
-    //   Rcout << "weights" << weights.t() << std::endl;
-    //   Rcout << "residuals" << resid.t() << std::endl;
-    //   // Rcout << "mu" << mu.t() << std::endl;
-    //   // Rcout << "deriv" << deriv.t() << std::endl;
-    //   // Rcout << "Vmu" << Vmu.t() << std::endl;
-    // }
+    
     
   } // End while loop
   

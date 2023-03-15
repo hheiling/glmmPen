@@ -3,6 +3,7 @@
 #include <RcppArmadillo.h>
 #include "utility_glm.h"
 
+
 using namespace Rcpp;
 
 // Calculates the M residuals for an individual given eta, updates nu and resid
@@ -144,41 +145,15 @@ double Qfun_quad_beta(double Q0, double step_size, const arma::mat& diff0,
   beta_diff = beta - beta0;
   term2 = sum(beta_diff % beta_diff);
   
-  Q_quad = Q0 - term1 / M + (0.5 * N / step_size) * term2 ; // 0.5 * final term?
+  Q_quad = Q0 - term1 / M + (0.5 * N / step_size) * term2 ; 
   
   return(Q_quad);
   
 }
 
-// // Quadratic approximation to Q function estimate (based on Taylor series expansion about 
-// //    linear predictor evaluated at previous beta0 coefficient estimates)
-// // Note: in M-step, have already calculated Q evaluated at past coefficient value (Q0)
-// // Note: nu = 1 / step_size
-// // [[Rcpp::export]]
-// double Qfun_quad(double Q0, double nu, 
-//                  const arma::mat& diff0, const arma::mat& eta, const arma::mat& eta0){
-//   
-//   int N = eta.n_cols;
-//   int M = eta.n_rows;
-//   
-//   int i = 0;
-//   
-//   double Q_quad = 0;
-//   double term1 = 0;
-//   double term2 = 0;
-//   
-//   arma::vec eta_diff(M);
-//   
-//   for(i=0;i<N;i++){
-//     eta_diff = eta.col(i) - eta0.col(i);
-//     term1 = term1 + sum(diff0.col(i) % eta_diff);
-//     term2 = term2 + sum(eta_diff % eta_diff);
-//   }
-//   
-//   Q_quad = Q0 - term1 / M + (0.5 * nu) * term2 / M;
-//   
-//   return(Q_quad);
-//   
-// }
+
+
+
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

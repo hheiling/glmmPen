@@ -1,6 +1,6 @@
 data {
   int<lower=0> N; // Number of observations in group k (N_k)
-  int<lower=0> q; // Number of random effect variables
+  int<lower=0> q; // Number of latent variables (glmmPen: number random effects; glmmPen_FA: number latent common factors)
   vector[N] eta_fef; // fixed effects portion of linear predictor for individuals in group k
   real y[N]; // Outcome values in group k
   matrix[N,q] Z; // Portion of Z * Gamma matrix for group k

@@ -342,6 +342,11 @@ select_tune = function(dat, offset = NULL, family, covar = c("unstructured","ind
       if(!is.numeric(BIC_crit)) BIC_crit = Inf
       if(length(BIC_crit) != 1) BIC_crit = Inf
       
+      if(is.na(BIC_crit)){
+        stop("Model selection criteria ", BIC_option, " calculated as NA due to issues with model fit,
+             stopping variable selection proceedure")
+      }
+      
       if(BIC_crit < BIC_critold){
         fout = out
         BIC_critold = BIC_crit

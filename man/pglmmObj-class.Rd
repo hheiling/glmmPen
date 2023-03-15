@@ -40,9 +40,9 @@
 \title{Class \code{pglmmObj} of Fitted Penalized Generalized Mixed-Effects Models for 
 package \code{glmmPen}}
 \usage{
-\method{fixef}{pglmmObj}(object)
+\method{fixef}{pglmmObj}(object, ...)
 
-\method{ranef}{pglmmObj}(object)
+\method{ranef}{pglmmObj}(object, ...)
 
 \method{sigma}{pglmmObj}(object, ...)
 
