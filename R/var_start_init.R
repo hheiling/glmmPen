@@ -2,6 +2,7 @@
 # data: list object containing response y and group vector 'group'
 # fam_fun: family function output from 'family_export' function
 #' @importFrom lme4 lmer glmer VarCorr
+#' @importFrom coxme coxme VarCorr
 var_init = function(data, fam_fun){
   y = data$y
   grp = data$group
@@ -9,6 +10,10 @@ var_init = function(data, fam_fun){
     int_only = lmer(formula = y ~ 1 + (1 | grp))
   }else if(fam_fun$family %in% c("binomial","poisson")){
     int_only = glmer(formula = y ~ 1 + (1 | grp), family = fam_fun)
+  }else if(fam_fun$family == "coxph"){
+    y_times = data$y_times
+    y_status = data$y_status
+    int_only = coxme(formula = Surv(y_times, y_status) ~ (1 | grp))
   }
   
   var_start = VarCorr(int_only)$grp[[1]] * 2.0

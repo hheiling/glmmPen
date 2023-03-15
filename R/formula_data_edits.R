@@ -100,7 +100,7 @@ checkXmatrix = function(X){
   if (typeof(X)=="character") stop("input variables must be numeric", call.=FALSE)
   # Make sure individuals did not input an additional intercept or a variable with only one value
   # for all observations
-  col_vars = apply(X[,-1,drop=F], 2, var, na.rm=TRUE)
+  col_vars = apply(X[,-1,drop=FALSE], 2, var, na.rm=TRUE)
   if(any(col_vars == 0)){
     # If true, more than one column with zero variance
     # If only one column, class(col_vars) == "numeric"

@@ -2,12 +2,13 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.5.2.11
-Date: 2022-12-12
+Version: 1.5.3.0
+Date: 2023-03-14
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
-    person("Naim", "Rashid", email = "naim@unc.edu", role = c("aut")),
-    person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")))
+    person("Naim", "Rashid", email = "nur2@email.unc.edu", role = c("aut")),
+    person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")),
+    person("Joseph", "Ibrahim", email = "ibrahim@bios.unc.edu", role = c("aut")))
 Maintainer: Hillary Heiling <hheiling@live.unc.edu>
 Description: Fits high dimensional penalized generalized linear 
     mixed models using 
@@ -33,10 +34,10 @@ Imports:
     ncvreg,
     reshape2,
     rstan (>= 2.18.1),
-    rstantools (>= 2.0.0),
     stringr,
     mvtnorm,
-    MASS
+    MASS,
+    coxme
 Depends: 
     lme4,
     bigmemory,
@@ -55,7 +56,8 @@ NeedsCompilation: yes
 Packaged: 2019-01-25 20:03:59 UTC; hheiling
 Author: Hillary Heiling [aut, cre],
   Naim Rashid [aut],
-  Quefeng Li [aut]
+  Quefeng Li [aut],
+  Joseph Ibrahim [aut]
 Suggests: 
     testthat,
     knitr,

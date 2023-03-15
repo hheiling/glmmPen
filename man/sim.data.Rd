@@ -29,6 +29,7 @@ sim.data.FA(
   family = "binomial",
   B = NULL,
   r = 2,
+  corr = NULL,
   seed,
   imbalance = 0,
   beta = NULL,
@@ -53,8 +54,8 @@ random effects covariance matrix (applied to the non-zero random effects)}
 \item{family}{character string specifying which family to generate data from.
 Family options include "binomial" (default), "poisson", and "gaussian".}
 
-\item{corr}{optional value to specify correlation in the random effects
-covariance matrix. Default \code{NULL}, only available within \code{sim.data}.}
+\item{corr}{optional value to specify correlation between covariates
+in the model matrix. Default \code{NULL}, only available within \code{sim.data}.}
 
 \item{seed}{integer to use for the setting of a random seed}
 

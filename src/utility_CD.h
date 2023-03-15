@@ -37,6 +37,14 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
 // See "utility_grpCD.cpp" file for function details
 //----------------------------------------------------------------------------------------//
 
+// Calculate initial eta, an M x N matrix of linear predictor values
+//    N = number total subjects, M = number of posterior draws taken during the previous E-step
+// See "utility_FA.cpp"
+// arma::mat eta_calc_FA(arma::mat& X, arma::mat& Z, arma::vec& group, arma::vec& offset,
+//                       arma::vec& beta, arma::vec& beta0, arma::mat& eta0,
+//                       const arma::sp_mat& J, SEXP pBigMat,
+//                       int N, int M, int d, int q, int r, int p, int init);
+
 // Calculating residuals by individual using eta as input - grp_CD_XZ_fast function
 arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, double nu, double phi);
 
@@ -59,7 +67,8 @@ double Qfun(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBi
             const char* family, int link, double sig_g, double phi);
 
 // Calculates Q-function (positive version of "Q1" expression in Rashid et al. (2020))
-// for glmm_FA() and glmmPen_FA() implementation
+// for glmm_FA() and glmmPen_FA() implementation 
+// For  families that are NOT Cox Proportional Hazards 
 // See function in "utility_FA.cpp"
 double Qfun_FA(const arma::vec& y, const arma::mat& X, const arma::mat& Z, SEXP pBigMat, 
             const arma::vec& group, const arma::sp_mat& J_q,
