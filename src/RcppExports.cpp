@@ -72,6 +72,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// maxprod
+double maxprod(SEXP X_, SEXP y_, SEXP v_, SEXP m_, int n, int p);
+RcppExport SEXP _glmmPen_maxprod(SEXP X_SEXP, SEXP y_SEXP, SEXP v_SEXP, SEXP m_SEXP, SEXP nSEXP, SEXP pSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type X_(X_SEXP);
+    Rcpp::traits::input_parameter< SEXP >::type y_(y_SEXP);
+    Rcpp::traits::input_parameter< SEXP >::type v_(v_SEXP);
+    Rcpp::traits::input_parameter< SEXP >::type m_(m_SEXP);
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    rcpp_result_gen = Rcpp::wrap(maxprod(X_, y_, v_, m_, n, p));
+    return rcpp_result_gen;
+END_RCPP
+}
 // soft_thresh
 double soft_thresh(double zeta, double lambda);
 RcppExport SEXP _glmmPen_soft_thresh(SEXP zetaSEXP, SEXP lambdaSEXP) {
@@ -333,6 +349,7 @@ RcppExport SEXP _rcpp_module_boot_stan_fit4poisson_log_model_mod();
 static const R_CallMethodDef CallEntries[] = {
     {"_glmmPen_grp_CD_XZ_FA_step", (DL_FUNC) &_glmmPen_grp_CD_XZ_FA_step, 20},
     {"_glmmPen_grp_CD_XZ_step", (DL_FUNC) &_glmmPen_grp_CD_XZ_step, 20},
+    {"_glmmPen_maxprod", (DL_FUNC) &_glmmPen_maxprod, 6},
     {"_glmmPen_soft_thresh", (DL_FUNC) &_glmmPen_soft_thresh, 2},
     {"_glmmPen_MCP_soln", (DL_FUNC) &_glmmPen_MCP_soln, 5},
     {"_glmmPen_SCAD_soln", (DL_FUNC) &_glmmPen_SCAD_soln, 5},

@@ -324,7 +324,7 @@ fD_adj = function(out){
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @importFrom stats model.offset na.omit
-#' @import bigmemory Rcpp
+#' @import bigmemory Rcpp rstantools
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL,
@@ -1132,6 +1132,37 @@ XZ_std = function(fD_out){
 ## Note: significant parts of code borrowed from ncvreg
 ###########################################################################################
 
+# setupLambda_copy is based on the setupLambda() code in ncvreg R/setupLambda.R
+#' @importFrom stats glm
+setupLambda_copy <- function(X, y, family, alpha, lambda.min, nlambda, penalty.factor) {
+  n <- nrow(X)
+  p <- ncol(X)
+  
+  ## Determine lambda.max
+  ind <- which(penalty.factor!=0)
+  if (length(ind)!=p) {
+    fit <- glm(y~X[, -ind, FALSE], family=family)
+  } else {
+    fit <- glm(y~1, family=family)
+  }
+  if (family=="gaussian") {
+    zmax <- maxprod(X, fit$residuals, ind, penalty.factor, n, p) / n 
+  } else {
+    zmax <- maxprod(X, residuals(fit, "working") * fit$weights, ind, penalty.factor, n, p) / n 
+  }
+  lambda.max <- zmax/alpha
+  
+  if (lambda.min==0) {
+    lambda <- c(exp(seq(log(lambda.max), log(.001*lambda.max), len=nlambda-1)), 0)
+  } else {
+    lambda <- exp(seq(log(lambda.max), log(lambda.min*lambda.max), len=nlambda))
+  }
+  
+  if (length(ind)!=p) lambda[1] <- lambda[1] * 1.000001
+  
+  return(lambda)
+}
+
 #' @title Calculation of Penalty Parameter Sequence (Lambda Sequence)
 #' 
 #' @description Calculates the sequence of penalty parameters used in the model selection procedure.
@@ -1158,7 +1189,6 @@ XZ_std = function(fD_out){
 #' minimum penalty parameter (first element) equal to fraction \code{lambda.min} multiplied by the 
 #' maximum penalty parameter to the maximum penalty parameter (last element)
 #' 
-#' @importFrom ncvreg setupLambda 
 #' @export
 LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL, nlambda = 10,
                        penalty.factor = NULL){
@@ -1202,7 +1232,7 @@ LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL,
   # setupLambda and setupLambdaCox from ncvreg package
   ## Order: from max lambda to min lambda
   if(family != "coxph"){
-    lambda = setupLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+    lambda = setupLambda_copy(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
   }else if(family == "coxph"){
     stop("LambdaSeq is not yet set up for Cox Proportional Hazards (coxph) family")
     # if(is.null(y_times)){
@@ -1212,7 +1242,7 @@ LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL,
     #   stop("y must be the event indicator (0 vs 1) for the 'coxph' family")
     # }
     # if(all.equal(y_times, y_times[order(y_times)])){
-    #   lambda = setupLambdaCox(X, y_times, y, alpha, lambda.min, nlambda, penalty.factor)
+    #   lambda = setupLambdaCox_copy(X, y_times, y, alpha, lambda.min, nlambda, penalty.factor)
     # }else{
     #   stop("observations for the 'coxph' family must be sorted by y_times (smalles to largest)")
     # }

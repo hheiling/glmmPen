@@ -9,6 +9,10 @@ grp_CD_XZ_step <- function(y, X, Z, group, pBigMat, J_q, dims, beta, offset, ste
     .Call('_glmmPen_grp_CD_XZ_step', PACKAGE = 'glmmPen', y, X, Z, group, pBigMat, J_q, dims, beta, offset, step_size, sig_g, family, link, init, phi, XZ_group, K, penalty, params, trace)
 }
 
+maxprod <- function(X_, y_, v_, m_, n, p) {
+    .Call('_glmmPen_maxprod', PACKAGE = 'glmmPen', X_, y_, v_, m_, n, p)
+}
+
 soft_thresh <- function(zeta, lambda) {
     .Call('_glmmPen_soft_thresh', PACKAGE = 'glmmPen', zeta, lambda)
 }
