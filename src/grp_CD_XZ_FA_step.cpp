@@ -17,6 +17,7 @@ using namespace arma;
 // Assume no orthogonalization/standardization needed for random effects
 
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
+// Code is an extension of techniques used in ncvreg and grpreg, with application to mixed models
 
 // Majorization-minimization approximation for the second derivative of the loss function
 //    (a.k.a. max weight from IRLS weights), represented by "nu" in code

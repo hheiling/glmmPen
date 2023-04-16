@@ -2,8 +2,8 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.5.3.0
-Date: 2023-03-14
+Version: 1.5.3.4
+Date: 2023-04-01
 Authors@R: c(
     person("Hillary", "Heiling", email = "hheiling@live.unc.edu", role = c("aut", "cre")),
     person("Naim", "Rashid", email = "nur2@email.unc.edu", role = c("aut")),
@@ -37,7 +37,9 @@ Imports:
     stringr,
     mvtnorm,
     MASS,
-    coxme
+    coxme,
+    survival,
+    rstantools
 Depends: 
     lme4,
     bigmemory,
@@ -48,6 +50,7 @@ LinkingTo:
     bigmemory,
     Rcpp (>= 0.12.0),
     RcppArmadillo,
+    RcppParallel,
     RcppEigen (>= 0.3.3.3.0),
     rstan (>= 2.18.1),
     StanHeaders (>= 2.18.0)
