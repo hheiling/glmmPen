@@ -2,7 +2,6 @@
 # data: list object containing response y and group vector 'group'
 # fam_fun: family function output from 'family_export' function
 #' @importFrom lme4 lmer glmer VarCorr
-#' @export
 var_init = function(data, fam_fun){
   y = data$y
   grp = data$group
@@ -29,7 +28,6 @@ var_init = function(data, fam_fun){
 }
 
 #' @importFrom lme4 lmer glmer VarCorr
-#' @export
 var_init_survival = function(data){
   y = data$y
   grp = data$group
