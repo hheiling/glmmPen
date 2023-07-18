@@ -477,7 +477,7 @@ fit_dat_FA = function(dat, lambda0 = 0, lambda1 = 0,
     #   no random slopes. Cases: pre-specified random effects only includes random
     #   intercept, OR all random slopes have been penalized out of model
     if((nrow(cov) == 1) | all(diag(cov[-1,-1,drop=FALSE]) == 0)){
-      if(cov[1,1] < 0.01){
+      if(cov[1,1] < 0.001){ # 0.01
         randInt_issue = 1
       }
     }else{
@@ -736,7 +736,7 @@ fit_dat_FA = function(dat, lambda0 = 0, lambda1 = 0,
   }else{
     BICq = NA
   }
-  message("BICq value outside if statement: ", BICq)
+  # message("BICq value outside if statement: ", BICq)
   
   ############################################################################################
   # Final output object

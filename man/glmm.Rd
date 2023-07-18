@@ -23,7 +23,8 @@ glmm(
 random effects part of the model, with the response on the left of a ~ operator and the terms, 
 separated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
 ("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
-of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
+of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. 
+Only one grouping factor 
 will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
 The offset must be specified outside of the formula in the 'offset' argument.}
 
@@ -33,7 +34,8 @@ omitted, variables will be taken from the environment of \code{formula}.}
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the Binomial ("binomial" or binomial()), 
 Gaussian ("gaussian" or gaussian()), and Poisson ("poisson" or poisson()) families
-with canonical links only.}
+with canonical links only. See \code{\link{phmmPen}} for variable selection within
+proportional hazards mixed models for survival data.}
 
 \item{covar}{character string specifying whether the covariance matrix should be unstructured
 ("unstructured") or diagonal with no covariances between variables ("independent").

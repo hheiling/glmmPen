@@ -284,36 +284,51 @@ adaptControl = function(batch_length = 100, offset = 0){
 
 #' @title Control of Cox Proportional Hazards Model Fitting
 #' 
-#' @description Constructs the control structure for additional parameters needed for
-#' the sampling and optimization routines involving the Cox Proportional Hazards model fit algorithm
+#' @description Constructs the control structure for additional parameters needed to
+#' properly fit survival data using a Piecewise Exponential model
 #' 
 #' @param cut_num positive integer specifying the number of time intervals to include in
 #' the piecewise exponential hazard model assumptions for the sampling step. Default is 8.
 #' General recommendation: use between 5 and 10 intervals. See the Details section for
 #' additional information.
-#' @param lhaz_prior positive numeric value specifying the standard deviation of the 
-#' multivariate normal prior for the log of the baseline hazard values for each time interval.
-#' Default is 3. If encounter convergence issues, the user can consider 
-#' increasing or decreasing this value (e.g. increase to 4 or decrease to 2 ...).
+#' @param interval_type character specifying how the time intervals are calculated.
+#' If 'equal' (default),  time intervals
+#' are calculated such that there are approximately equal numbers of events per time 
+#' interval.
+#' If 'manual', the user needs to input
+#' their own cut points (see \code{cut_points} for details).
+#' If 'group', time intervals are calculated such that there are approximately
+#' equal numbers of events per time interval AND there are at least 4 events observed
+#' by each group within each time interval. The input number of time intervals \code{cut_num}
+#' may be modified to a lower number in order to accomplish this goal. 
+#' This option is generally difficult to perform when there are 
+#' a large number of groups in the data.
+#' @param cut_points numeric vector specifying the value of the cut points to use
+#' in the calculation of the time intervals for the piecewise exponential model. 
+#' If \code{interval_type} set to 'equal' or 'group', then this argument is not utilized.
+#' If \code{interval_type} set to 'manual', then this argument is required.
+#' First value must be 0, and all values must be ordered smallest to largest.
+#' @param time_scale positive numeric value (greater than 1) used to scale the time variable 
+#' in the survival data. In order to calculate the piecewise exponential model,
+#' the log of the time a subject survived within a particular interval
+#' is used as an offset in the model fit. Sometimes multiplying the time scale
+#' by a factor greater than 1 improves the stability of the model fit algorithm.
 #' 
 #' @return Function returns a list inheriting from class \code{optimControl}
 #' containing fit and optimization criteria values used in optimization routine.
 #' 
-#' @details In the piecewise exponential hazard model assumption---which is assumed in the 
-#' sampling step (E-step) for the Cox PH family---there is an assumption that the 
+#' @details In the piecewise exponential hazard model assumption, there is an assumption that the 
 #' time line of the data can be cut into \code{cut_num}
 #' time intervals and the baseline hazard is constant within
-#' each of these time intervals. In the sampling step, we need to estimate
+#' each of these time intervals. In the fit algorithm, we estimate
 #' these baseline hazard values (specifically, we estimate the log of the baseline
 #' hazard values). We determine cut points by specifying the total number of cuts
 #' to make (\code{cut_num}) and then specifying time values for cut points such
-#' that each time interval has an equal number (or approximately equal number) 
-#' of events. Each time interval must have at least one event for the model
-#' to be identifiable, but more events per time interval is better. 
-#' Consequently, having too many cut points could result in (i) not having enough
-#' events for each time interval and/or (ii) significantly slowing down the 
-#' sampling step due to requiring the estimation of many log baseline hazard values.
-#' Additionally, data with few events could result too few events per time interval
+#' that each time interval has an approximately equal number 
+#' of events and that each group has at least some (4) events within each time interval. 
+#' Having too many cut points could result in not having enough
+#' events for each time interval.
+#' Additionally, data with few events could result in too few events per time interval
 #' even for a small number of cut points. We generally recommend having
 #' 8 total time intervals (more broadly, between 5 and 10). Warnings or errors
 #' will occur for cases when there are 1 or 0 events for a time interval. 
@@ -322,7 +337,8 @@ adaptControl = function(batch_length = 100, offset = 0){
 #' consider not using this software for your estimation purposes. 
 #' 
 #' @export
-coxphControl = function(cut_num = 8, lhaz_prior = 3){
+survivalControl = function(cut_num = 8, interval_type = c("equal","manual","group"), 
+                        cut_points = NULL, time_scale = 1){
   
   #########################################################################################
   # Input checks and restrictions
@@ -333,18 +349,50 @@ coxphControl = function(cut_num = 8, lhaz_prior = 3){
     stop("cut_num must be a positive integer")
   }
   
+  if(length(interval_type) > 1){
+    interval_type = interval_type[1]
+  }
+  if(!(interval_type %in% c("equal","manual","group"))){
+    stop("interval_type must be either 'equal', 'manual, or 'group', see coxphControl() documentation")
+  }
+  
+  if(interval_type == "manual"){
+    if(is.null(cut_points)){
+      stop("cut_points must be specified if interval_type = 'manual' ")
+    }
+    if(length(cut_points) != cut_num){
+      message("changing 'cut_num' to length of input cut_points vector")
+      cut_num = length(cut_points)
+    }
+    if(cut_points[1] != 0){
+      stop("first cut-point value must equal 0")
+    }
+    if(length(cut_points) > 1){
+      for(i in 2:length(cut_points)){
+        if(cut_points[i-1] > cut_points[i]){
+          stop("cut_points must be a sequence of ascending order (min value to max value)")
+        }
+      }
+    }
+  }
+  
+  if((interval_type != "manual") & (!is.null(cut_points))){
+    message("if interval_type set to 'equal' or 'group', then cut_points will be automatically calculated and input cut_points will not be used")
+    cut_points = NULL
+  }
+  
   if((cut_num < 5) | (cut_num > 10)){
     warning("the glmmPen team recommends that you keep cut_num between 5 and 10; 8 is typically a good cut_num value", immediate. = TRUE)
   }
   
-  # lhaz_prior
-  if(lhaz_prior <= 0){
-    stop("lhaz_prior must be a positive numeric value")
+  if(time_scale < 1){
+    stop("time_scale must be a positive value greater than 1")
   }
   
   # output object
-  structure(list(cut_num = cut_num, lhaz_prior = lhaz_prior),
-            class = "coxphControl")
+  structure(list(cut_num = cut_num, interval_type = interval_type, 
+                 cut_points = cut_points, time_scale = time_scale),
+            class = "survivalControl")
   
 }
 
@@ -601,6 +649,9 @@ optim_recommend = function(optim_options, family, q, select){
 #' in the model. If \code{NULL} (default), this value estimated from the data. See 
 #' \code{r_est_method} for available estimation procedures, and the Details
 #' section for further details on the general estimation procedure.
+#' If \code{r} is specified, the no estimation procedure is performed and the algorithm
+#' uses the input value or r. All other parameters for this function are
+#' relevant for the estimation procedure.
 #' @param r_max positive integer specifying maximum number of latent factors to consider.
 #' If \code{NULL} (default), this value is automatically calculated.
 #' @param r_est_method character string indicating method used to estimate number
@@ -618,7 +669,13 @@ optim_recommend = function(optim_options, family, q, select){
 #' r, which is restricted to be no less than 25. If this \code{size} is greater
 #' than the number of groups in the data (i.e.~the number of levels of the grouping
 #' variable), then a sampling procedure is used to increase the number of pseudo estimates
-#' to the value of \code{size}.
+#' to the value of \code{size} if the value of \code{sample} is \code{TRUE}.
+#' @param sample logical value indicating if the total number of pseudo random effect
+#' estimates to use in the estimation procedure for the number of latent common factors r
+#' should be larger than the number of unique groups in the data, where the number 
+#' of pseudo estimates are increased to the value of \code{size} using a sampling 
+#' procedure. Default is \code{FALSE}. If \code{TRUE}, the sampling procedure is only
+#' performed if the value of \code{size} is greater than the number of groups in the data.
 #' 
 #' @details Estimation of \code{r} procedure: For each level of the group variable separately,
 #' we identify the observations within that group and 
@@ -627,11 +684,11 @@ optim_recommend = function(optim_options, family, q, select){
 #' are placed into a matrix \code{G}
 #' (rows = number of levels of the grouping variable, columns = number of random effect covariates),
 #' and this pseudo random effects matrix is treated as the observed outcome matrix used in
-#' the "GR", "ER", and "BN" estimatino procedures described above in the description of \code{r_est_method}.
+#' the "GR", "ER", and "BN" estimation procedures described above in the description of \code{r_est_method}.
 #' 
 #' @export
 rControl = function(r = NULL, r_max = NULL, r_est_method = "GR",
-                    size = 25){
+                    size = 25, sample = FALSE){
   
   # r, r_max, and sample_size must all be positive integers
   int_check = list(r = r, r_max = r_max, size = size)
@@ -661,8 +718,12 @@ rControl = function(r = NULL, r_max = NULL, r_est_method = "GR",
     stop("r_est_method must be one of GR, ER, BN1, or BN2, see rControl() documentation")
   } 
   
+  if(!is.logical(sample)){
+    stop("sample must be either TRUE or FALSE")
+  }
+  
   structure(list(r = r, r_max = r_max, r_est_method = r_est_method,
-                 size = size),
+                 size = size, sample = sample),
             class = "rControl")
   
 }

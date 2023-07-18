@@ -7,8 +7,8 @@
 LambdaSeq(
   X,
   y,
-  y_times = NULL,
   family,
+  offset = NULL,
   alpha = 1,
   lambda.min = NULL,
   nlambda = 10,
@@ -19,16 +19,18 @@ LambdaSeq(
 \item{X}{matrix of standardized fixed effects (see \code{std} function in \code{ncvreg} 
 documenation). X should not include intercept.}
 
-\item{y}{numeric vector of response values. If "coxph" family, \code{y} are the event indicator
+\item{y}{numeric vector of response values. If "survival" family, \code{y} are the event indicator
 values (0 if censored, 1 if event)}
-
-\item{y_times}{numeric vector of observed times for "coxph" family; \code{NULL} for all 
-other families}
 
 \item{family}{a description of the error distribution and link function to be used in the model. 
 Currently, the \code{glmmPen} algorithm allows the Binomial ("binomial" or binomial()), 
 Gaussian ("gaussian" or gaussian()), and Poisson ("poisson" or poisson()) families
-with canonical links only.}
+with canonical links only. See \code{\link{phmmPen}} for variable selection within
+proportional hazards mixed models for survival data.}
+
+\item{offset}{numeric vector that can be used to specify an a priori known component 
+to be included in the linear predictor during fitting. 
+This should be \code{NULL} or a numeric vector of length equal to the number of observations}
 
 \item{alpha}{Tuning parameter for the Mnet estimator which controls the relative contributions 
 from the MCP/SCAD/LASSO penalty and the ridge, or L2, penalty. \code{alpha=1} is equivalent to 
@@ -61,9 +63,4 @@ maximum penalty parameter to the maximum penalty parameter (last element)
 \description{
 Calculates the sequence of penalty parameters used in the model selection procedure.
 This function calls functions from package \code{ncvreg}.
-}
-\details{
-If the family is "coxph", the \code{y}, \code{y_times}, and \code{X} must be 
-sorted such that the subjects' \code{y_times} are sorted from the smallest to the largest times.
-The "coxph" family procedure is still in production and not yet ready.
 }

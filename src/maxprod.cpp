@@ -32,13 +32,41 @@ double maxprod(SEXP X_, SEXP y_, SEXP v_, SEXP m_,
   double *y = REAL(y_);
   double *m = REAL(m_);
   int *v = INTEGER(v_);
+  double m_val=0.0;
   
   for (int j=0; j<p; j++) {
-    zz = crossprod(X, y, n, v[j]-1) / m[v[j]-1];
-    if (fabs(zz) > z) z = fabs(zz);
+    m_val =  m[v[j]-1];
+    if(m_val > 0){
+      zz = crossprod(X, y, n, v[j]-1) /  m_val;
+      if (fabs(zz) > z) z = fabs(zz);
+    }
     // if (fabs(zz) > REAL(z)[0]) REAL(z)[0] = fabs(zz);
   } 
   
   // Return list
   return(z);
 }
+
+// // [[Rcpp::export]]
+// double maxprod(SEXP X_, SEXP y_, SEXP v_, SEXP m_,
+//                int n, int p) {
+//   
+//   // Declarations
+//   // SEXP z = PROTECT(z = allocVector(REALSXP, 1));
+//   // REAL(z)[0] = 0;
+//   double z=0;
+//   double zz;
+//   double *X = REAL(X_);
+//   double *y = REAL(y_);
+//   double *m = REAL(m_);
+//   int *v = INTEGER(v_);
+//   
+//   for (int j=0; j<p; j++) {
+//     zz = crossprod(X, y, n, v[j]-1) / m[v[j]-1];
+//     if (fabs(zz) > z) z = fabs(zz);
+//     // if (fabs(zz) > REAL(z)[0]) REAL(z)[0] = fabs(zz);
+//   } 
+//   
+//   // Return list
+//   return(z);
+// }
