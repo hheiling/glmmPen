@@ -113,41 +113,41 @@ checkXmatrix = function(X){
 # Convert formula and data options into y, X, Z, and group
 # lme4 inspiration: https://github.com/lme4/lme4/blob/master/R/modular.R
 
-#' Extracting Useful Vectors and Matrices from Formula and Data Information
-#' 
-#' Takes the model \code{formula} and an optional data frame and converts them into y, X, Z, and group output.
-#' 
-#' @param formula a two-sided linear formula object describing both the fixed-effects and 
-#' random-effects part of the model, with the response on the left of a ~ operator and the terms, 
-#' sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
-#' ("|") separating expression for design matrices from grouping factors. \code{formula} should be 
-#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
-#' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
-#' The offset must be specified outside of the formula in the 'offset' argument.
-#' @param data an optional data frame containing the variables named in \code{formula}. Although 
-#' \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
-#' omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).
-#' @param family a description of the error distribution and link function to be used in the model 
-#' (a family function or the result of a call to a family function).
-#' (See \link{family} for details of family functions.)
-#' @param subset an optional vector specifying a subset of observations to be used in the fitting process.
-#' @param weights an optional vector of ‘prior weights’ to be used in the fitting process. Should be NULL or a numeric vector.
-#' @param na.action a function that indicates what should happen when the data contain NAs. The default
-#' option \code{na.omit} removes observations with any missing values in any of the variables
-#' @param offset this can be used to specify an a priori known component to be included in the linear predictor during fitting. 
-#' This should be NULL or a numeric vector of length equal to the number of cases.
-#' @param ... potential further arguments
-#' 
-#' @return a list with the following elements:
-#' \item{fr}{a model frame including all fixed and random covariates, the response, and the 
-#' grouping variable}
-#' \item{X}{fixed effects covariates model matrix}
-#' \item{reTrms}{list containing several items relating to the random effects} 
-#' \item{family}{family specified for data modeling}
-#' \item{formula}{formula}
-#' \item{fixed_vars}{vector of variable names used for fixed effects}
-#' \item{fwmsgs}{indicator for a check of the group levels}
-#' 
+# Extracting Useful Vectors and Matrices from Formula and Data Information
+# 
+# Takes the model \code{formula} and an optional data frame and converts them into y, X, Z, and group output.
+# 
+# @param formula a two-sided linear formula object describing both the fixed-effects and 
+# random-effects part of the model, with the response on the left of a ~ operator and the terms, 
+# sepearated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
+# ("|") separating expression for design matrices from grouping factors. \code{formula} should be 
+# of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
+# will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
+# The offset must be specified outside of the formula in the 'offset' argument.
+# @param data an optional data frame containing the variables named in \code{formula}. Although 
+# \code{data} is optional, the package authors \emph{strongly} recommend its use. If \code{data} is 
+# omitted, variables will be taken from the environment of \code{formula} (if specified as a formula).
+# @param family a description of the error distribution and link function to be used in the model 
+# (a family function or the result of a call to a family function).
+# (See \link{family} for details of family functions.)
+# @param subset an optional vector specifying a subset of observations to be used in the fitting process.
+# @param weights an optional vector of ‘prior weights’ to be used in the fitting process. Should be NULL or a numeric vector.
+# @param na.action a function that indicates what should happen when the data contain NAs. The default
+# option \code{na.omit} removes observations with any missing values in any of the variables
+# @param offset this can be used to specify an a priori known component to be included in the linear predictor during fitting. 
+# This should be NULL or a numeric vector of length equal to the number of cases.
+# @param ... potential further arguments
+# 
+# @return a list with the following elements:
+# \item{fr}{a model frame including all fixed and random covariates, the response, and the 
+# grouping variable}
+# \item{X}{fixed effects covariates model matrix}
+# \item{reTrms}{list containing several items relating to the random effects} 
+# \item{family}{family specified for data modeling}
+# \item{formula}{formula}
+# \item{fixed_vars}{vector of variable names used for fixed effects}
+# \item{fwmsgs}{indicator for a check of the group levels}
+# 
 #' @importFrom lme4 factorize mkReTrms nobars subbars findbars
 #' @importFrom stats get_all_vars
 glFormula_edit <- function(formula, data=NULL, family,

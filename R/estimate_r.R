@@ -12,10 +12,11 @@
 ############################################################################################
 # Put all steps together to estimate r
 ############################################################################################
+#' @importFrom stringr str_detect
 estimate_r = function(dat, optim_options = optimControl(), coef_names,
                       r_est_method = "GR", r_max, family_info, offset_fit, 
                       penalty, lambda0, gamma_penalty, alpha, group_X, 
-                      sample, size, trace){
+                      sample, size, data_type, trace){
   
   # Extract relevant data
   y = dat$y
@@ -23,8 +24,15 @@ estimate_r = function(dat, optim_options = optimControl(), coef_names,
   group = dat$group
   d = nlevels(group)
   ## Input covariates: Only those specified for random effects
-  col_idx = which(coef_names$random %in% coef_names$fixed)
-  X_use = X[,col_idx, drop = FALSE]
+  col_idx = which(coef_names$fixed %in% coef_names$random)
+  if(data_type != "survival"){
+    X_use = X[,col_idx, drop = FALSE]
+  }else if(data_type == "survival"){
+    col_idx_surv = c(2:length(dat$cut_points),col_idx)
+    col_idx = col_idx_surv[order(col_idx_surv)]
+    X_use = X[,col_idx, drop=FALSE]
+  }
+  
   p = ncol(X_use)
   
   # Extract optimization hyper parameters

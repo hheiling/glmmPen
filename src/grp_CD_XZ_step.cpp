@@ -24,6 +24,7 @@ using namespace arma;
 // All other cases: nu = 1 / step_size, where step_size is determined by a line search
 // algorithm. Reference: Book "Proximal Algorithms" by Parihk and Boyd (2013),
 // see Section 4.2
+//
 
 // [[Rcpp::export]]
 arma::vec grp_CD_XZ_step(const arma::vec& y, const arma::mat& X, const arma::mat& Z,

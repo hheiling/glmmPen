@@ -34,11 +34,11 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
   
   # Check that (...) arguments are subsets of glmmPen arguments
   args_extra = list(...)
-  args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior")
+  args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior","survival_options")
   if(length(args_extra) >= 1){
     if(!(names(args_extra) %in% args_avail)){
       stop("additional arguments provided in '...' input must match glmmPen arguments \n",
-           "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior' \n",
+           "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior', 'survival_options', \n",
            "see glmmPen documentation for details")
     }
   }
@@ -58,7 +58,8 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
   output = glmmPen(formula = formula, data = data, family = family, covar = covar,
                    offset = offset, optim_options = optim_options,
                    adapt_RW_options = adapt_RW_options, trace = trace,
-                   tuning_options = tuning_options, progress = progress, ...)
+                   tuning_options = tuning_options,
+                   progress = progress, ...)
   
   output$call = call
   out_object = pglmmObj$new(output)
@@ -88,7 +89,7 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
 ##    - flist: a list of grouping factors using inf the random-effects terms
 ## fixed_vars: vector of variables used for the fixed effects covariates
 #' @importFrom stats model.response
-fD_adj = function(out){
+fD_adj = function(out, data_type){
   frame = out$fr
   y = model.response(frame)
   X = out$X
@@ -100,17 +101,25 @@ fD_adj = function(out){
   family = out$family
   
   # Check y input
-  # If y is not numeric (e.g. a factor), convert to numeric
-  if(!is.double(y)) {
-    # If y is a character vector, first set y as a factor
-    if(is.character(y)){
-      y = as.factor(y)
+  if(data_type == "survival"){
+    if(!inherits(y,"Surv")){
+      stop("response in formula must be of class 'Surv', use survival::Surv()")
+      # Note: Additional checks in 'survival_data()' function
     }
-    # Convert y to a numeric vector
-    ## If two-level factor, will convert to numeric vector with values {1,2}
-    tmp <- try(y <- as.double(y), silent=TRUE)
-    if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
+  }else{
+    # If y is not numeric (e.g. a factor), convert to numeric
+    if(!is.double(y)) {
+      # If y is a character vector, first set y as a factor
+      if(is.character(y)){
+        y = as.factor(y)
+      }
+      # Convert y to a numeric vector
+      ## If two-level factor, will convert to numeric vector with values {1,2}
+      tmp <- try(y <- as.double(y), silent=TRUE)
+      if (inherits(tmp, "try-error")) stop("y must be numeric or able to be coerced to numeric", call.=FALSE)
+    }
   }
+  
   
   # Check X input
   if(!is.matrix(X)){
@@ -139,15 +148,17 @@ fD_adj = function(out){
         stop("response needs to be coded as a binary variable with levels 0 vs 1")
       }
     }
-  }else if(family$family == "poisson"){
+  }else if((family$family == "poisson") & (data_type != "survival")){
     if(!all(floor(y) == y)){
       stop("response must be integer counts for the poisson family")
     }else if(any(y < 0)){
       stop("response must be non-negative integer counts for the poisson family")
     }
-  }
+  } 
+  # Note: Check of response for data_type == "survival" is done in "survival_data()" function in
+  #   the "coxph_utility.R" file
   
-  # For now, retrict algorithm to only handle single grouping factor
+  # For now, restrict algorithm to only handle single grouping factor
   if(length(flist) > 1){
     stop("procedure can only handle one group")
   }else{
@@ -202,7 +213,8 @@ fD_adj = function(out){
 #' random effects part of the model, with the response on the left of a ~ operator and the terms, 
 #' separated by + operators, on the right. Random-effects terms are distinguished by vertical bars 
 #' ("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
-#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. Only one grouping factor 
+#' of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. 
+#' Only one grouping factor 
 #' will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
 #' The offset must be specified outside of the formula in the 'offset' argument.
 #' @param data an optional data frame containing the variables named in \code{formula}. If \code{data} is 
@@ -210,7 +222,8 @@ fD_adj = function(out){
 #' @param family a description of the error distribution and link function to be used in the model. 
 #' Currently, the \code{glmmPen} algorithm allows the Binomial ("binomial" or binomial()), 
 #' Gaussian ("gaussian" or gaussian()), and Poisson ("poisson" or poisson()) families
-#' with canonical links only.
+#' with canonical links only. See \code{\link{phmmPen}} for variable selection within
+#' proportional hazards mixed models for survival data. 
 #' @param covar character string specifying whether the covariance matrix should be unstructured
 #' ("unstructured") or diagonal with no covariances between variables ("independent").
 #' Default is set to \code{NULL}. If \code{covar} is set to \code{NULL} and the number of random effects
@@ -324,14 +337,15 @@ fD_adj = function(out){
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @importFrom stats model.offset na.omit
-#' @import bigmemory Rcpp rstantools
+#' @import bigmemory Rcpp
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL,
                    fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                    alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                    optim_options = optimControl(), adapt_RW_options = adaptControl(),
-                   trace = 0, tuning_options = selectControl(), BICq_posterior = NULL,
+                   trace = 0, tuning_options = selectControl(), 
+                   BICq_posterior = NULL,
                    progress = TRUE, ...){
   
   ###########################################################################################
@@ -340,17 +354,20 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   
   # Check that (...) arguments are subsets of glmmPen_FA arguments (factor assumption version)
   args_extra = list(...)
-  args_avail = c("r_estimation")
+  args_avail = c("r_estimation","survival_options")
+  r_estimation = NULL
+  survival_options = NULL
   if(length(args_extra) >= 1){
-    if(!(names(args_extra) %in% args_avail)){
+    if(!all(names(args_extra) %in% args_avail)){
       stop("additional arguments provided in '...' input must match the following glmmPen_FA arguments: \n",
-           "'r_estimation', see glmmPen_FA documentation for details")
+           "'r_estimation' or 'survival_options', see glmmPen_FA and phmmPen_FA documentation for details")
     }
-    if(names(args_extra) %in% "r_estimation"){
+    if(any(names(args_extra) %in% "r_estimation")){
       r_estimation = args_extra$r_estimation
     }
-  }else{
-    r_estimation = NULL
+    if(any(names(args_extra) %in% "survival_options")){
+      survival_options = args_extra$survival_options
+    }
   }
   
   if(is.null(r_estimation)){
@@ -367,6 +384,16 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   # Input modification and restriction for family
   family_info = family_export(family)
   fam_fun = family_info$family_fun
+  data_type = family_info$data_type
+  
+  if(data_type == "survival"){
+    if(is.null(survival_options)){
+      stop("survival_options must be specified for the 'coxph' family, see phmmPen and phmmPen_FA documentation for details")
+    }
+    if(!inherits(survival_options,"survivalControl")){
+      stop("survival_options must be of class 'survivalControl' (see survivalControl() documentation)")
+    }
+  }
   
   # Check penalty parameters
   penalty_check = checkPenalty(penalty, gamma_penalty, alpha)
@@ -393,6 +420,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     stop("optim_options must be of class 'optimControl' (see optimControl documentation)")
   }
   
+  if(data_type == "survival"){
+    if(!inherits(survival_options, "survivalControl")){ 
+      stop("survival_options must be of class 'survivalControl' (see survivalControl documentation)")
+    }
+  }
   
   out = NULL
   
@@ -409,7 +441,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   
   # Perform additional checks/restrictions/modifications of data input
   # See fD_adj() function earlier in this document
-  fD_out = fD_adj(out = fD_out0)
+  fD_out = fD_adj(out = fD_out0, data_type = data_type)
   
   # If offset = NULL, then set offset as arbitrary vector of 0s
   if(is.null(model.offset(fD_out$frame))){
@@ -421,17 +453,69 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     }
   }
   
+  # If survival data, create long-form dataset needed for piecewise exponential
+  #   model fit and and update fD_out object
+  if(data_type == "survival"){
+    # Save original data (input format, one row per observation/subject)
+    fD_out_original = fD_out
+    offset_original = offset
+    # Calculate long-form dataset
+    data_surv = survival_data(y = fD_out$y, X = fD_out$X,
+                              Z = fD_out$Z, group = fD_out$group_num,
+                              offset_fit = offset,
+                              survival_options = survival_options)
+    # Re-specify offset to include appropriate offset for piecewise exponential model
+    offset = data_surv$offset_total
+    # Update fD_out object with long-form data elements of X, Z, y, and group
+    fD_out$X = data_surv$X
+    fD_out$Z = data_surv$Z
+    fD_out$y = data_surv$y_status
+    fD_out$group_num = data_surv$group
+    fD_out$group = fD_out$group[data_surv$IDs]
+  }else{
+    fD_out_original = NULL
+    offset_original = NULL
+  }
+
   # Names of covariates for fixed effects, random effects, and group factor
   coef_names = list(fixed = colnames(fD_out$X), random = fD_out$cnms, group = fD_out$group_name)
   
+  # If needed, standardize input covariates
   # data_input: list of main data for fit algorithm
   standardization = optim_options$standardization
   if(standardization == TRUE){
-    # Standardize X and Z - see XZ_std() function later in this document
-    std_out = XZ_std(fD_out)
-    # Specify data to use in fit procedure
-    data_input = list(y = fD_out$y, X = std_out$X_std, Z = std_out$Z_std, 
-                      group = fD_out$group_num, coef_names = coef_names)
+    if(data_type != "survival"){
+      # Standardize X and Z - see XZ_std() function later in this document
+      std_out = XZ_std(fD_out)
+      # Specify data to use in fit procedure
+      data_input = list(y = fD_out$y, X = std_out$X_std, Z = std_out$Z_std, 
+                         group = fD_out$group_num, coef_names = coef_names)
+    }else if(data_type == "survival"){
+      # Standardize original X and Z (not long-form dataset)
+      std_out0 = XZ_std(fD_out_original)
+      # Using standardized values of X and Z, create long-form dataset
+      data_surv_std = survival_data(y = fD_out_original$y,
+                                    X = std_out0$X_std,
+                                    Z = std_out0$Z_std,
+                                    group = fD_out_original$group_num,
+                                    offset_fit = offset_original,
+                                    survival_options = survival_options)
+      # Specify data to use in fit procedure
+      data_input = list(y = fD_out$y,
+                        X = data_surv_std$X,
+                        Z = data_surv_std$Z,
+                        group = fD_out$group_num,
+                        coef_names = coef_names)
+      # Update std_out object with long-form data elements
+      ## Note: No standardization is applied to the time interval indicator variables
+      ##    in the long-form X dataset
+      std_out = list(X_std = data_surv_std$X,
+                     Z_std = data_surv_std$Z,
+                     X_center = c(rep(0,length(data_surv$cut_points)-1), std_out0$X_center),
+                     X_scale = c(rep(1,length(data_surv$cut_points)-1), std_out0$X_scale),
+                     Z_center = std_out0$Z_center,
+                     Z_scale = std_out0$Z_scale) 
+    }
   }else if(standardization == FALSE){
     # Put dummy values into std_out list
     std_out = list(X_std = NULL, Z_std = NULL, 
@@ -443,33 +527,64 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                       group = fD_out$group_num, coef_names = coef_names)
   }
   
- 
+  
+  # Add cut-points information to data_input list if survival data (piecewise exponential model)
+  if(data_type == "survival"){
+    data_input$cut_points = data_surv$cut_points
+  }
   
   # Identify fixed effects that should not be penalized in select_tune or fit_dat (if any)
   ## For now, do not allow grouping of fixed effects (i.e. cannot penalize fixed effects as groups of covariates)
   # group_X: 0 indicates intercept or other covariates that should not be penalized
   #   positive integer indicates that the fixed effect can be penalized
-  if(is.null(fixef_noPen)){
-    group_X = 0:(ncol(data_input$X)-1)
-  }else if(is.numeric(fixef_noPen)){
-    if(length(fixef_noPen) != (ncol(data_input$X)-1)){
-      stop("length of fixef_noPen must match number of fixed effects covariates")
-    }
-    if(sum(fixef_noPen == 0) == 0){
+  if(data_type != "survival"){
+    if(is.null(fixef_noPen)){
       group_X = 0:(ncol(data_input$X)-1)
-    }else{
-      ones = which(fixef_noPen == 1) + 1
-      # Sequence: consecutive integers (1 to number of fixed effects to potentially penalize)
-      sq = 1:length(ones)
-      # Initialize as all 0
-      group_X = rep(0, times = ncol(data_input$X))
-      # for appropriate fixed effects, set to the appropriate postive integer
-      group_X[ones] = sq
+    }else if(is.numeric(fixef_noPen)){
+      if(length(fixef_noPen) != (ncol(data_input$X)-1)){
+        stop("length of fixef_noPen must match number of fixed effects covariates")
+      }
+      if(sum(fixef_noPen == 0) == 0){
+        group_X = 0:(ncol(data_input$X)-1)
+      }else{
+        ones = which(fixef_noPen == 1) + 1
+        # Sequence: consecutive integers (1 to number of fixed effects to potentially penalize)
+        sq = 1:length(ones)
+        # Initialize as all 0
+        group_X = rep(0, times = ncol(data_input$X))
+        # for appropriate fixed effects, set to the appropriate postive integer
+        group_X[ones] = sq
+      }
+    }
+  }else if(data_type == "survival"){
+    p_tmp = ncol(data_input$X)
+    cut_num = length(data_input$cut_points)
+    if(is.null(fixef_noPen)){
+      group_X = c(rep(0,times = cut_num),1:(p_tmp-cut_num))
+      fixef_noPen = c(rep(0,times = cut_num-1), rep(1,times=p_tmp-cut_num))
+    }else if(is.numeric(fixef_noPen)){
+      if(length(fixef_noPen) != (p_tmp-cut_num-1)){
+        stop("length of fixef_noPen must match number of fixed effects covariates")
+      }
+      if(sum(fixef_noPen == 0) == 0){
+        group_X = c(rep(0,times = cut_num),1:(p_tmp-cut_num))
+      }else{
+        ones = which(fixef_noPen == 1) + 1
+        # Sequence: consecutive integers (1 to number of fixed effects to potentially penalize)
+        sq = 1:length(ones) + cut_num
+        # Initialize as all 0
+        group_X = rep(0, times = ncol(data_input$X))
+        # for appropriate fixed effects, set to the appropriate positive integer
+        group_X[ones] = sq
+      }
+      # Update fixef_noPen to include 0's for the time indicator columns
+      fixef_noPen = c(rep(0,times = cut_num-1), fixef_noPen)
     }
   }
   
+  
   # Store call for output object
-  call = match.call(expand.dots = F)
+  call = match.call(expand.dots = FALSE)
   
   # If covar specified as NULL, recommend a covariance structure based on the size of the 
   # random effects.
@@ -512,7 +627,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
               lambda.min = 0.10
             }
           }
-          lambda0 = min(LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
+          lambda0 = min(LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, offset = offset,
                                   alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
                                   lambda.min = lambda.min))
         }else{
@@ -529,13 +644,15 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                          penalty = penalty, lambda0 = lambda0, 
                          gamma_penalty = gamma_penalty, alpha = alpha, 
                          group_X = group_X, 
-                         sample = (r_estimation$size < nlevels(data_input$group)), 
-                         size = r_estimation$size,
+                         sample = ((r_estimation$size > nlevels(data_input$group)) & (r_estimation$sample)), 
+                         size = r_estimation$size, data_type = data_type,
                          trace = trace)
       # Extract estimate of r
       r = r_out$r_est
       # Record maximum considered value of r
       r_max = r_out$r_max
+      
+      message("estimated r: ", r)
       
     }else{ # Checks on input r
       r = r_estimation$r
@@ -560,7 +677,11 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   # Recommend starting variance  for random effects covariance matrix (if necessary)
   if(optim_options$var_start == "recommend"){
     if((fit_type == "glmmPen") | ((fit_type == "glmmPen_FA") & (optim_options$B_init_type == "data"))){
-      var_start = var_init(data_input, fam_fun)
+      if(data_type != "survival"){
+        var_start = var_init(data_input, fam_fun)
+      }else if(data_type == "survival"){
+        var_start = var_init_survival(data_input)
+      }
       optim_options$var_start = var_start
     }
   }
@@ -697,7 +818,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     # See LambdaSeq() function later in this document
     ## Fixed effects penalty parameters
     if(is.null(tuning_options$lambda0_seq)){
-      lambda0_seq = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
+      lambda0_seq = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, offset=offset,
                                 alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
                                 lambda.min = lambda.min)
     }else{
@@ -705,7 +826,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     }
     ## Random effects penalty parameters
     if(is.null(tuning_options$lambda1_seq)){
-      lambda1_seq = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
+      lambda1_seq = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, offset=offset,
                               alpha = alpha, nlambda = tuning_options$nlambda, penalty.factor = fixef_noPen,
                               lambda.min = lambda.min)
       # Extract or calculate penalty parameters for pre-screening step
@@ -727,7 +848,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       # Fixed effects: use minimum fixed effects penalty parameters
       # Random effects: calculate penalty to use using lambda.min.presc 
       ##    (penalty = lambda.min.presc * max random effect penalty parameter)
-      full_ranef = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, 
+      full_ranef = LambdaSeq(X = data_input$X[,-1,drop=FALSE], y = data_input$y, family = fam_fun$family, offset=offset,
                              alpha = alpha, nlambda = 2, penalty.factor = fixef_noPen,
                              lambda.min = lambda.min.presc)
       lambda.min.full = c(min(lambda0_seq), min(full_ranef))
@@ -920,7 +1041,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     beta_results = matrix(0, nrow = nrow(coef_results), ncol = ncol(data_input$X))
     beta_results[,1] = coef_results[,1] - apply(coef_results[,2:ncol(data_input$X),drop=FALSE], MARGIN = 1, FUN = function(x) sum(x * std_out$X_center / std_out$X_scale))
     for(i in 1:nrow(beta_results)){
-      beta_results[,-1] = coef_results[,2:ncol(data_input$X),drop=FALSE] / std_out$X_scale
+      beta_results[i,-1] = coef_results[i,2:ncol(data_input$X),drop=FALSE] / std_out$X_scale
     }
     
     if(fit_type == "glmmPen"){
@@ -1134,21 +1255,21 @@ XZ_std = function(fD_out){
 
 # setupLambda_copy is based on the setupLambda() code in ncvreg R/setupLambda.R
 #' @importFrom stats glm
-setupLambda_copy <- function(X, y, family, alpha, lambda.min, nlambda, penalty.factor) {
+setupLambda_copy <- function(X, y, family, offset, alpha, lambda.min, nlambda, penalty.factor) {
   n <- nrow(X)
   p <- ncol(X)
   
   ## Determine lambda.max
   ind <- which(penalty.factor!=0)
   if (length(ind)!=p) {
-    fit <- glm(y~X[, -ind, FALSE], family=family)
+    fit <- glm(y~X[, -ind, drop=FALSE], family=family, offset=offset)
   } else {
-    fit <- glm(y~1, family=family)
+    fit <- glm(y~1, family=family, offset=offset)
   }
   if (family=="gaussian") {
     zmax <- maxprod(X, fit$residuals, ind, penalty.factor, n, p) / n 
   } else {
-    zmax <- maxprod(X, residuals(fit, "working") * fit$weights, ind, penalty.factor, n, p) / n 
+    zmax <- maxprod(X, residuals(fit, "working") * fit$weights, 1:p, penalty.factor, n, p) / n 
   }
   lambda.max <- zmax/alpha
   
@@ -1172,26 +1293,24 @@ setupLambda_copy <- function(X, y, family, alpha, lambda.min, nlambda, penalty.f
 #' @inheritParams lambdaControl
 #' @param X matrix of standardized fixed effects (see \code{std} function in \code{ncvreg} 
 #' documenation). X should not include intercept.
-#' @param y numeric vector of response values. If "coxph" family, \code{y} are the event indicator
+#' @param y numeric vector of response values. If "survival" family, \code{y} are the event indicator
 #' values (0 if censored, 1 if event)
-#' @param y_times numeric vector of observed times for "coxph" family; \code{NULL} for all 
-#' other families
+#' @param offset numeric vector that can be used to specify an a priori known component 
+#' to be included in the linear predictor during fitting. 
+#' This should be \code{NULL} or a numeric vector of length equal to the number of observations
 #' @param nlambda positive integer specifying number of penalty parameters (lambda) with 
 #' which to fit a model.
 #' @param penalty.factor an optional numeric vector equal to the \code{fixef_noPen} argument
 #' in \code{\link{glmmPen}}
 #' 
-#' @details If the family is "coxph", the \code{y}, \code{y_times}, and \code{X} must be 
-#' sorted such that the subjects' \code{y_times} are sorted from the smallest to the largest times.
-#' The "coxph" family procedure is still in production and not yet ready.
 #' 
 #' @return numeric sequence of penalty parameters of length \code{nlambda} ranging from the
 #' minimum penalty parameter (first element) equal to fraction \code{lambda.min} multiplied by the 
 #' maximum penalty parameter to the maximum penalty parameter (last element)
 #' 
 #' @export
-LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL, nlambda = 10,
-                       penalty.factor = NULL){
+LambdaSeq = function(X, y, family, offset=NULL, alpha = 1, lambda.min = NULL, nlambda = 10,
+                     penalty.factor = NULL){
   # Checks
   if(!is.matrix(X)){
     stop("X must be a matrix")
@@ -1208,6 +1327,13 @@ LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL,
     }
     if(any(!(penalty.factor %in% c(0,1)))){
       stop("penalty.factor must be vector of 0 and 1 only")
+    }
+  }
+  if(is.null(offset)){
+    offset = rep(0, length(y))
+  }else{
+    if((!is.numeric(offset)) | (length(offset) != length(y))){
+      stop("offset must be a numeric vector of the same length as y")
     }
   }
   
@@ -1229,25 +1355,11 @@ LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL,
     penalty.factor = rep(1, p)
   }
   
-  # setupLambda and setupLambdaCox from ncvreg package
+  # setupLambda_copy() is a modified version of setupLambda() from the ncvreg package
   ## Order: from max lambda to min lambda
-  if(family != "coxph"){
-    lambda = setupLambda_copy(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
-  }else if(family == "coxph"){
-    stop("LambdaSeq is not yet set up for Cox Proportional Hazards (coxph) family")
-    # if(is.null(y_times)){
-    #   stop("y_times must be given for the 'coxph' family")
-    # }
-    # if(!all(unique(y) %in% c(0,1))){
-    #   stop("y must be the event indicator (0 vs 1) for the 'coxph' family")
-    # }
-    # if(all.equal(y_times, y_times[order(y_times)])){
-    #   lambda = setupLambdaCox_copy(X, y_times, y, alpha, lambda.min, nlambda, penalty.factor)
-    # }else{
-    #   stop("observations for the 'coxph' family must be sorted by y_times (smalles to largest)")
-    # }
-    
-  }
+  lambda = setupLambda_copy(X=X, y=yy, family=family, offset=offset, 
+                            alpha=alpha, lambda.min=lambda.min, nlambda=nlambda, 
+                            penalty.factor=penalty.factor)
   
   # reverse the order of the lambda - from min lambda to max lambda
   lambda_rev = lambda[order(lambda)]
@@ -1256,6 +1368,57 @@ LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL,
   
 }
 
+# @importFrom ncvreg setupLambda
+# @export
+# LambdaSeq = function(X, y, y_times = NULL, family, alpha = 1, lambda.min = NULL, nlambda = 10,
+#                      penalty.factor = NULL){
+#   # Checks
+#   if(!is.matrix(X)){
+#     stop("X must be a matrix")
+#   }
+#   if(!is.numeric(y)){
+#     stop("y must be numeric")
+#   }
+#   if(nrow(X) != length(y)){
+#     stop("The number of rows of X must equal the length of y")
+#   }
+#   if(!is.null(penalty.factor)){
+#     if(ncol(X) != length(penalty.factor)){
+#       stop("The number of columns of X must equal the length of penalty.factor")
+#     }
+#     if(any(!(penalty.factor %in% c(0,1)))){
+#       stop("penalty.factor must be vector of 0 and 1 only")
+#     }
+#   }
+# 
+#   # Borrowed elements from `ncvreg` function
+#   n = nrow(X)
+#   p = ncol(X)
+# 
+#   if(family == "gaussian"){
+#     yy = y - mean(y)
+#   }else{
+#     yy = y
+#   }
+# 
+#   if(is.null(lambda.min)){
+#     lambda.min = ifelse(n>p, 0.01, 0.05)
+#   }
+# 
+#   if(is.null(penalty.factor)){
+#     penalty.factor = rep(1, p)
+#   }
+# 
+#   # setupLambda from ncvreg package
+#   ## Order: from max lambda to min lambda
+#   lambda = setupLambda(X, yy, family, alpha, lambda.min, nlambda, penalty.factor)
+# 
+#   # reverse the order of the lambda - from min lambda to max lambda
+#   lambda_rev = lambda[order(lambda)]
+# 
+#   return(lambda_rev)
+# 
+# }
 
 
 

@@ -17,7 +17,6 @@ using namespace arma;
 // Assume no orthogonalization/standardization needed for random effects
 
 // Grouped coordinate descent with both fixed (X) and random (Z) effects
-// Code is an extension of techniques used in ncvreg and grpreg, with application to mixed models
 
 // Majorization-minimization approximation for the second derivative of the loss function
 //    (a.k.a. max weight from IRLS weights), represented by "nu" in code
@@ -29,13 +28,13 @@ using namespace arma;
 
 // [[Rcpp::export]]
 arma::vec grp_CD_XZ_FA_step(const arma::vec& y, const arma::mat& X, const arma::mat& Z,
-                            const arma::vec& group, 
-                            SEXP pBigMat, const arma::sp_mat& J_f, arma::vec dims,
-                            arma::vec beta, const arma::vec& offset,
-                            double step_size, double sig_g,
-                            const char* family, int link, int init, double phi,
-                            const arma::uvec& X_group, arma::uvec K, // covariate group index and size of covariate groups
-                            const char* penalty, arma::vec params, int trace) {
+                    const arma::vec& group, 
+                    SEXP pBigMat, const arma::sp_mat& J_f, arma::vec dims,
+                    arma::vec beta, const arma::vec& offset,
+                    double step_size, double sig_g,
+                    const char* family, int link, int init, double phi,
+                    const arma::uvec& X_group, arma::uvec K, // covariate group index and size of covariate groups
+                    const char* penalty, arma::vec params, int trace) {
   
   
   // y = response vector

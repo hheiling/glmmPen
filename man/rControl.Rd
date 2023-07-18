@@ -8,13 +8,22 @@ Constructs the control structure for the estimation of the
 number of latent factors (r) for use within the \code{glmmPen_FA} and
 \code{glmm_FA} estimation procedures.}
 \usage{
-rControl(r = NULL, r_max = NULL, r_est_method = "GR", size = 25)
+rControl(
+  r = NULL,
+  r_max = NULL,
+  r_est_method = "GR",
+  size = 25,
+  sample = FALSE
+)
 }
 \arguments{
 \item{r}{positive integer specifying number of latent common factors to assume 
 in the model. If \code{NULL} (default), this value estimated from the data. See 
 \code{r_est_method} for available estimation procedures, and the Details
-section for further details on the general estimation procedure.}
+section for further details on the general estimation procedure.
+If \code{r} is specified, the no estimation procedure is performed and the algorithm
+uses the input value or r. All other parameters for this function are
+relevant for the estimation procedure.}
 
 \item{r_max}{positive integer specifying maximum number of latent factors to consider.
 If \code{NULL} (default), this value is automatically calculated.}
@@ -35,7 +44,14 @@ effect estimates to use in the estimation procedure for the number of latent fac
 r, which is restricted to be no less than 25. If this \code{size} is greater
 than the number of groups in the data (i.e.~the number of levels of the grouping
 variable), then a sampling procedure is used to increase the number of pseudo estimates
-to the value of \code{size}.}
+to the value of \code{size} if the value of \code{sample} is \code{TRUE}.}
+
+\item{sample}{logical value indicating if the total number of pseudo random effect
+estimates to use in the estimation procedure for the number of latent common factors r
+should be larger than the number of unique groups in the data, where the number 
+of pseudo estimates are increased to the value of \code{size} using a sampling 
+procedure. Default is \code{FALSE}. If \code{TRUE}, the sampling procedure is only
+performed if the value of \code{size} is greater than the number of groups in the data.}
 }
 \description{
 Control of Latent Factor Model Number Estimation
@@ -52,5 +68,5 @@ minimum fixed effect penalty. These group-specific estimates, which we label as 
 are placed into a matrix \code{G}
 (rows = number of levels of the grouping variable, columns = number of random effect covariates),
 and this pseudo random effects matrix is treated as the observed outcome matrix used in
-the "GR", "ER", and "BN" estimatino procedures described above in the description of \code{r_est_method}.
+the "GR", "ER", and "BN" estimation procedures described above in the description of \code{r_est_method}.
 }

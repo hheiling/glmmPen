@@ -1,12 +1,13 @@
 
 #' @name sim.data
-#' @aliases sim.data.FA
+#' @aliases sim.data.FA sim.data.piecewise.exp
 #' 
 #' @title Simulates data to use for the \code{\link{glmmPen}} package
 #' 
 #' @description Simulates data to use for testing the \code{\link{glmmPen}} package.
-#' \code{sim.data} simulates data for \code{\link{glmmPen}}, and
-#' \code{sim.data.FA} simulates data for \code{\link{glmmPen_FA}}.
+#' \code{sim.data} simulates data for \code{\link{glmmPen}},
+#' \code{sim.data.FA} simulates data for \code{\link{glmmPen_FA}},
+#' and \code{sim.data.piecewise.exp} simulates data for \code{\link{phmmPen}} and \code{\link{phmmPen_FA}}.
 #' Possible parameters to specify includes number of total covariates,
 #' number of non-zero fixed and random effects, and the magnitude
 #' of the random effect covariance values.
@@ -39,6 +40,19 @@
 #' The random effect covariance matrix is specified as Sigma = B x t(B) + diag(sd_raneff)
 #' @param r positive integer specifying number of latent common factors that describe the random effects,
 #' only used within \code{sim.data.FA}
+#' @param cut_points vector of cut points to use for the time intervals when simulating piecewise 
+#' exponential data. Length of cut points must equal length of \code{lhaz_vals}, and the 
+#' value of the first cut point must be 0.
+#' @param lhaz_vals vector of the log baseline hazard values for each time interval (which
+#' correspond to the time intervals defined by the \code{cut_points} argument) within
+#' piecewise exponential data. Hazards are assumed to be constant within each time interval.
+#' @param cens_type character specifying type of censoring to implement. Default "unif" specifies
+#' uniform censoring from 0 to \code{cens_max}. The option "exp" specifies exponential
+#' censoring with rate \code{exp_rate}
+#' @param cens_max numeric value used to characterize the range of the uniform censoring procedure 
+#' (from 0 to \code{cens_max})
+#' @param exp_rate numeric value used to characterize the exponential censoring rate (where rate
+#' is defined as the rate used in \code{\link[stats]{rexp}})
 #' 
 #' @return list containing the following elements:
 #' \item{y}{vector of the response}

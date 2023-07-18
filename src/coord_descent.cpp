@@ -7,8 +7,6 @@
 using namespace Rcpp;
 using namespace arma;
 
-// Coordinate descent algorithm assuming regular GLM model with no fixed effects
-
 arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid, 
                      arma::vec eta, arma::vec dims, arma::vec beta, 
                      const char* penalty, double lambda, double gamma, double alpha, // penalty type and parameters
@@ -121,7 +119,15 @@ arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resi
       converged = 1;
     }
     
-    
+    // if(trace >= 2){
+    //   Rprintf("Results at end of iteration %i \n", iter);
+    //   Rcout << "beta" << beta.t() << std::endl;
+    //   Rcout << "weights" << weights.t() << std::endl;
+    //   Rcout << "residuals" << resid.t() << std::endl;
+    //   // Rcout << "mu" << mu.t() << std::endl;
+    //   // Rcout << "deriv" << deriv.t() << std::endl;
+    //   // Rcout << "Vmu" << Vmu.t() << std::endl;
+    // }
     
   } // End while loop
   

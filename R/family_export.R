@@ -3,8 +3,24 @@
 #' @importFrom MASS negative.binomial
 family_export = function(family){
   
+  data_type = NULL
+  
   if(is.character(family)){
-    family = get(family, mode = "function", envir = parent.frame())
+    if(family == "coxph"){
+      data_type = "survival"
+    }
+  }
+  
+  if(is.null(data_type)){
+    data_type = "glmm"
+  }
+  
+  if(is.character(family)){
+    if(family != "coxph"){
+      family = get(family, mode = "function", envir = parent.frame())
+    }else if(family == "coxph"){
+      family = poisson(link="log")
+    }
   }
   if(is.function(family)){
     family = family()
@@ -39,7 +55,7 @@ family_export = function(family){
   
   ## Currently, only allow the following family-link combinations
   if(!(family %in% c("binomial","poisson","gaussian"))){
-    stop("Invalid family. Available families: 'binomial', 'poisson', or 'gaussian'")
+    stop("Invalid family. Available families: 'binomial', 'poisson', 'gaussian', or 'coxph'")
   }
   if(!(link %in% c("logit","log","identity"))){
     stop("Invalid link. Available link functions: 'logit', 'log', 'identity'")
@@ -80,6 +96,6 @@ family_export = function(family){
   #   link_int = 31
   # }
   
-  return(list(family_fun = fam_fun, family = family, link = link, link_int = link_int))
+  return(list(family_fun = fam_fun, family = family, link = link, link_int = link_int, data_type = data_type))
   
 }
