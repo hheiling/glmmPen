@@ -6,7 +6,7 @@
 
 using namespace Rcpp;
 using namespace arma;
-
+// coordinate descent algorithm - "naive" m-step for fitting model without random effects
 arma::vec coord_desc(arma::vec y, arma::mat X, arma::vec weights, arma::vec resid, 
                      arma::vec eta, arma::vec dims, arma::vec beta, 
                      const char* penalty, double lambda, double gamma, double alpha, // penalty type and parameters

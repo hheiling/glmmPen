@@ -28,6 +28,7 @@ var_init = function(data, fam_fun){
 }
 
 #' @importFrom lme4 lmer glmer VarCorr
+#' @importFrom stats poisson
 var_init_survival = function(data){
   y = data$y
   grp = data$group

@@ -19,9 +19,9 @@ glmmPen_FA(
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = selectControl(),
-  survival_options = survivalControl(),
   BICq_posterior = NULL,
-  progress = TRUE
+  progress = TRUE,
+  ...
 )
 }
 \arguments{
@@ -118,6 +118,9 @@ gives some other information regarding the progress of the variable selection
 procedure, including the model selection criteria and log-likelihood estimates
 for each model fit.
 Default is \code{TRUE}.}
+
+\item{...}{additional arguments that could be passed into \code{glmmPen_FA}. 
+See \code{\link{phmmPen_FA}} for further details (e.g. \code{survival_options} argument).}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 

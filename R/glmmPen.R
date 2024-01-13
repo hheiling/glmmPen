@@ -294,7 +294,7 @@ fD_adj = function(out, data_type){
 #' for each model fit.
 #' Default is \code{TRUE}.
 #' @param ... additional arguments that could be passed into \code{glmmPen}. See \code{\link{glmmPen_FA}}
-#' for further details.
+#' and \code{\link{phmmPen_FA}} for further details.
 #' 
 #' @details Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
 #' (\code{tuning_options}) is specified 
@@ -337,7 +337,7 @@ fD_adj = function(out, data_type){
 #' @importFrom Matrix Matrix
 #' @importFrom bigmemory write.big.matrix attach.big.matrix
 #' @importFrom stats model.offset na.omit
-#' @import bigmemory Rcpp
+#' @import bigmemory Rcpp 
 #' @export
 glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
                    offset = NULL,

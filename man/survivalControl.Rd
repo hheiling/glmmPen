@@ -2,7 +2,8 @@
 % Please edit documentation in R/control_options.R
 \name{survivalControl}
 \alias{survivalControl}
-\title{Control of Cox Proportional Hazards Model Fitting}
+\title{Control for Fitting Piecewise Constant Hazard Mixed Models as an Approximation to Fitting 
+Cox Proportional Hazards Mixed Models}
 \usage{
 survivalControl(
   cut_num = 8,
@@ -13,11 +14,12 @@ survivalControl(
 }
 \arguments{
 \item{cut_num}{positive integer specifying the number of time intervals to include in
-the piecewise exponential hazard model assumptions for the sampling step. Default is 8.
+the piecewise constant hazard model assumptions for the sampling step. Default is 8.
 General recommendation: use between 5 and 10 intervals. See the Details section for
 additional information.}
 
 \item{interval_type}{character specifying how the time intervals are calculated.
+Options include 'equal' (default), 'manual', or 'group'.
 If 'equal' (default),  time intervals
 are calculated such that there are approximately equal numbers of events per time 
 interval.
@@ -31,40 +33,47 @@ This option is generally difficult to perform when there are
 a large number of groups in the data.}
 
 \item{cut_points}{numeric vector specifying the value of the cut points to use
-in the calculation of the time intervals for the piecewise exponential model. 
+in the calculation of the time intervals for the piecewise constant hazard model. 
 If \code{interval_type} set to 'equal' or 'group', then this argument is not utilized.
 If \code{interval_type} set to 'manual', then this argument is required.
 First value must be 0, and all values must be ordered smallest to largest.}
 
 \item{time_scale}{positive numeric value (greater than 1) used to scale the time variable 
-in the survival data. In order to calculate the piecewise exponential model,
-the log of the time a subject survived within a particular interval
+in the survival data. In order to calculate the piecewise constant hazard mixed model,
+the log of the time a subject survived within a particular time interval
 is used as an offset in the model fit. Sometimes multiplying the time scale
 by a factor greater than 1 improves the stability of the model fit algorithm.}
 }
 \value{
-Function returns a list inheriting from class \code{optimControl}
+Function returns a list inheriting from class \code{survivalControl}
 containing fit and optimization criteria values used in optimization routine.
 }
 \description{
 Constructs the control structure for additional parameters needed to
-properly fit survival data using a Piecewise Exponential model
+properly fit survival data using a piecewise constant hazard mixed model
 }
 \details{
-In the piecewise exponential hazard model assumption, there is an assumption that the 
+In the piecewise constant hazard model, there is an assumption that the 
 time line of the data can be cut into \code{cut_num}
 time intervals and the baseline hazard is constant within
 each of these time intervals. In the fit algorithm, we estimate
 these baseline hazard values (specifically, we estimate the log of the baseline
-hazard values). We determine cut points by specifying the total number of cuts
+hazard values). By default, we determine cut points by specifying the total number of cuts
 to make (\code{cut_num}) and then specifying time values for cut points such
 that each time interval has an approximately equal number 
-of events and that each group has at least some (4) events within each time interval. 
-Having too many cut points could result in not having enough
-events for each time interval.
+of events (\code{interval_type = equal}).
+The authors of this package have found simulations to work well using this default \code{interval_type = equal},
+but if desired, users can further specify that each group has at least some (4) events observed
+within each time interval. 
+Regardless of the \code{interval_type} choice, users should be aware that 
+having too many cut points could result in having too few
+events for each time interval needed for a stable estimation of the baseline hazard estimates.
 Additionally, data with few events could result in too few events per time interval
-even for a small number of cut points. We generally recommend having
-8 total time intervals (more broadly, between 5 and 10). Warnings or errors
+even for a small number of cut points. 
+Alternatively, having too few cut points could result in a sub-par approximation of the baseline hazard, 
+which can lead to biased estimation for the coefficients corresponding to the input variables of interest.
+We generally recommend having
+8 total time intervals (more broadly, between 5 and 10 total time intervals). Warnings or errors
 will occur for cases when there are 1 or 0 events for a time interval. 
 If this happens, either adjust the \code{cut_num} value appropriately,
 or in the case when the data simply has a very small number of events,
