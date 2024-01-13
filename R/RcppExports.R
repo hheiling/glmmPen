@@ -65,6 +65,9 @@ phi_ml_init <- function(y, eta, link, limit, eps) {
     .Call('_glmmPen_phi_ml_init', PACKAGE = 'glmmPen', y, eta, link, limit, eps)
 }
 
+#' @importFrom RcppParallel RcppParallelLibs
+NULL
+
 Qfun_quad_beta <- function(Q0, step_size, diff0, eta, eta0, beta, beta0) {
     .Call('_glmmPen_Qfun_quad_beta', PACKAGE = 'glmmPen', Q0, step_size, diff0, eta, eta0, beta, beta0)
 }

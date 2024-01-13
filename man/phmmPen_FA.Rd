@@ -2,8 +2,9 @@
 % Please edit documentation in R/phmmPen.R
 \name{phmmPen_FA}
 \alias{phmmPen_FA}
-\title{Fit Penalized Proportional Hazards Mixed Models via Monte Carlo Expectation Conditional 
-Minimization (MCECM)}
+\title{Fit a Penalized Proportional Hazards Mixed Model via 
+Monte Carlo Expectation Conditional Minimization (MCECM) using
+a Piecewise Constant Hazard Mixed Model Approximation}
 \usage{
 phmmPen_FA(
   formula,
@@ -32,7 +33,6 @@ The response must be a \code{Surv} object (see
 Random-effects terms are distinguished by vertical bars 
 ("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
 of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. 
-
 Only one grouping factor 
 will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
 The offset must be specified outside of the formula in the 'offset' argument.}
@@ -90,10 +90,10 @@ The default for \code{glmm} is to run the model fit with no penalization (\code{
 When function \code{glmmPen} is run, \code{tuning_options} is specified using \code{selectControl()}. 
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
-\item{survival_options}{a list of class "survivalControl" resulting from
-\code{\link{survivalControl()}} containing additional control parameters needed for
-fitting survival data using the piecewise exponential approximation to the Cox Proportional 
-Hazards model.}
+\item{survival_options}{a structure of class "survivalControl" created 
+from function \code{\link{survivalControl}} that specifies several parameters needed to 
+properly fit the input survival data using a piecewise constant hazard mixed model. See the 
+documentation for \code{\link{survivalControl}} for more details on defaults.}
 
 \item{BICq_posterior}{an optional character string expressing the path and file 
 basename of a file combination that 
@@ -126,13 +126,13 @@ A reference class object of class \code{\link{pglmmObj}} for which many methods 
 available (e.g. \code{methods(class = "pglmmObj")}, see ?pglmmObj for additional documentation)
 }
 \description{
-\code{phmmPen_FA} is used to fit penalized proportional hazards mixed models via 
-Monte Carlo Expectation Conditional Minimization (MCECM) using a piecewise exponential mixed model
-approximation to the proportional hazards mixed model and a factor model decomposition of
+\code{phmmPen_FA} is used to approximate penalized proportional hazards mixed models using
+using a piecewise constant hazard mixed survival model approximation via 
+Monte Carlo Expectation Conditional Minimization (MCECM) and a factor model decomposition of
 the random effects. 
 The purpose of the function is to perform 
 variable selection on both the fixed and random effects simultaneously for the
-piecewise exponential mixed model. 
+piecewise constant hazard mixed model. 
 This function uses a factor model decomposition on the random effects. This assumption
 reduces the latent space in the E-step (Expectation step) of the algorithm,
 which reduces the computational complexity of the algorithm. This improves

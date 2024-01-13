@@ -125,7 +125,7 @@ for each model fit.
 Default is \code{TRUE}.}
 
 \item{...}{additional arguments that could be passed into \code{glmmPen}. See \code{\link{glmmPen_FA}}
-for further details.}
+and \code{\link{phmmPen_FA}} for further details.}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 

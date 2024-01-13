@@ -2,7 +2,8 @@
 % Please edit documentation in R/phmmPen.R
 \name{phmm_FA}
 \alias{phmm_FA}
-\title{Fit a Proportional Hazards Mixed Model via Monte Carlo Expectation Conditional Minimization (MCECM)}
+\title{Fit a Proportional Hazards Mixed Model via Monte Carlo Expectation Conditional Minimization (MCECM) using
+a Piecewise Constant Hazard Mixed Model Approximation}
 \usage{
 phmm_FA(
   formula,
@@ -27,7 +28,6 @@ The response must be a \code{Surv} object (see
 Random-effects terms are distinguished by vertical bars 
 ("|") separating expression for design matrices from the grouping factor. \code{formula} should be 
 of the same format needed for \code{\link[lme4]{glmer}} in package \pkg{lme4}. 
-
 Only one grouping factor 
 will be recognized. The random effects covariates need to be a subset of the fixed effects covariates.
 The offset must be specified outside of the formula in the 'offset' argument.}
@@ -65,10 +65,10 @@ The default for \code{glmm} is to run the model fit with no penalization (\code{
 When function \code{glmmPen} is run, \code{tuning_options} is specified using \code{selectControl()}. 
 See the \code{\link{lambdaControl}} and \code{\link{selectControl}} documentation for further details.}
 
-\item{survival_options}{a list of class "survivalControl" resulting from
-\code{\link{survivalControl()}} containing additional control parameters needed for
-fitting survival data using the piecewise exponential approximation to the Cox Proportional 
-Hazards model.}
+\item{survival_options}{a structure of class "survivalControl" created 
+from function \code{\link{survivalControl}} that specifies several parameters needed to 
+properly fit the input survival data using a piecewise constant hazard mixed model. See the 
+documentation for \code{\link{survivalControl}} for more details on defaults.}
 
 \item{progress}{a logical value indicating if additional output should be given showing the
 progress of the fit procedure. If \code{TRUE}, such output includes iteration-level information
@@ -91,14 +91,15 @@ A reference class object of class \code{\link{pglmmObj}} for which many methods 
 available (e.g. \code{methods(class = "pglmmObj")})
 }
 \description{
-\code{phmm_FA} is used to fit a single proportional hazards mixed model via Monte Carlo 
-Expectation Conditional Minimization (MCECM) using a piecewise exponential mixed model
-approximation to the proportional hazards mixed model and a factor model decomposition of
+\code{phmm_FA} is used to fit a single piecewise constant hazard mixed model as an
+approximation to a proportional hazards mixed model via Monte Carlo 
+Expectation Conditional Minimization (MCECM). This piecewise constant hazard mixed model
+uses a factor model decomposition of
 the random effects. No model selection is performed.
 }
 \details{
 The \code{phmm_FA} function can be used to approximate a single proportional hazards
-mixed model using a piecewise exponential mixed model.
+mixed model using a piecewise constant hazard mixed model.
 While this approach is meant to be used in the case where the user knows which
 covariates belong in the fixed and random effects and no penalization is required, one is
 allowed to specify non-zero fixed and random effects penalties using \code{\link{lambdaControl}}

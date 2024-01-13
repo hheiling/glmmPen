@@ -23,10 +23,10 @@ linear predictor during fitting. Default set to \code{NULL} (no offset). If the 
 argument is not \code{NULL}, this should be a numeric vector of length equal to the 
 number of cases (the length of the response vector).}
 
-\item{survival_options}{a list of class "survivalControl" resulting from
-\code{\link{survivalControl()}} containing additional control parameters needed for
-fitting survival data using the piecewise exponential approximation to the Cox Proportional 
-Hazards model.}
+\item{survival_options}{a structure of class "survivalControl" created 
+from function \code{\link{survivalControl}} that specifies several parameters needed to 
+properly fit the input survival data using a piecewise constant hazard mixed model. See the 
+documentation for \code{\link{survivalControl}} for more details on defaults.}
 }
 \description{
 Converts the input survival data with one row or element corresponding to a 

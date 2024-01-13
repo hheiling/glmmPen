@@ -8,6 +8,7 @@ using namespace Rcpp;
 
 // Calculates the M residuals for an individual given eta, updates nu and resid
 // Canonical link option only
+//' @importFrom RcppParallel RcppParallelLibs
 arma::vec resid_nu_i(double yi, arma::vec eta, const char* family, int link, double nu, double phi){
   
   int M = eta.n_elem;

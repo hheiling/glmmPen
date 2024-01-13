@@ -1,6 +1,7 @@
 
 #' @importFrom stringr str_detect
 #' @importFrom MASS negative.binomial
+#' @importFrom stats poisson
 family_export = function(family){
   
   data_type = NULL

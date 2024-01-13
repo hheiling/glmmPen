@@ -13,8 +13,8 @@
 #' @inheritParams glmmPen 
 #' @inheritParams glmmPen_FA
 #' @param ... additional arguments that could be passed into \code{glmmPen_FA}. 
-#' See \code{\link{glmmPen_FA}}
-#' for further details.
+#' See \code{\link{glmmPen_FA}} for further details (e.g. arguments related to variable selection
+#' that could be used to fit a single penalized GLMM model).
 #' 
 #' @details The \code{glmm_FA} function can be used to fit a single generalized linear mixed model.
 #' While this approach is meant to be used in the case where the user knows which
@@ -37,7 +37,6 @@ glmm_FA = function(formula, data = NULL, family = "binomial",
                   offset = NULL, r_estimation = rControl(),
                   optim_options = optimControl(), adapt_RW_options = adaptControl(),
                   trace = 0, tuning_options = lambdaControl(),
-                  survival_options = survivalControl(),
                   progress = TRUE, ...){
   
   # Check that (...) arguments are subsets of glmmPen arguments
@@ -67,7 +66,7 @@ glmm_FA = function(formula, data = NULL, family = "binomial",
                    offset = offset, r_estimation = r_estimation,
                    optim_options = optim_options,
                    adapt_RW_options = adapt_RW_options, trace = trace,
-                   tuning_options = tuning_options, survival_options = survival_options,
+                   tuning_options = tuning_options,
                    progress = progress, ...)
   
   output$call = call
@@ -102,6 +101,8 @@ glmm_FA = function(formula, data = NULL, family = "binomial",
 #' @param r_estimation a list of class "rControl" from function \code{\link{rControl}} 
 #' containing the control parameters for the estimation of the number of latent
 #' factors to use in the \code{glmmPen_FA} and \code{glmm_FA} estimation procedures.
+#' @param ... additional arguments that could be passed into \code{glmmPen_FA}. 
+#' See \code{\link{phmmPen_FA}} for further details (e.g. \code{survival_options} argument). 
 #' 
 #' @details Argument \code{BICq_posterior} details: If the \code{BIC_option} in \code{\link{selectControl}} 
 #' (\code{tuning_options}) is specified 
@@ -151,10 +152,9 @@ glmmPen_FA = function(formula, data = NULL, family = "binomial",
                       fixef_noPen = NULL, penalty = c("MCP","SCAD","lasso"),
                       alpha = 1, gamma_penalty = switch(penalty[1], SCAD = 4.0, 3.0),
                       optim_options = optimControl(), adapt_RW_options = adaptControl(),
-                      trace = 0, tuning_options = selectControl(), 
-                      survival_options = survivalControl(),
+                      trace = 0, tuning_options = selectControl(),
                       BICq_posterior = NULL,
-                      progress = TRUE){
+                      progress = TRUE, ...){
   
   
   ###########################################################################################
@@ -166,8 +166,7 @@ glmmPen_FA = function(formula, data = NULL, family = "binomial",
                    alpha = alpha, gamma_penalty = gamma_penalty,
                    optim_options = optim_options, adapt_RW_options = adapt_RW_options,
                    trace = trace, tuning_options = tuning_options,
-                   survival_options = survival_options,
-                   BICq_posterior = BICq_posterior, progress = progress)
+                   BICq_posterior = BICq_posterior, progress = progress, ...)
   
   
 }

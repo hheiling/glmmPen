@@ -14,7 +14,6 @@ glmm_FA(
   adapt_RW_options = adaptControl(),
   trace = 0,
   tuning_options = lambdaControl(),
-  survival_options = survivalControl(),
   progress = TRUE,
   ...
 )
@@ -81,8 +80,8 @@ for each model fit.
 Default is \code{TRUE}.}
 
 \item{...}{additional arguments that could be passed into \code{glmmPen_FA}. 
-See \code{\link{glmmPen_FA}}
-for further details.}
+See \code{\link{glmmPen_FA}} for further details (e.g. arguments related to variable selection
+that could be used to fit a single penalized GLMM model).}
 }
 \value{
 A reference class object of class \code{\link{pglmmObj}} for which many methods are 
