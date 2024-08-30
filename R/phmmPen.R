@@ -47,7 +47,7 @@ phmm_FA = function(formula, data = NULL,
   args_extra = list(...)
   args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior")
   if(length(args_extra) >= 1){
-    if(!(names(args_extra) %in% args_avail)){
+    if(!all(names(args_extra) %in% args_avail)){
       stop("additional arguments provided in '...' input must match phmmPen arguments \n",
            "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior' \n",
            "see phmmPen documentation for details")
@@ -56,8 +56,8 @@ phmm_FA = function(formula, data = NULL,
   
   # Check that tuning_options has the correct input type
   if(!inherits(tuning_options, "lambdaControl")){
-    stop("phmm requires the use of lambdaControl for the tuning_options. \n",
-         "  In order to use selectControl for model selection, please use phmmPen function")
+    stop("phmm_FA requires the use of lambdaControl for the tuning_options. \n",
+         "  In order to use selectControl for model selection, please use phmmPen_FA function")
   }
   
   call = match.call(expand.dots = FALSE)
@@ -220,7 +220,7 @@ phmm = function(formula, data = NULL, covar = NULL,
   args_extra = list(...)
   args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior")
   if(length(args_extra) >= 1){
-    if(!(names(args_extra) %in% args_avail)){
+    if(!all(names(args_extra) %in% args_avail)){
       stop("additional arguments provided in '...' input must match phmmPen arguments \n",
            "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior' \n",
            "see phmmPen documentation for details")

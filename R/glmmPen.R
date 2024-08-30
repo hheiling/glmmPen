@@ -36,7 +36,7 @@ glmm = function(formula, data = NULL, family = "binomial", covar = NULL,
   args_extra = list(...)
   args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior","survival_options")
   if(length(args_extra) >= 1){
-    if(!(names(args_extra) %in% args_avail)){
+    if(!all(names(args_extra) %in% args_avail)){
       stop("additional arguments provided in '...' input must match glmmPen arguments \n",
            "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior', 'survival_options', \n",
            "see glmmPen documentation for details")
@@ -448,7 +448,7 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
     offset = rep(0, length(fD_out$y))
   }else{
     offset = model.offset(fD_out$frame)
-    if((!is.numeric(offset)) | (length(offset) != length(y))){
+    if((!is.numeric(offset)) | (length(offset) != length(fD_out$y))){
       stop("offset must be a numeric vector of the same length as y")
     }
   }
@@ -750,51 +750,98 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
       
       coef = fit$coef
       J = fit$J
-      if(fit_type == "glmmPen"){
-        gamma = fit$Gamma_mat
-        # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% gamma (calculate for each group individually)
-        # Used within E-step
-        Znew2 = Z
-        for(j in 1:d){
-          Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
-        }
-        Estep_out = E_step(coef = coef, ranef_idx = sum(diag(fit$sigma) > 0), 
-                           y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
-                           nMC=optim_options$nMC, nMC_burnin=optim_options$nMC_burnin, 
-                           family=fam_fun$family, link=fam_fun$link, 
-                           phi=1.0, sig_g=out$sigma_gaus,
-                           sampler=optim_options$sampler, d=d, uold=fit$u_init, 
-                           proposal_SD=fit$proposal_SD, 
-                           batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
-                           offset_increment=adapt_RW_options$offset_increment, 
-                           trace=trace)
-      }else if(fit_type == "glmmPen_FA"){
-        B = fit$B
-        # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% B (calculate for each group individually)
-        # Used within E-step
-        Znew2 = matrix(0, nrow = nrow(Z), ncol = d*r)
-        for(j in 1:d){
-          Znew2[group == j,seq(j, ncol(Znew2), by = d)] = Z[group == j, seq(j, ncol(Z), by = d)] %*% B
-        }
-        Estep_out = E_step(coef = coef, ranef_idx = 1:r, 
-                           y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
-                           nMC=optim_options$nMC, nMC_burnin=optim_options$nMC_burnin, 
-                           family=fam_fun$family, link=fam_fun$link, 
-                           phi=1.0, sig_g=out$sigma_gaus,
-                           sampler=optim_options$sampler, d=d, 
-                           uold=fit$u_init, proposal_SD=fit$proposal_SD, 
-                           batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
-                           offset_increment=adapt_RW_options$offset_increment, 
-                           trace=trace)
-      }
       
-      u0 = attach.big.matrix(Estep_out$u0)
-      # File-back the posterior samples of the minimal penalty model
-      ufull_big_tmp = as.big.matrix(u0[,],
-                                    backingpath = dirname(BICq_posterior),
-                                    backingfile = sprintf("%s.bin",basename(BICq_posterior)),
-                                    descriptorfile = sprintf("%s.desc",basename(BICq_posterior)))
-      rm(ufull_big_tmp)
+      if(file.exists(sprintf("%s.desc",BICq_posterior)) & file.exists(sprintf("%s.bin",BICq_posterior))){
+        message("Using saved posterior draws from previously fit model for BIC-ICQ calculation: ")
+        message(sprintf("file-backed big.matrix stored in %s.bin and %s.desc", BICq_posterior, BICq_posterior))
+        postdraws_needed = FALSE
+      }else{
+        message(sprintf("The files %s.bin and %s.desc do not currently exist.", BICq_posterior, BICq_posterior))
+        message(sprintf("Saving posterior draws for BIC-ICQ calculation to %s.bin and %s.desc",
+                        BICq_posterior, BICq_posterior))
+        postdraws_needed = TRUE
+      } # End if-else file.exists
+      
+      if(postdraws_needed == TRUE){
+        if(fit_type == "glmmPen"){
+          gamma = fit$Gamma_mat
+          # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% gamma (calculate for each group individually)
+          # Used within E-step
+          Znew2 = Z
+          for(j in 1:d){
+            Znew2[group == j,seq(j, ncol(Z), by = d)] = Z[group == j,seq(j, ncol(Z), by = d)]%*%gamma
+          }
+          Estep_out = E_step(coef = coef, ranef_idx = sum(diag(fit$sigma) > 0), 
+                             y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
+                             nMC=optim_options$M, nMC_burnin=optim_options$nMC_burnin, 
+                             family=fam_fun$family, link=fam_fun$link, 
+                             phi=1.0, sig_g=ifelse(fam_fun$family == "gaussian", fit$sigma_gaus, 1.0),
+                             sampler=optim_options$sampler, d=d, uold=fit$u_init, 
+                             proposal_SD=fit$proposal_SD, 
+                             batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
+                             offset_increment=adapt_RW_options$offset_increment, 
+                             trace=trace)
+        }else if(fit_type == "glmmPen_FA"){
+          B = fit$B
+          # Znew2: For each group k = 1,...,d, calculate Znew2 = Z %*% B (calculate for each group individually)
+          # Used within E-step
+          Znew2 = matrix(0, nrow = nrow(Z), ncol = d*r)
+          for(j in 1:d){
+            Znew2[group == j,seq(j, ncol(Znew2), by = d)] = Z[group == j, seq(j, ncol(Z), by = d)] %*% B
+          }
+          Estep_out = E_step(coef = coef, ranef_idx = 1:r, 
+                             y=y, X=X, Znew2=Znew2, group=group, offset_fit = offset,
+                             nMC=optim_options$M, nMC_burnin=optim_options$nMC_burnin, 
+                             family=fam_fun$family, link=fam_fun$link, 
+                             phi=1.0, ifelse(fam_fun$family == "gaussian", fit$sigma_gaus, 1.0),
+                             sampler=optim_options$sampler, d=d, 
+                             uold=fit$u_init, proposal_SD=fit$proposal_SD, 
+                             batch=fit$updated_batch, batch_length=adapt_RW_options$batch_length, 
+                             offset_increment=adapt_RW_options$offset_increment, 
+                             trace=trace)
+        } # End if-else fit_type
+        
+        u0 = attach.big.matrix(Estep_out$u0)
+        # File-back the posterior samples of the minimal penalty model
+        ufull_big_tmp = as.big.matrix(u0[,],
+                                      backingpath = dirname(BICq_posterior),
+                                      backingfile = sprintf("%s.bin",basename(BICq_posterior)),
+                                      descriptorfile = sprintf("%s.desc",basename(BICq_posterior)))
+        ufull_describe_tmp = describe(ufull_big_tmp)
+        rm(ufull_big_tmp)
+      }else{ # postdraws_needed == FALSE
+        ufull_big_tmp = attach.big.matrix(sprintf("%s.desc",BICq_posterior))
+        ufull_describe_tmp = describe(ufull_big_tmp)
+        rm(ufull_big_tmp)
+        # Checks
+        if(fit_type == "glmmPen"){
+          if(ncol(ufull_big_tmp) != ncol(Z)){
+            stop("The number of columns in the saved posterior draws from a previous model fit do not match \n",
+                 "  the number of columns in the random effects matrix Z: ",ncol(Z))
+          }
+        }
+        if(fit_type == "glmmPen_FA"){
+          if(ncol(ufull_big_tmp) != nlevels(group)*r){
+            stop("The number of columns in the saved posterior draws from a previous model fit does not equal \n",
+                 "  the number of groups ", nlevels(group)," times number of common factors ", r, 
+                 ", ", nlevels(group)*r)
+          }
+        }
+        if(nrow(ufull_big_tmp) < 10^4){
+          warning("The number of posterior draws saved in ",BICq_posterior, "\n",
+                  "  is less than the recommended 10^4",immediate. = TRUE)
+        }
+      } # End if-else postdraws_needed
+      
+      
+      BICq_val = BICICQ_calc(ufull_describe = ufull_describe_tmp, fit_type = fit_type,
+                             family=family_info$family, link_int=family_info$link_int, 
+                             phi=1.0, sig_g=ifelse(family_info$family == "gaussian", fit$sigma_gaus, 1.0),
+                             y = y, X = X, Z_Matrix = Z, group = group, d = d,
+                             coef = coef, J = J, offset_fit = offset, 
+                             r = switch(fit_type, glmmPen_FA = r, NULL))
+    }else{
+      BICq_val = NA
     }
     
   }else if(inherits(tuning_options, "selectControl")){
@@ -1133,7 +1180,8 @@ glmmPen = function(formula, data = NULL, family = "binomial", covar = NULL,
   if(inherits(tuning_options, "lambdaControl")){
     # If performed a single model fit, save the final model output as the 'optimal' model
     # in order to standarize the output 
-    optim_results = c(fit$lambda0, fit$lambda1, Estep_out$BICh, Estep_out$BIC, fit$BICq,
+    optim_results = c(fit$lambda0, fit$lambda1, Estep_out$BICh, Estep_out$BIC, 
+                      BICq_val,
                       Estep_out$BICNgrp, Estep_out$ll,
                       sum(fit$coef[2:ncol(data_input$X)] != 0),
                       sum(diag(fit$sigma[-1,-1,drop=FALSE]) !=0),

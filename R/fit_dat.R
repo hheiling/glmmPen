@@ -751,7 +751,7 @@ fit_dat = function(dat, lambda0 = 0, lambda1 = 0,
     for(k in 1:d){
       cols_idx = seq(from = k, to = ncol(Z), by = d)
       post_k = ufull[,cols_idx]
-      q2 = q2 + sum(dmvnorm(post_k, log=T)) / nrow(ufull)
+      q2 = q2 + sum(dmvnorm(post_k, log=TRUE)) / nrow(ufull)
     }
     llq = q1 + q2
     BICq = -2*llq + sum(coef != 0)*log(nrow(X))
