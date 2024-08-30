@@ -454,7 +454,9 @@ survivalControl = function(cut_num = 8, interval_type = c("equal","manual","grou
 #' @param var_start either the character string "recommend" or a positive number specifying the 
 #' starting values to initialize the variance of the covariance matrix. For \code{\link{glmmPen}},
 #' the default "recommend" first
-#' fits a simple model with a fixed and random intercept only using the \link{lme4} package. The 
+#' fits a simple model with a fixed and random intercept only using the lme4 R package, see 
+#' \link[lme4]{glmer} for details on fitting generalized linear mixed models or 
+#' \link[lme4]{lmer} for details on fitting linear mixed models. The 
 #' random intercept variance estimate from this model is then multiplied by 2 and used as the 
 #' starting variance. For \code{\link{glmmPen_FA}}, the default is set to 0.10 (see \code{B_init_type} 
 #' for further information).

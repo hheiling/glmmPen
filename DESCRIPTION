@@ -2,14 +2,13 @@ Package: glmmPen
 Type: Package
 Title: High Dimensional Penalized Generalized Linear Mixed Models
         (pGLMM)
-Version: 1.5.4.4
-Date: 2024-01-13
+Version: 1.5.4.8
+Date: 2024-08-29
 Authors@R: c(
     person("Hillary", "Heiling", email = "hmheiling@gmail.com", role = c("aut", "cre")),
     person("Naim", "Rashid", email = "nur2@email.unc.edu", role = c("aut")),
     person("Quefeng", "Li", email = "quefeng@email.unc.edu", role = c("aut")),
     person("Joseph", "Ibrahim", email = "ibrahim@bios.unc.edu", role = c("aut")))
-Maintainer: Hillary Heiling <hheiling@live.unc.edu>
 Description: Fits high dimensional penalized generalized linear 
     mixed models using 
     the Monte Carlo Expectation Conditional Minimization (MCECM) algorithm. 

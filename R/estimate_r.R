@@ -64,6 +64,8 @@ estimate_r = function(dat, optim_options = optimControl(), coef_names,
                    penalty_factor = penalty_factor, 
                    sample = sample, size = size, trace = trace)
   
+  # print(any(is.na(G)))
+  
   if((r_est_method == "GR") | (r_est_method == "ER")){
     r_est = rest_ratio(G = G, r_max = r_max, type = r_est_method)
   }else if(r_est_method == "BN1"){

@@ -1,13 +1,14 @@
 
 #' @name sim.data
-#' @aliases sim.data.FA sim.data.piecewise.exp
+#' @aliases sim.data.FA sim.data.piecewise.exp sim.data.weibull
 #' 
 #' @title Simulates data to use for the \code{\link{glmmPen}} package
 #' 
 #' @description Simulates data to use for testing the \code{\link{glmmPen}} package.
 #' \code{sim.data} simulates data for \code{\link{glmmPen}},
 #' \code{sim.data.FA} simulates data for \code{\link{glmmPen_FA}},
-#' and \code{sim.data.piecewise.exp} simulates data for \code{\link{phmmPen}} and \code{\link{phmmPen_FA}}.
+#' \code{sim.data.piecewise.exp} simulates survival data for \code{\link{phmmPen}} and \code{\link{phmmPen_FA}},
+#' and \code{sim.data.weibull} simulates alternative survival data for \code{\link{phmmPen}} and \code{\link{phmmPen_FA}}.
 #' Possible parameters to specify includes number of total covariates,
 #' number of non-zero fixed and random effects, and the magnitude
 #' of the random effect covariance values.
@@ -53,6 +54,16 @@
 #' (from 0 to \code{cens_max})
 #' @param exp_rate numeric value used to characterize the exponential censoring rate (where rate
 #' is defined as the rate used in \code{\link[stats]{rexp}})
+#' @param lhaz_base numeric value that gives the log of the scale parameter for the Weibull distribution 
+#' (for description of Weibull scale parameter without log transformation, 
+#' see "lambdas" argument in \code{\link[simsurv]{simsurv}} and the lambda notation in section "Weibull 
+#' distribution" in the simsurv vignette 
+#' https://cran.r-project.org/web/packages/simsurv/vignettes/simsurv_technical.html)
+#' @param alpha_PH numeric value > 0 that gives the shape parameter for the Weibull distribution 
+#' (for description of Weibull shape paraemeter,
+#' see "gammas" argument in \code{\link[simsurv]{simsurv}} and the gamma notation in section "Weibull
+#' distribution" in the simsurv vignette 
+#' https://cran.r-project.org/web/packages/simsurv/vignettes/simsurv_technical.html)
 #' 
 #' @return list containing the following elements:
 #' \item{y}{vector of the response}

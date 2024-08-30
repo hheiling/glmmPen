@@ -41,11 +41,11 @@ glmm_FA = function(formula, data = NULL, family = "binomial",
   
   # Check that (...) arguments are subsets of glmmPen arguments
   args_extra = list(...)
-  args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior")
+  args_avail = c("fixef_noPen","penalty","alpha","gamma_penalty","BICq_posterior","survival_options")
   if(length(args_extra) >= 1){
-    if(!(names(args_extra) %in% args_avail)){
+    if(!all(names(args_extra) %in% args_avail)){
       stop("additional arguments provided in '...' input must match glmmPen arguments \n",
-           "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior' \n",
+           "allowed extra arguments inclue 'fixef_noPen', 'penalty', 'alpha', 'gamma_penalty', 'BICq_posterior', 'survival_options', \n",
            "see glmmPen documentation for details")
     }
   }
